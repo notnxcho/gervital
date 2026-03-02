@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { Group, LogOut, Settings, Shop, Calendar } from 'iconoir-react'
+import { Group, LogOut, Settings, Shop, Calendar, StatsReport } from 'iconoir-react'
 import { useAuth } from '../../context/AuthContext'
 
 export default function Navbar() {
   const { user, logout, hasAccess } = useAuth()
 
   const navItems = [
+    { to: '/dashboard', label: 'Dashboard', icon: StatsReport, access: 'clients' },
     { to: '/clientes', label: 'Clientes', icon: Group, access: 'clients' },
     { to: '/grupos', label: 'Grupos', icon: Calendar, access: 'clients' },
     { to: '/proveedores', label: 'Proveedores', icon: Shop, access: 'suppliers' },
