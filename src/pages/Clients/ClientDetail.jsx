@@ -107,6 +107,7 @@ export default function ClientDetail() {
 
   useEffect(() => {
     loadClientData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   const loadClientData = async () => {
@@ -849,6 +850,7 @@ function PaymentModal({ isOpen, onClose, clientId, year, month, liveAmount, user
       .then(b => { setBilling(b); setAmount(String(b.chargeableAmount)) })
       .catch(() => setAmount(String(liveAmount)))
       .finally(() => setLoadingBilling(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
   const handleSubmit = async () => {

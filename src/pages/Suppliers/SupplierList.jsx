@@ -44,6 +44,7 @@ export default function SupplierList() {
 
   useEffect(() => {
     loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month])
 
   const loadData = async () => {

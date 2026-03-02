@@ -5,7 +5,7 @@ import { createClient, updateClient, getClientById } from '../../services/api'
 import { getPlanPricing, calculatePlanPriceSync } from '../../services/pricing/pricingService'
 import Button from '../../components/ui/Button'
 import Input, { Select, Textarea, Checkbox } from '../../components/ui/Input'
-import Card, { CardContent, CardHeader } from '../../components/ui/Card'
+import Card, { CardContent } from '../../components/ui/Card'
 
 // MOCKED RES - Opciones de planes
 const FREQUENCY_OPTIONS = [
