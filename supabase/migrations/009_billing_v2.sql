@@ -67,6 +67,7 @@ ALTER TABLE monthly_invoices DROP COLUMN IF EXISTS original_calculated_amount;
 ALTER TABLE monthly_invoices ADD COLUMN IF NOT EXISTS monthly_rate NUMERIC(12,2);
 ALTER TABLE monthly_invoices ADD COLUMN IF NOT EXISTS is_amount_overridden BOOLEAN DEFAULT false;
 ALTER TABLE monthly_invoices ADD COLUMN IF NOT EXISTS original_chargeable_amount NUMERIC(12,2);
+ALTER TABLE monthly_invoices ADD COLUMN IF NOT EXISTS paid_date DATE;
 
 -- Update payment_status CHECK: remove 'overdue'
 ALTER TABLE monthly_invoices DROP CONSTRAINT IF EXISTS monthly_invoices_payment_status_check;
@@ -217,10 +218,7 @@ BEGIN
     RETURN jsonb_build_object('error', 'Precio de plan no encontrado');
   END IF;
 
-  v_monthly_rate := CASE WHEN v_plan.has_transport
-    THEN ROUND(v_pricing.price * 1.2)
-    ELSE v_pricing.price
-  END;
+  v_monthly_rate := v_pricing.price;
 
   v_month_start := _month_start(p_year, p_month);
   v_month_end := _month_end(p_year, p_month);
@@ -244,13 +242,14 @@ BEGIN
       v_full_month_days := v_full_month_days + 1;
 
       IF v_day >= v_effective_start THEN
+        -- Count ALL assigned days as planned (including vacation)
+        v_planned_days := v_planned_days + 1;
+
         IF EXISTS (
           SELECT 1 FROM attendance_records
           WHERE client_id = p_client_id AND date = v_day AND status = 'vacation'
         ) THEN
           v_vacation_days := v_vacation_days + 1;
-        ELSE
-          v_planned_days := v_planned_days + 1;
         END IF;
       END IF;
     END IF;
@@ -297,7 +296,8 @@ CREATE OR REPLACE FUNCTION mark_month_paid(
   p_month INTEGER,
   p_amount NUMERIC(12,2),
   p_method TEXT DEFAULT NULL,
-  p_notes TEXT DEFAULT NULL
+  p_notes TEXT DEFAULT NULL,
+  p_paid_date DATE DEFAULT NULL
 )
 RETURNS JSONB AS $$
 DECLARE
@@ -319,6 +319,7 @@ BEGIN
   UPDATE monthly_invoices SET
     payment_status = 'paid',
     paid_at = NOW(),
+    paid_date = COALESCE(p_paid_date, CURRENT_DATE),
     paid_amount = COALESCE(p_amount, v_calculated_amount),
     payment_method = p_method,
     payment_notes = p_notes,
@@ -717,6 +718,7 @@ SELECT
   mi.invoice_url AS "invoiceUrl",
   mi.payment_status AS "paymentStatus",
   mi.paid_at AS "paidAt",
+  mi.paid_date AS "paidDate",
   mi.paid_amount AS "paidAmount",
   mi.payment_method AS "paymentMethod",
   mi.payment_notes AS "paymentNotes",

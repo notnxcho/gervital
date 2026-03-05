@@ -452,6 +452,9 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, user
   const today = new Date()
   const isPaid = invoice?.paymentStatus === 'paid'
   const isInvoiced = invoice?.invoiceStatus === 'invoiced'
+  // Overdue: unpaid and past the 11th of the invoice's month
+  const dueDate = new Date(year, month, 11, 23, 59, 59)
+  const isOverdue = !isPaid && today > dueDate
 
   // --- Billing calculation (local, for unpaid months) ---
   const clientStart = new Date(client.startDate)
@@ -470,12 +473,10 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, user
   }).length
 
   const plannedDays = days.filter(d => {
-    const dateStr = format(d, 'yyyy-MM-dd')
-    const rec = attendance.find(a => a.date === dateStr)
     const name = DAY_INDEX_TO_NAME[getDay(d)]
     if (!name || !client.plan.assignedDays.includes(name)) return false
     if (d < effectiveStart) return false
-    return rec?.status !== 'vacation'
+    return true
   }).length
 
   const chargeableDays = plannedDays - vacationDays
@@ -578,10 +579,15 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, user
                 className={`w-full flex items-center justify-between gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
                   isPaid
                     ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-                    : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                    : isOverdue
+                      ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                      : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
                 }`}
               >
-                <span>{isPaid ? 'Cobrado' : 'Pendiente'}</span>
+                <span className="flex items-center gap-1">
+                  {isPaid ? 'Cobrado' : 'Pendiente'}
+                  {isOverdue && <span className="px-1 py-0.5 bg-red-600 text-white rounded text-[10px] leading-none">Vencido</span>}
+                </span>
                 <NavArrowDown className="w-3 h-3" />
               </button>
               {paymentDropOpen && (
@@ -589,7 +595,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, user
                   {isPaid ? (
                     <>
                       <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100">
-                        <div>Cobrado el {format(new Date(invoice.paidAt), "d/M/yyyy")}</div>
+                        <div>Fecha de pago: {invoice.paidDate ? format(new Date(invoice.paidDate + 'T12:00:00'), "d/M/yyyy") : format(new Date(invoice.paidAt), "d/M/yyyy")}</div>
                         {invoice.paidAmount && <div className="font-semibold text-gray-900">${invoice.paidAmount.toLocaleString()}</div>}
                         {invoice.paymentMethod && <div>{invoice.paymentMethod}</div>}
                       </div>
@@ -736,8 +742,8 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, user
         month={month}
         liveAmount={liveChargeableAmount}
         userName={user?.name}
-        onConfirm={(amount, method, notes) =>
-          withProcessing(() => markMonthPaid(client.id, year, month, amount, method, notes))
+        onConfirm={(amount, method, notes, paidDate) =>
+          withProcessing(() => markMonthPaid(client.id, year, month, amount, method, notes, paidDate))
         }
       />
 
@@ -837,13 +843,16 @@ function PaymentModal({ isOpen, onClose, clientId, year, month, liveAmount, user
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState('')
   const [notes, setNotes] = useState('')
+  const [paidDate, setPaidDate] = useState('')
   const [loadingBilling, setLoadingBilling] = useState(false)
   const [billing, setBilling] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!isOpen) { setAmount(''); setMethod(''); setNotes(''); setBilling(null); setError(''); return }
+    if (!isOpen) { setAmount(''); setMethod(''); setNotes(''); setPaidDate(''); setBilling(null); setError(''); return }
+    // Default paid date to today
+    setPaidDate(format(new Date(), 'yyyy-MM-dd'))
     // Fetch authoritative billing from server
     setLoadingBilling(true)
     calculateMonthBilling(clientId, year, month)
@@ -856,10 +865,11 @@ function PaymentModal({ isOpen, onClose, clientId, year, month, liveAmount, user
   const handleSubmit = async () => {
     const num = Number(amount)
     if (isNaN(num) || num < 0) { setError('Ingresa un monto válido'); return }
+    if (!paidDate) { setError('Ingresa la fecha de pago'); return }
     setSubmitting(true)
     setError('')
     try {
-      await onConfirm(num, method || null, notes || null)
+      await onConfirm(num, method || null, notes || null, paidDate)
     } catch (e) {
       setError(e.message)
       setSubmitting(false)
@@ -908,6 +918,16 @@ function PaymentModal({ isOpen, onClose, clientId, year, month, liveAmount, user
               placeholder="0"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de pago</label>
+          <input
+            type="date"
+            value={paidDate}
+            onChange={e => setPaidDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
         </div>
 
         <div>

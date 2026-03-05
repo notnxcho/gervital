@@ -40,6 +40,7 @@ export async function getClientInvoices(clientId) {
     invoiceUrl: inv.invoiceUrl,
     paymentStatus: inv.paymentStatus,
     paidAt: inv.paidAt,
+    paidDate: inv.paidDate,
     paidAmount: inv.paidAmount ? Number(inv.paidAmount) : null,
     paymentMethod: inv.paymentMethod,
     paymentNotes: inv.paymentNotes
@@ -82,15 +83,17 @@ export async function calculateMonthBilling(clientId, year, month) {
  * @param {number} amount - amount paid (can differ from calculated)
  * @param {string} method - payment method (optional)
  * @param {string} notes - payment notes (optional)
+ * @param {string} paidDate - YYYY-MM-DD date of payment (optional, defaults to today)
  */
-export async function markMonthPaid(clientId, year, month, amount, method = null, notes = null) {
+export async function markMonthPaid(clientId, year, month, amount, method = null, notes = null, paidDate = null) {
   const { data, error } = await supabase.rpc('mark_month_paid', {
     p_client_id: clientId,
     p_year: year,
     p_month: month,
     p_amount: amount,
     p_method: method,
-    p_notes: notes
+    p_notes: notes,
+    p_paid_date: paidDate
   })
   if (error) throw new Error(error.message)
   if (!data.success) throw new Error(data.error || 'Error al marcar como pagado')
@@ -130,6 +133,7 @@ export async function unmarkMonthPaid(clientId, year, month) {
     .update({
       payment_status: 'pending',
       paid_at: null,
+      paid_date: null,
       paid_amount: null,
       payment_method: null,
       payment_notes: null,
