@@ -62,6 +62,7 @@ const INITIAL_FORM_DATA = {
   accessNotes: '',
   doorbell: '',
   concierge: '',
+  distanceRange: '',
   // Plan
   frequency: '1',
   schedule: 'morning',
@@ -119,6 +120,7 @@ export default function AddClient() {
           accessNotes: client.address?.accessNotes || '',
           doorbell: client.address?.doorbell || '',
           concierge: client.address?.concierge || '',
+          distanceRange: client.address?.distanceRange || '',
           frequency: String(client.plan?.frequency || 1),
           schedule: client.plan?.schedule || 'morning',
           hasTransport: client.plan?.hasTransport || false,
@@ -217,7 +219,8 @@ export default function AddClient() {
           street: formData.street,
           accessNotes: formData.accessNotes,
           doorbell: formData.doorbell,
-          concierge: formData.concierge
+          concierge: formData.concierge,
+          distanceRange: formData.distanceRange || null
         },
         medicalInfo: {
           dietaryRestrictions: formData.dietaryRestrictions,
@@ -469,6 +472,19 @@ export default function AddClient() {
                     value={formData.concierge}
                     onChange={(e) => updateField('concierge', e.target.value)}
                     placeholder="De 8 a 20hs"
+                  />
+                  <Select
+                    label="Distancia al club"
+                    value={formData.distanceRange}
+                    onChange={(e) => updateField('distanceRange', e.target.value)}
+                    options={[
+                      { value: '', label: 'Sin definir' },
+                      { value: 'under_1km', label: 'Menos de 1 km' },
+                      { value: '1_to_5km', label: '1 a 5 km' },
+                      { value: '5_to_10km', label: '5 a 10 km' },
+                      { value: 'over_10km', label: 'Más de 10 km' }
+                    ]}
+                    className="col-span-2"
                   />
                   <Textarea
                     label="Observaciones de acceso"

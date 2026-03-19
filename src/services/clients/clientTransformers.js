@@ -26,6 +26,7 @@ export function transformClientToDb(clientData) {
     p_addr_access_notes: clientData.address?.accessNotes || null,
     p_addr_doorbell: clientData.address?.doorbell || null,
     p_addr_concierge: clientData.address?.concierge || null,
+    p_addr_distance_range: clientData.address?.distanceRange || null,
     // Medical info
     p_med_dietary: clientData.medicalInfo?.dietaryRestrictions || null,
     p_med_medical: clientData.medicalInfo?.medicalRestrictions || null,
@@ -67,7 +68,8 @@ export function transformClientFromDb(dbClient) {
       street: '',
       accessNotes: '',
       doorbell: '',
-      concierge: ''
+      concierge: '',
+      distanceRange: null
     },
     medicalInfo: dbClient.medicalInfo || {
       dietaryRestrictions: '',
@@ -122,6 +124,7 @@ export function transformUpdateToDb(clientId, updateData) {
     if (updateData.address.accessNotes !== undefined) params.p_addr_access_notes = updateData.address.accessNotes
     if (updateData.address.doorbell !== undefined) params.p_addr_doorbell = updateData.address.doorbell
     if (updateData.address.concierge !== undefined) params.p_addr_concierge = updateData.address.concierge
+    if (updateData.address.distanceRange !== undefined) params.p_addr_distance_range = updateData.address.distanceRange
   }
 
   // Medical info

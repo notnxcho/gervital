@@ -35,9 +35,33 @@ export function getShiftsForSchedule(schedule) {
   }
 }
 
+export const DISTANCE_RANGES = [
+  { id: 'under_1km', label: 'Menos de 1 km' },
+  { id: '1_to_5km', label: '1 a 5 km' },
+  { id: '5_to_10km', label: '5 a 10 km' },
+  { id: 'over_10km', label: 'Más de 10 km' }
+]
+
+// Per-trip prices: frequency → schedule → distanceRange → price
 export const TRANSPORT_TRIP_PRICES = {
-  1: { morning: 3500, afternoon: 3500, full_day: 3500 },
-  2: { morning: 3200, afternoon: 3200, full_day: 3200 },
-  3: { morning: 2800, afternoon: 2800, full_day: 2800 },
-  4: { morning: 2500, afternoon: 2500, full_day: 2500 }
+  1: {
+    morning:   { under_1km: 2500, '1_to_5km': 3000, '5_to_10km': 3500, over_10km: 4500 },
+    afternoon: { under_1km: 2500, '1_to_5km': 3000, '5_to_10km': 3500, over_10km: 4500 },
+    full_day:  { under_1km: 2500, '1_to_5km': 3000, '5_to_10km': 3500, over_10km: 4500 }
+  },
+  2: {
+    morning:   { under_1km: 2200, '1_to_5km': 2700, '5_to_10km': 3200, over_10km: 4000 },
+    afternoon: { under_1km: 2200, '1_to_5km': 2700, '5_to_10km': 3200, over_10km: 4000 },
+    full_day:  { under_1km: 2200, '1_to_5km': 2700, '5_to_10km': 3200, over_10km: 4000 }
+  },
+  3: {
+    morning:   { under_1km: 1900, '1_to_5km': 2400, '5_to_10km': 2800, over_10km: 3500 },
+    afternoon: { under_1km: 1900, '1_to_5km': 2400, '5_to_10km': 2800, over_10km: 3500 },
+    full_day:  { under_1km: 1900, '1_to_5km': 2400, '5_to_10km': 2800, over_10km: 3500 }
+  },
+  4: {
+    morning:   { under_1km: 1600, '1_to_5km': 2100, '5_to_10km': 2500, over_10km: 3000 },
+    afternoon: { under_1km: 1600, '1_to_5km': 2100, '5_to_10km': 2500, over_10km: 3000 },
+    full_day:  { under_1km: 1600, '1_to_5km': 2100, '5_to_10km': 3500, over_10km: 3000 }
+  }
 }

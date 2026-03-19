@@ -47,6 +47,8 @@ CREATE TABLE transport_trip_counts (
 
 ALTER TABLE client_addresses ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
 ALTER TABLE client_addresses ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+ALTER TABLE client_addresses ADD COLUMN IF NOT EXISTS distance_range TEXT
+  CHECK (distance_range IN ('under_1km', '1_to_5km', '5_to_10km', 'over_10km'));
 
 -- ============================================
 -- Step 2 — Update clients_full view to include lat/lng
@@ -99,7 +101,8 @@ SELECT
         'doorbell', ca.doorbell,
         'concierge', ca.concierge,
         'latitude', ca.latitude,
-        'longitude', ca.longitude
+        'longitude', ca.longitude,
+        'distanceRange', ca.distance_range
       )
     ELSE NULL
   END AS address,
@@ -326,3 +329,172 @@ BEGIN
   RETURN v_base_price;
 END;
 $$ LANGUAGE plpgsql STABLE;
+
+-- ============================================
+-- Step 8 — Add distance_range to create_client_full and update_client_full
+-- ============================================
+
+-- Recreate create_client_full with p_addr_distance_range parameter
+CREATE OR REPLACE FUNCTION create_client_full(
+  p_first_name TEXT,
+  p_last_name TEXT,
+  p_email TEXT DEFAULT NULL,
+  p_phone TEXT DEFAULT NULL,
+  p_birth_date DATE DEFAULT NULL,
+  p_cognitive_level TEXT DEFAULT NULL,
+  p_start_date DATE DEFAULT CURRENT_DATE,
+  p_plan_frequency INTEGER DEFAULT NULL,
+  p_plan_schedule TEXT DEFAULT NULL,
+  p_plan_has_transport BOOLEAN DEFAULT FALSE,
+  p_plan_assigned_days TEXT[] DEFAULT '{}',
+  p_ec_name TEXT DEFAULT NULL,
+  p_ec_relationship TEXT DEFAULT NULL,
+  p_ec_phone TEXT DEFAULT NULL,
+  p_addr_street TEXT DEFAULT NULL,
+  p_addr_access_notes TEXT DEFAULT NULL,
+  p_addr_doorbell TEXT DEFAULT NULL,
+  p_addr_concierge TEXT DEFAULT NULL,
+  p_addr_distance_range TEXT DEFAULT NULL,
+  p_med_dietary TEXT DEFAULT NULL,
+  p_med_medical TEXT DEFAULT NULL,
+  p_med_mobility TEXT DEFAULT NULL,
+  p_med_medication TEXT DEFAULT NULL,
+  p_med_medication_schedule TEXT DEFAULT NULL,
+  p_med_notes TEXT DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE
+  v_client_id UUID;
+BEGIN
+  INSERT INTO clients (
+    first_name, last_name, email, phone, birth_date,
+    cognitive_level, start_date, recovery_days_available
+  ) VALUES (
+    p_first_name, p_last_name, p_email, p_phone, p_birth_date,
+    p_cognitive_level, p_start_date, 0
+  ) RETURNING id INTO v_client_id;
+
+  IF p_plan_frequency IS NOT NULL THEN
+    INSERT INTO client_plans (client_id, frequency, schedule, has_transport, assigned_days)
+    VALUES (v_client_id, p_plan_frequency, p_plan_schedule, p_plan_has_transport, p_plan_assigned_days);
+  END IF;
+
+  IF p_ec_name IS NOT NULL THEN
+    INSERT INTO emergency_contacts (client_id, name, relationship, phone)
+    VALUES (v_client_id, p_ec_name, p_ec_relationship, p_ec_phone);
+  END IF;
+
+  IF p_addr_street IS NOT NULL THEN
+    INSERT INTO client_addresses (client_id, street, access_notes, doorbell, concierge, distance_range)
+    VALUES (v_client_id, p_addr_street, p_addr_access_notes, p_addr_doorbell, p_addr_concierge, p_addr_distance_range);
+  END IF;
+
+  INSERT INTO medical_info (
+    client_id, dietary_restrictions, medical_restrictions,
+    mobility_restrictions, medication, medication_schedule, notes
+  ) VALUES (
+    p_client_id, p_med_dietary, p_med_medical,
+    p_med_mobility, p_med_medication, p_med_medication_schedule, p_med_notes
+  );
+
+  RETURN v_client_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Recreate update_client_full with p_addr_distance_range parameter
+CREATE OR REPLACE FUNCTION update_client_full(
+  p_client_id UUID,
+  p_first_name TEXT DEFAULT NULL,
+  p_last_name TEXT DEFAULT NULL,
+  p_email TEXT DEFAULT NULL,
+  p_phone TEXT DEFAULT NULL,
+  p_birth_date DATE DEFAULT NULL,
+  p_cognitive_level TEXT DEFAULT NULL,
+  p_start_date DATE DEFAULT NULL,
+  p_plan_frequency INTEGER DEFAULT NULL,
+  p_plan_schedule TEXT DEFAULT NULL,
+  p_plan_has_transport BOOLEAN DEFAULT NULL,
+  p_plan_assigned_days TEXT[] DEFAULT NULL,
+  p_ec_name TEXT DEFAULT NULL,
+  p_ec_relationship TEXT DEFAULT NULL,
+  p_ec_phone TEXT DEFAULT NULL,
+  p_addr_street TEXT DEFAULT NULL,
+  p_addr_access_notes TEXT DEFAULT NULL,
+  p_addr_doorbell TEXT DEFAULT NULL,
+  p_addr_concierge TEXT DEFAULT NULL,
+  p_addr_distance_range TEXT DEFAULT NULL,
+  p_med_dietary TEXT DEFAULT NULL,
+  p_med_medical TEXT DEFAULT NULL,
+  p_med_mobility TEXT DEFAULT NULL,
+  p_med_medication TEXT DEFAULT NULL,
+  p_med_medication_schedule TEXT DEFAULT NULL,
+  p_med_notes TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  UPDATE clients SET
+    first_name = COALESCE(p_first_name, first_name),
+    last_name = COALESCE(p_last_name, last_name),
+    email = COALESCE(p_email, email),
+    phone = COALESCE(p_phone, phone),
+    birth_date = COALESCE(p_birth_date, birth_date),
+    cognitive_level = COALESCE(p_cognitive_level, cognitive_level),
+    start_date = COALESCE(p_start_date, start_date),
+    updated_at = NOW()
+  WHERE id = p_client_id;
+
+  IF p_plan_frequency IS NOT NULL THEN
+    INSERT INTO client_plans (client_id, frequency, schedule, has_transport, assigned_days)
+    VALUES (p_client_id, p_plan_frequency, p_plan_schedule, COALESCE(p_plan_has_transport, FALSE), COALESCE(p_plan_assigned_days, '{}'))
+    ON CONFLICT (client_id) DO UPDATE SET
+      frequency = EXCLUDED.frequency,
+      schedule = EXCLUDED.schedule,
+      has_transport = EXCLUDED.has_transport,
+      assigned_days = EXCLUDED.assigned_days,
+      updated_at = NOW();
+  END IF;
+
+  IF p_ec_name IS NOT NULL THEN
+    INSERT INTO emergency_contacts (client_id, name, relationship, phone)
+    VALUES (p_client_id, p_ec_name, p_ec_relationship, p_ec_phone)
+    ON CONFLICT (client_id) DO UPDATE SET
+      name = EXCLUDED.name,
+      relationship = EXCLUDED.relationship,
+      phone = EXCLUDED.phone,
+      updated_at = NOW();
+  END IF;
+
+  IF p_addr_street IS NOT NULL THEN
+    INSERT INTO client_addresses (client_id, street, access_notes, doorbell, concierge, distance_range)
+    VALUES (p_client_id, p_addr_street, p_addr_access_notes, p_addr_doorbell, p_addr_concierge, p_addr_distance_range)
+    ON CONFLICT (client_id) DO UPDATE SET
+      street = EXCLUDED.street,
+      access_notes = EXCLUDED.access_notes,
+      doorbell = EXCLUDED.doorbell,
+      concierge = EXCLUDED.concierge,
+      distance_range = COALESCE(EXCLUDED.distance_range, client_addresses.distance_range),
+      updated_at = NOW();
+  END IF;
+
+  IF p_med_dietary IS NOT NULL OR p_med_medical IS NOT NULL OR p_med_mobility IS NOT NULL
+     OR p_med_medication IS NOT NULL OR p_med_medication_schedule IS NOT NULL OR p_med_notes IS NOT NULL THEN
+    INSERT INTO medical_info (
+      client_id, dietary_restrictions, medical_restrictions,
+      mobility_restrictions, medication, medication_schedule, notes
+    ) VALUES (
+      p_client_id, p_med_dietary, p_med_medical,
+      p_med_mobility, p_med_medication, p_med_medication_schedule, p_med_notes
+    )
+    ON CONFLICT (client_id) DO UPDATE SET
+      dietary_restrictions = COALESCE(EXCLUDED.dietary_restrictions, medical_info.dietary_restrictions),
+      medical_restrictions = COALESCE(EXCLUDED.medical_restrictions, medical_info.medical_restrictions),
+      mobility_restrictions = COALESCE(EXCLUDED.mobility_restrictions, medical_info.mobility_restrictions),
+      medication = COALESCE(EXCLUDED.medication, medical_info.medication),
+      medication_schedule = COALESCE(EXCLUDED.medication_schedule, medical_info.medication_schedule),
+      notes = COALESCE(EXCLUDED.notes, medical_info.notes),
+      updated_at = NOW();
+  END IF;
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

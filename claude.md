@@ -93,7 +93,8 @@ src/services/
     street: string,
     accessNotes: string,
     doorbell: string,
-    concierge: string
+    concierge: string,
+    distanceRange: 'under_1km' | '1_to_5km' | '5_to_10km' | 'over_10km' | null
   },
   
   medicalInfo: {
@@ -498,7 +499,8 @@ npm run build
 ### Transporte (Facturación separada)
 - Facturación de transporte es completamente independiente de la facturación de asistencia
 - Se cobra por viaje: cantidad de turnos asignados por día (máximo 2: llegada + salida)
-- Precio por viaje determinado por el plan del cliente (frecuencia × horario)
+- Precio por viaje determinado por: frecuencia × horario × rango de distancia del cliente
+- Rangos de distancia: `under_1km`, `1_to_5km`, `5_to_10km`, `over_10km` (se guarda en `client_addresses.distance_range`)
 - Precios hardcodeados en `transportConstants.js` (futuro: pantalla de superadmin)
 
 ---

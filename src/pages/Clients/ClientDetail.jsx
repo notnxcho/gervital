@@ -324,7 +324,14 @@ export default function ClientDetail() {
             <div className="h-8 w-px bg-gray-200" />
             <div>
               <p className="text-sm text-gray-500">Transporte</p>
-              <p className="font-semibold text-gray-900">{client.plan.hasTransport ? 'Incluido' : 'No incluido'}</p>
+              <p className="font-semibold text-gray-900">
+                {client.plan.hasTransport ? 'Incluido' : 'No incluido'}
+                {client.plan.hasTransport && client.address?.distanceRange && (
+                  <span className="text-sm font-normal text-gray-500 ml-1">
+                    ({({ under_1km: '<1km', '1_to_5km': '1-5km', '5_to_10km': '5-10km', over_10km: '10+km' })[client.address.distanceRange]})
+                  </span>
+                )}
+              </p>
             </div>
           </div>
           <div className="text-right">
