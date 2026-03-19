@@ -15,7 +15,8 @@ export {
   logout,
   getSession,
   fetchUserProfile,
-  onAuthStateChange
+  onAuthStateChange,
+  changePassword
 } from './auth/authService'
 
 // ============================================
@@ -28,6 +29,14 @@ export {
   updateClient,
   deleteClient
 } from './clients/clientService'
+
+// ============================================
+// CLIENT AVATARS API
+// ============================================
+export {
+  uploadClientAvatar,
+  deleteClientAvatar
+} from './clients/avatarService'
 
 // ============================================
 // ATTENDANCE API
@@ -98,3 +107,17 @@ export {
   deleteExpense,
   getExpensesSummary
 } from './expenses/expenseService'
+
+// ============================================
+// TRANSPORT API
+// ============================================
+export {
+  getTransportClients,
+  filterClientsForShift,
+  getArrangementForDate,
+  saveTransportDay,
+  findLastWeekdayArrangement,
+  copyArrangementFromDate,
+  buildDefaultFleet,
+  getNextCarColor
+} from './transport/transportService'
