@@ -57,6 +57,13 @@ export default function TransportScheduler() {
   const [error, setError] = useState(null)
   const [toast, setToast] = useState(null)
 
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty])
+
   const dateStr = getDateStr(currentDate)
   const dayName = DAY_NAMES[currentDate.getDay()]
   const dayLabelEs = DAY_LABELS_ES[dayName] || dayName

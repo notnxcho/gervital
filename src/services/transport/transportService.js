@@ -92,7 +92,7 @@ export async function findLastWeekdayArrangement(dateStr) {
     .select('id, date')
     .lt('date', dateStr)
     .order('date', { ascending: false })
-    .limit(20)
+    .limit(100)
   if (error) throw new Error(error.message)
   for (const arr of (data || [])) {
     const arrDate = new Date(arr.date + 'T12:00:00')

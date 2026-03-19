@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { Trash, Minus, Plus } from 'iconoir-react'
@@ -13,6 +13,10 @@ export default function CarCard({
 }) {
   const [editingName, setEditingName] = useState(false)
   const [localName, setLocalName] = useState(car.name)
+
+  useEffect(() => {
+    if (!editingName) setLocalName(car.name)
+  }, [car.name, editingName])
 
   const { setNodeRef, isOver } = useDroppable({
     id: `car-${car.id}`,

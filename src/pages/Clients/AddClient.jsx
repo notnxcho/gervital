@@ -549,7 +549,7 @@ export default function AddClient() {
                 </p>
                 <p className="text-xs text-indigo-600 mt-1">
                   {formData.frequency}x/semana • {SCHEDULE_OPTIONS.find(s => s.value === formData.schedule)?.label}
-                  {formData.hasTransport && ' • Con transporte'}
+                  {formData.hasTransport && ' • Transporte'}
                 </p>
               </div>
             </div>

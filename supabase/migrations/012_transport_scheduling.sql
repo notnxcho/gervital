@@ -311,6 +311,9 @@ $$;
 -- Step 7 — Cleanup old transport pricing from get_plan_price
 -- ============================================
 
+-- Drop old 3-parameter overload so it cannot be called accidentally
+DROP FUNCTION IF EXISTS get_plan_price(INTEGER, TEXT, BOOLEAN);
+
 CREATE OR REPLACE FUNCTION get_plan_price(p_frequency INTEGER, p_schedule TEXT)
 RETURNS NUMERIC AS $$
 DECLARE v_base_price NUMERIC;

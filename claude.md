@@ -226,7 +226,6 @@ src/services/
   schedule: 'morning' | 'afternoon' | 'full_day',
   price: number               // Precio mensual base
 }
-// Transporte agrega +20% al precio base
 ```
 
 ---
