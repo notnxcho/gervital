@@ -23,6 +23,8 @@ Controlar la asistencia de los clientes y generar facturación mensual proporcio
 - **Tailwind CSS 3** - Estilos (compilación manual con `npx tailwindcss`)
 - **Iconoir React** - Librería de iconos
 - **date-fns** - Manipulación de fechas
+- **@dnd-kit** - Drag & drop (Grupos, Transporte)
+- **@react-google-maps/api** - Google Maps (Transporte)
 
 ### Build Tools
 - **Create React App** con **CRACO** para override de configuración
@@ -268,7 +270,7 @@ Mes anterior         Mes actual              Próximo mes
 
 ```javascript
 // Precio mensual del plan
-const monthlyPrice = calculatePlanPrice(frequency, schedule, hasTransport)
+const monthlyPrice = calculatePlanPrice(frequency, schedule)
 
 // Días planificados en el mes
 const plannedDays = getPlannedDaysForMonth(clientId, year, month)
@@ -344,6 +346,17 @@ const chargeableAmount = (chargeableDays.length / plannedDays.length) * monthlyP
 - Estados: pendiente/pagado
 - Resumen mensual
 
+### 8. Transporte (`/transporte`)
+- Programación diaria de vehículos para clientes con transporte
+- Navegación por día (salta fines de semana)
+- 4 turnos fijos: Llegada mañana (9:00), Salida mañana (14:00), Llegada tarde (15:00), Salida tarde (19:00)
+- Panel split: Google Maps con pins coloreados por auto + panel DnD de asignación
+- Autos editables: nombre, asientos, agregar/eliminar por turno
+- Drag & drop de clientes entre pool sin asignar y autos (usa @dnd-kit)
+- "Repetir último [día]": copia configuración del mismo día de la semana anterior
+- Guardado atómico vía RPC `save_transport_day`
+- Cuenta de viajes por cliente por día (0-2) persistida en `transport_trip_counts`
+
 ---
 
 ## Roles y Permisos
@@ -387,8 +400,18 @@ src/
 │   │   ├── AddClient.jsx     # Wizard de alta
 │   │   ├── ClientDetail.jsx  # Detalle + calendario
 │   │   └── ClientList.jsx    # Lista con filtros
+│   ├── Dashboard/
+│   │   └── Dashboard.jsx     # Métricas y resumen
+│   ├── Groups/
+│   │   └── DailyGroups.jsx   # Grupos diarios con DnD
 │   ├── Suppliers/
 │   │   └── SupplierList.jsx
+│   ├── Transport/
+│   │   ├── TransportScheduler.jsx  # Página principal
+│   │   ├── TransportMap.jsx        # Google Maps con pins
+│   │   ├── CarAssignmentPanel.jsx  # Panel DnD de autos
+│   │   ├── CarCard.jsx             # Card de auto individual
+│   │   └── ClientChip.jsx          # Chip draggable de cliente
 │   └── Login.jsx
 ├── services/
 │   ├── supabase/
@@ -408,6 +431,9 @@ src/
 │   │   └── expenseService.js
 │   ├── pricing/
 │   │   └── pricingService.js
+│   ├── transport/
+│   │   ├── transportConstants.js  # Turnos, colores, flota, precios
+│   │   └── transportService.js    # CRUD transporte, RPC save
 │   ├── users/
 │   │   └── userService.js
 │   └── api.js                # Facade (re-exports)
@@ -424,7 +450,11 @@ supabase/
 │   ├── 004_views.sql         # Vistas
 │   ├── 005_functions.sql     # Funciones RPC
 │   ├── 006_triggers.sql      # Triggers
-│   └── 007_seed_pricing.sql  # Datos iniciales
+│   ├── 007_seed_pricing.sql  # Datos iniciales
+│   ├── 008_billing_overhaul.sql
+│   ├── 010_daily_groups.sql
+│   ├── 011_client_avatars.sql
+│   └── 012_transport_scheduling.sql  # Transporte: tablas, RPC, cleanup
 └── README.md                 # Guía de setup
 ```
 
@@ -461,10 +491,16 @@ npm run build
 5. Todo lo demás SE COBRA (asistencias, faltas injustificadas, recuperos)
 6. Estado de factura y pago son **independientes**
 
-### Precios
+### Precios (Asistencia)
 - 8 combinaciones base: 4 frecuencias × 2 horarios (mañana/tarde tienen mismo precio)
 - Día completo tiene precio mayor
-- Transporte agrega +20% al precio base
+- `hasTransport` en el perfil del cliente indica si usa transporte (no afecta precio de asistencia)
+
+### Transporte (Facturación separada)
+- Facturación de transporte es completamente independiente de la facturación de asistencia
+- Se cobra por viaje: cantidad de turnos asignados por día (máximo 2: llegada + salida)
+- Precio por viaje determinado por el plan del cliente (frecuencia × horario)
+- Precios hardcodeados en `transportConstants.js` (futuro: pantalla de superadmin)
 
 ---
 
@@ -488,7 +524,10 @@ npm run build
 ### Futuras Features
 - [ ] Integración con facturación electrónica
 - [ ] Módulo de estadísticas
-- [ ] Módulo de transporte
+- [x] Módulo de transporte (programación diaria + trip counts)
+- [ ] Geocoding de direcciones (Google Places Autocomplete en alta de cliente)
+- [ ] Pantalla superadmin para editar precios de transporte
+- [ ] Facturación de transporte (consumir trip counts para generar facturas separadas)
 - [ ] Edición de días planificados por mes
 - [ ] Notificaciones de vencimiento de pago
 - [ ] Reportes exportables
