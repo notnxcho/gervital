@@ -393,7 +393,7 @@ BEGIN
     client_id, dietary_restrictions, medical_restrictions,
     mobility_restrictions, medication, medication_schedule, notes
   ) VALUES (
-    p_client_id, p_med_dietary, p_med_medical,
+    v_client_id, p_med_dietary, p_med_medical,
     p_med_mobility, p_med_medication, p_med_medication_schedule, p_med_notes
   );
 
