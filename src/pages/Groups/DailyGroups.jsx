@@ -110,9 +110,17 @@ function ClientCard({ client, editMode, sortableProps, isOverlay }) {
       )}
 
       {/* Avatar */}
-      <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600 flex-shrink-0">
-        {initials}
-      </div>
+      {client.avatarUrl ? (
+        <img
+          src={client.avatarUrl}
+          alt={initials}
+          className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+        />
+      ) : (
+        <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600 flex-shrink-0">
+          {initials}
+        </div>
+      )}
 
       {/* Name */}
       <span className="text-sm text-gray-800 font-medium flex-1 truncate">

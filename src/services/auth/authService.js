@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../supabase/client'
 
 /**
@@ -117,6 +118,43 @@ export async function fetchUserProfile(session) {
   } catch (err) {
     console.error('fetchUserProfile error:', err)
     return null
+  }
+}
+
+/**
+ * Change password for the currently logged-in user
+ * @param {string} currentPassword - Current password (for re-authentication)
+ * @param {string} newPassword - New password
+ */
+export async function changePassword(currentPassword, newPassword) {
+  // Get the current user's email
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) {
+    throw new Error('No se pudo obtener el usuario actual')
+  }
+
+  // Verify current password using a throwaway client so the main session is not replaced
+  const tempClient = createClient(
+    process.env.REACT_APP_SUPABASE_URL,
+    process.env.REACT_APP_SUPABASE_ANON_KEY,
+    { auth: { persistSession: false } }
+  )
+  const { error: signInError } = await tempClient.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword
+  })
+
+  if (signInError) {
+    throw new Error('La contraseña actual es incorrecta')
+  }
+
+  // Update password on the real session
+  const { error: updateError } = await supabase.auth.updateUser({
+    password: newPassword
+  })
+
+  if (updateError) {
+    throw new Error('Error al cambiar la contraseña: ' + updateError.message)
   }
 }
 

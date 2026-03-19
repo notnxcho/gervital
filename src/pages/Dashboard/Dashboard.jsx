@@ -284,6 +284,65 @@ export default function Dashboard() {
             </Card>
           </div>
 
+          {/* Unpaid clients list */}
+          {metrics.unpaidClients.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-gray-800">
+                    Pendientes de pago — {metrics.unpaidClients.length}
+                  </h2>
+                  <span className="text-xs text-gray-400">
+                    {formatCurrency(metrics.unpaidClients.reduce((s, c) => s + c.amount, 0))} total
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="divide-y divide-gray-100">
+                  {metrics.unpaidClients.map(client => (
+                    <button
+                      key={client.id}
+                      onClick={() => navigate(`/clientes/${client.id}`)}
+                      className="flex items-center gap-3 w-full py-2.5 px-1 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                    >
+                      {/* Avatar */}
+                      {client.avatarUrl ? (
+                        <img
+                          src={client.avatarUrl}
+                          alt={`${client.firstName} ${client.lastName}`}
+                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-500 flex-shrink-0">
+                          {client.firstName[0]}{client.lastName[0]}
+                        </div>
+                      )}
+
+                      {/* Name */}
+                      <span className="text-sm font-medium text-gray-800 flex-1 truncate">
+                        {client.firstName} {client.lastName}
+                      </span>
+
+                      {/* Status badge */}
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        client.status === 'overdue'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {client.status === 'overdue' ? 'Vencido' : 'Pendiente'}
+                      </span>
+
+                      {/* Amount */}
+                      <span className="text-sm font-semibold text-gray-700 w-24 text-right">
+                        {formatCurrency(client.amount)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Operational performance section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 

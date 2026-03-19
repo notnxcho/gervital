@@ -251,14 +251,21 @@ function ClientCard({ client, onView, onDelete }) {
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group">
       <div onClick={onView}>
-        {/* Imagen placeholder con tier cognitivo */}
+        {/* Imagen / placeholder con tier cognitivo */}
         <div className="relative h-40 bg-gradient-to-br from-gray-200 to-gray-300">
-          {/* Placeholder de foto */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-6xl text-gray-400 font-light">
-              {client.firstName[0]}{client.lastName[0]}
-            </span>
-          </div>
+          {client.avatarUrl ? (
+            <img
+              src={client.avatarUrl}
+              alt={`${client.firstName} ${client.lastName}`}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-6xl text-gray-400 font-light">
+                {client.firstName[0]}{client.lastName[0]}
+              </span>
+            </div>
+          )}
           
           {/* Tier cognitivo badge */}
           <div className={`absolute bottom-3 left-3 px-3 py-1 rounded-lg text-sm font-semibold border ${COGNITIVE_LEVEL_COLORS[client.cognitiveLevel] || 'bg-gray-100 text-gray-700'}`}>

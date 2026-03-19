@@ -14,11 +14,11 @@ export async function getDashboardMetrics(year, month) {
   const [clientsRes, invoicesRes, attendanceRes, expensesRes] = await Promise.all([
     supabase
       .from('clients_full')
-      .select('id, cognitiveLevel, recoveryDaysAvailable, plan'),
+      .select('id, firstName, lastName, avatarUrl, cognitiveLevel, recoveryDaysAvailable, plan'),
 
     supabase
       .from('invoices_view')
-      .select('chargeableAmount, paymentStatus, invoiceStatus, paidAmount')
+      .select('clientId, chargeableAmount, paymentStatus, invoiceStatus, paidAmount')
       .eq('year', year)
       .eq('month', month),
 
@@ -85,6 +85,27 @@ export async function getDashboardMetrics(year, month) {
 
   const transportPct = totalClients > 0 ? (withTransport / totalClients) * 100 : 0
 
+  // --- Unpaid clients list ---
+  const clientsById = new Map(clients.map(c => [c.id, c]))
+  const unpaidClients = invoices
+    .filter(inv => inv.paymentStatus !== 'paid')
+    .map(inv => {
+      const c = clientsById.get(inv.clientId)
+      return {
+        id: inv.clientId,
+        firstName: c?.firstName || '',
+        lastName: c?.lastName || '',
+        avatarUrl: c?.avatarUrl || null,
+        amount: Number(inv.chargeableAmount || 0),
+        status: inv.paymentStatus // 'pending' or 'overdue'
+      }
+    })
+    .sort((a, b) => {
+      // Overdue first, then by name
+      if (a.status !== b.status) return a.status === 'overdue' ? -1 : 1
+      return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`)
+    })
+
   // --- Attendance KPIs ---
   // Only count non-scheduled, non-recovery records (actual attended vs absent)
   const attendedCount = attendance.filter(r => r.status === 'attended').length
@@ -122,6 +143,7 @@ export async function getDashboardMetrics(year, month) {
       unjustifiedAbsences,
       attendanceRate,
       total: attendanceTotal
-    }
+    },
+    unpaidClients
   }
 }
