@@ -22,7 +22,9 @@ import {
   markVacationRange,
   markDayRecoveryAttended,
   unmarkDayRecoveryAttended,
-  deleteClient
+  deleteClient,
+  uploadClientAvatar,
+  deleteClientAvatar
 } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import Button from '../../components/ui/Button'
@@ -92,8 +94,10 @@ export default function ClientDetail() {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   const optionsMenuRef = useRef(null)
+  const avatarInputRef = useRef(null)
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -152,6 +156,34 @@ export default function ClientDetail() {
     }
   }
 
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingAvatar(true)
+    try {
+      const url = await uploadClientAvatar(id, file)
+      setClient(prev => ({ ...prev, avatarUrl: url }))
+    } catch (error) {
+      console.error('Error subiendo avatar:', error)
+      alert(error.message)
+    } finally {
+      setUploadingAvatar(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+    }
+  }
+
+  const handleAvatarDelete = async () => {
+    setUploadingAvatar(true)
+    try {
+      await deleteClientAvatar(id)
+      setClient(prev => ({ ...prev, avatarUrl: null }))
+    } catch (error) {
+      console.error('Error eliminando avatar:', error)
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
   const tabs = [
     { id: 'general', label: 'Información General' },
     { id: 'contact', label: 'Contacto y Dirección' },
@@ -179,11 +211,60 @@ export default function ClientDetail() {
 
   return (
     <div>
+      {/* Hidden file input for avatar upload */}
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        onChange={handleAvatarChange}
+        className="hidden"
+      />
+
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/clientes')}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
+
+        {/* Avatar */}
+        <div className="relative group/avatar flex-shrink-0">
+          {client.avatarUrl ? (
+            <img
+              src={client.avatarUrl}
+              alt={`${client.firstName} ${client.lastName}`}
+              className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-gray-200">
+              <span className="text-xl text-gray-500 font-medium">
+                {client.firstName[0]}{client.lastName[0]}
+              </span>
+            </div>
+          )}
+          {/* Hover overlay */}
+          <button
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={uploadingAvatar}
+            className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity cursor-pointer"
+          >
+            {uploadingAvatar ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+            ) : (
+              <Edit className="w-5 h-5 text-white" />
+            )}
+          </button>
+          {/* Delete avatar button */}
+          {client.avatarUrl && !uploadingAvatar && (
+            <button
+              onClick={handleAvatarDelete}
+              className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover/avatar:opacity-100 transition-opacity hover:bg-red-600"
+              title="Eliminar foto"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">
             {client.firstName} {client.lastName}
@@ -485,7 +566,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, user
     return attendance.find(a => a.date === dateStr)?.status === 'recovery'
   }).length
 
-  const monthlyRate = calculatePlanPriceSync(pricingData, client.plan.frequency, client.plan.schedule, client.plan.hasTransport)
+  const monthlyRate = calculatePlanPriceSync(pricingData, client.plan.frequency, client.plan.schedule)
   const liveChargeableAmount = fullMonthDays > 0
     ? Math.round((chargeableDays / fullMonthDays) * monthlyRate)
     : 0

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check } from 'iconoir-react'
-import { createClient, updateClient, getClientById } from '../../services/api'
+import { createClient, updateClient, getClientById, uploadClientAvatar } from '../../services/api'
 import { getPlanPricing, calculatePlanPriceSync } from '../../services/pricing/pricingService'
 import Button from '../../components/ui/Button'
 import Input, { Select, Textarea, Checkbox } from '../../components/ui/Input'
@@ -86,6 +86,8 @@ export default function AddClient() {
   const [loading, setLoading] = useState(false)
   const [loadingClient, setLoadingClient] = useState(false)
   const [pricingData, setPricingData] = useState([])
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarPreview, setAvatarPreview] = useState(null)
 
   useEffect(() => {
     getPlanPricing()
@@ -99,6 +101,9 @@ export default function AddClient() {
     getClientById(id)
       .then(client => {
         if (!client) return
+        if (client.avatarUrl) {
+          setAvatarPreview(client.avatarUrl)
+        }
         setFormData({
           firstName: client.firstName || '',
           lastName: client.lastName || '',
@@ -226,9 +231,15 @@ export default function AddClient() {
       
       if (isEditMode) {
         await updateClient(id, clientData)
+        if (avatarFile) {
+          await uploadClientAvatar(id, avatarFile).catch(console.error)
+        }
         navigate(`/clientes/${id}`)
       } else {
-        await createClient(clientData)
+        const newClient = await createClient(clientData)
+        if (avatarFile && newClient?.id) {
+          await uploadClientAvatar(newClient.id, avatarFile).catch(console.error)
+        }
         navigate('/clientes')
       }
     } catch (error) {
@@ -241,8 +252,7 @@ export default function AddClient() {
   const estimatedPrice = calculatePlanPriceSync(
     pricingData,
     parseInt(formData.frequency),
-    formData.schedule,
-    formData.hasTransport
+    formData.schedule
   )
 
   if (loadingClient) {
@@ -310,6 +320,55 @@ export default function AddClient() {
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Datos personales</h3>
+
+                {/* Avatar upload */}
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="relative group/avatar flex-shrink-0">
+                    {avatarPreview ? (
+                      <img
+                        src={avatarPreview}
+                        alt="Preview"
+                        className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-gray-200">
+                        <span className="text-2xl text-gray-400 font-light">
+                          {formData.firstName?.[0] || '?'}{formData.lastName?.[0] || '?'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg cursor-pointer transition-colors">
+                      {avatarPreview ? 'Cambiar foto' : 'Subir foto'}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          setAvatarFile(file)
+                          setAvatarPreview(URL.createObjectURL(file))
+                        }}
+                      />
+                    </label>
+                    {avatarPreview && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarFile(null)
+                          setAvatarPreview(null)
+                        }}
+                        className="ml-2 text-sm text-red-500 hover:text-red-600"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">JPG, PNG o WebP. Máx 5MB.</p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <Input
                     label="Nombre"
@@ -480,9 +539,6 @@ export default function AddClient() {
                   checked={formData.hasTransport}
                   onChange={(e) => updateField('hasTransport', e.target.checked)}
                 />
-                <p className="text-sm text-gray-500 mt-1 ml-6">
-                  El transporte tiene un costo adicional del 20%
-                </p>
               </div>
 
               {/* Price preview */}

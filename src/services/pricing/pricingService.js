@@ -26,15 +26,13 @@ export async function getPlanPricing() {
  * Calculate plan price with transport option
  * @param {number} frequency - Times per week (1-4)
  * @param {string} schedule - 'morning', 'afternoon', or 'full_day'
- * @param {boolean} hasTransport - Whether transport is included
  * @returns {Promise<number>}
  */
-export async function calculatePlanPrice(frequency, schedule, hasTransport = false) {
+export async function calculatePlanPrice(frequency, schedule) {
   const { data, error } = await supabase
     .rpc('get_plan_price', {
       p_frequency: frequency,
-      p_schedule: schedule,
-      p_has_transport: hasTransport
+      p_schedule: schedule
     })
 
   if (error) {
@@ -50,10 +48,9 @@ export async function calculatePlanPrice(frequency, schedule, hasTransport = fal
  * @param {Array} pricingData - Array from getPlanPricing()
  * @param {number} frequency
  * @param {string} schedule
- * @param {boolean} hasTransport
  * @returns {number}
  */
-export function calculatePlanPriceSync(pricingData, frequency, schedule, hasTransport = false) {
+export function calculatePlanPriceSync(pricingData, frequency, schedule) {
   const plan = pricingData.find(
     p => p.frequency === frequency && p.schedule === schedule
   )
