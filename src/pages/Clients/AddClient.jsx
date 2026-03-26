@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check } from 'iconoir-react'
-import { createClient, updateClient, getClientById, uploadClientAvatar } from '../../services/api'
+import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords } from '../../services/api'
+import { geocodeAndCalculateDistance } from '../../services/clients/geocodingService'
 import { getPlanPricing, calculatePlanPriceSync } from '../../services/pricing/pricingService'
 import Button from '../../components/ui/Button'
 import Input, { Select, Textarea, Checkbox } from '../../components/ui/Input'
@@ -89,6 +90,7 @@ export default function AddClient() {
   const [pricingData, setPricingData] = useState([])
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
+  const [geocoding, setGeocoding] = useState(false)
 
   useEffect(() => {
     getPlanPricing()
@@ -145,6 +147,20 @@ export default function AddClient() {
     }
   }
 
+  const handleStreetBlur = async () => {
+    if (!formData.street || formData.street.trim().length < 5) return
+    setGeocoding(true)
+    try {
+      const geo = await geocodeAndCalculateDistance(formData.street)
+      if (geo.distanceRange) {
+        updateField('distanceRange', geo.distanceRange)
+      }
+    } catch (e) {
+      console.warn('Geocoding on blur failed:', e)
+    }
+    setGeocoding(false)
+  }
+
   const toggleDay = (day) => {
     setFormData(prev => ({
       ...prev,
@@ -196,6 +212,12 @@ export default function AddClient() {
     
     setLoading(true)
     try {
+      // Geocode address to get lat/lng and auto-calculate distance range
+      let geoData = { lat: null, lng: null, distanceRange: null }
+      if (formData.street) {
+        geoData = await geocodeAndCalculateDistance(formData.street)
+      }
+
       const clientData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -220,7 +242,9 @@ export default function AddClient() {
           accessNotes: formData.accessNotes,
           doorbell: formData.doorbell,
           concierge: formData.concierge,
-          distanceRange: formData.distanceRange || null
+          latitude: geoData.lat,
+          longitude: geoData.lng,
+          distanceRange: formData.distanceRange || geoData.distanceRange
         },
         medicalInfo: {
           dietaryRestrictions: formData.dietaryRestrictions,
@@ -234,12 +258,18 @@ export default function AddClient() {
       
       if (isEditMode) {
         await updateClient(id, clientData)
+        if (geoData.lat && geoData.lng) {
+          await updateClientAddressCoords(id, geoData.lat, geoData.lng).catch(console.error)
+        }
         if (avatarFile) {
           await uploadClientAvatar(id, avatarFile).catch(console.error)
         }
         navigate(`/clientes/${id}`)
       } else {
         const newClient = await createClient(clientData)
+        if (geoData.lat && geoData.lng && newClient?.id) {
+          await updateClientAddressCoords(newClient.id, geoData.lat, geoData.lng).catch(console.error)
+        }
         if (avatarFile && newClient?.id) {
           await uploadClientAvatar(newClient.id, avatarFile).catch(console.error)
         }
@@ -457,8 +487,9 @@ export default function AddClient() {
                     label="Dirección"
                     value={formData.street}
                     onChange={(e) => updateField('street', e.target.value)}
+                    onBlur={handleStreetBlur}
                     error={errors.street}
-                    placeholder="Av. Corrientes 1234, CABA"
+                    placeholder="18 de Julio 1234, Montevideo"
                     className="col-span-2"
                   />
                   <Input
@@ -474,7 +505,7 @@ export default function AddClient() {
                     placeholder="De 8 a 20hs"
                   />
                   <Select
-                    label="Distancia al club"
+                    label={geocoding ? 'Calculando distancia...' : 'Distancia al club'}
                     value={formData.distanceRange}
                     onChange={(e) => updateField('distanceRange', e.target.value)}
                     options={[

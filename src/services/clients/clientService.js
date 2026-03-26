@@ -99,6 +99,22 @@ export async function deleteClient(id) {
 }
 
 /**
+ * Update client address geocoding data (lat/lng)
+ * @param {string} clientId - Client UUID
+ * @param {number|null} latitude
+ * @param {number|null} longitude
+ */
+export async function updateClientAddressCoords(clientId, latitude, longitude) {
+  const { error } = await supabase
+    .from('client_addresses')
+    .update({ latitude, longitude })
+    .eq('client_id', clientId)
+  if (error) {
+    console.warn('Failed to update address coords:', error.message)
+  }
+}
+
+/**
  * Update client's recovery days available
  * @param {string} id - Client UUID
  * @param {number} days - New recovery days count

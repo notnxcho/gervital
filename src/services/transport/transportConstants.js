@@ -1,3 +1,6 @@
+// Club location: Alejo Rosell y Rius 1663 esq 4 de Julio, Montevideo
+export const CLUB_LOCATION = { lat: -34.8969, lng: -56.1470 }
+
 export const SHIFTS = [
   { id: 'morning_arrive', label: 'Llegada mañana', time: '9:00', type: 'arrive', period: 'morning' },
   { id: 'morning_leave', label: 'Salida mañana', time: '14:00', type: 'leave', period: 'morning' },

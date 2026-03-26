@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api'
-import { UNASSIGNED_COLOR } from '../../services/transport/transportConstants'
+import { UNASSIGNED_COLOR, CLUB_LOCATION } from '../../services/transport/transportConstants'
 
 const MAP_CONTAINER_STYLE = {
   width: '100%',
   height: '100%'
 }
 
-const DEFAULT_CENTER = { lat: -34.6037, lng: -58.3816 }
+const DEFAULT_CENTER = CLUB_LOCATION
 
 const MAP_OPTIONS = {
   disableDefaultUI: true,
