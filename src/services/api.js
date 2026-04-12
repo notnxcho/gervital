@@ -122,3 +122,32 @@ export {
   buildDefaultFleet,
   getNextCarColor
 } from './transport/transportService'
+
+// ============================================
+// GROUPS API
+// ============================================
+export {
+  getTimeSlotsForDate,
+  createTimeSlot,
+  updateTimeSlot,
+  deleteTimeSlot,
+  createActivity,
+  updateActivity,
+  deleteActivity,
+  assignClientToActivity,
+  removeClientFromActivity,
+  cleanupOldGroups,
+  getTemplates,
+  getTemplateDetail,
+  saveTemplate,
+  updateTemplateName,
+  deleteTemplate,
+  applyTemplate,
+  saveCurrentAsTemplate,
+  createTemplateSlot,
+  updateTemplateSlot,
+  deleteTemplateSlot,
+  createTemplateActivity,
+  updateTemplateActivity,
+  deleteTemplateActivity
+} from './groups/groupService'
