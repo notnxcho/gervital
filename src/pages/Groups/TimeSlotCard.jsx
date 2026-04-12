@@ -11,12 +11,12 @@ export default function TimeSlotCard({
   onUpdateActivity,
   onDeleteActivity,
   readOnly,
-  invalidDropSlotId,
+  invalidDropSlotIds,
   draggedClientId
 }) {
 
   function isInvalidDropForActivity(activity) {
-    if (!draggedClientId || invalidDropSlotId !== slot.id) return false
+    if (!draggedClientId || !invalidDropSlotIds?.has(slot.id)) return false
     return !activity.clientIds.includes(draggedClientId)
   }
 

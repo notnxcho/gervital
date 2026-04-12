@@ -51,7 +51,7 @@ export default function DailyGroups() {
 
   // DnD state
   const [draggedClient, setDraggedClient] = useState(null)
-  const [invalidDropSlotId, setInvalidDropSlotId] = useState(null)
+  const [invalidDropSlotIds, setInvalidDropSlotIds] = useState(new Set())
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -221,24 +221,24 @@ export default function DailyGroups() {
     if (data?.type === 'pool-client') {
       setDraggedClient(data.client)
 
-      // Check if this client is already in any activity of any slot
-      // If so, mark that slot as invalid for additional drops
+      // Find ALL slots where this client already has an assignment
+      const ids = new Set()
       for (const slot of timeSlots) {
         for (const activity of slot.activities) {
           if (activity.clientIds.includes(data.client.id)) {
-            setInvalidDropSlotId(slot.id)
-            return
+            ids.add(slot.id)
+            break
           }
         }
       }
-      setInvalidDropSlotId(null)
+      setInvalidDropSlotIds(ids)
     }
   }
 
   function handleDragEnd({ active, over }) {
     const client = draggedClient
     setDraggedClient(null)
-    setInvalidDropSlotId(null)
+    setInvalidDropSlotIds(new Set())
 
     if (!over || !client) return
 
@@ -391,7 +391,7 @@ export default function DailyGroups() {
                       onUpdateActivity={handleUpdateActivity}
                       onDeleteActivity={handleDeleteActivity}
                       readOnly={readOnly}
-                      invalidDropSlotId={invalidDropSlotId}
+                      invalidDropSlotIds={invalidDropSlotIds}
                       draggedClientId={draggedClient?.id || null}
                     />
                   ))}
