@@ -25,6 +25,7 @@ import {
 import TimeSlotCard from './TimeSlotCard'
 import ClientPool from './ClientPool'
 import { PoolClientChip } from './ClientChip'
+import TemplateModal from './TemplateModal'
 import Button from '../../components/ui/Button'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -413,8 +414,15 @@ export default function DailyGroups() {
         </DndContext>
       )}
 
-      {/* Template modal placeholder — will be implemented in Task 7 */}
-      {/* {showTemplateModal && <TemplateModal ... />} */}
+      {/* Template modal */}
+      <TemplateModal
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        activeShift={activeShift}
+        dateStr={dateStr}
+        hasExistingData={timeSlots.length > 0}
+        onApplied={() => loadSlots(dateStr, activeShift)}
+      />
     </div>
   )
 }
