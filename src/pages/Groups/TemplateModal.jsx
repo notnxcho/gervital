@@ -18,7 +18,7 @@ import {
   deleteTemplateActivity
 } from '../../services/groups/groupService'
 
-const SHIFT_LABELS = { morning: 'Manana', afternoon: 'Tarde' }
+const SHIFT_LABELS = { morning: 'Mañana', afternoon: 'Tarde' }
 const TEMPLATES_PER_PAGE = 4
 
 // ── Screen 1: Template Grid ─────────────────────────────────────────────────
