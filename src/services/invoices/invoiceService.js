@@ -32,6 +32,17 @@ export async function getClientInvoices(clientId) {
     chargeableDays: inv.chargeableDays || 0,
     chargeableAmount: Number(inv.chargeableAmount) || 0,
     monthlyRate: Number(inv.monthlyRate) || 0,
+
+    attendanceMonthlyRateNet: Number(inv.attendanceMonthlyRateNet) || 0,
+    attendanceMonthlyRateGross: Number(inv.attendanceMonthlyRateGross) || 0,
+    attendanceChargeableNet: Number(inv.attendanceChargeableNet) || 0,
+    attendanceChargeableGross: Number(inv.attendanceChargeableGross) || 0,
+
+    transportMonthlyRateNet: Number(inv.transportMonthlyRateNet) || 0,
+    transportMonthlyRateGross: Number(inv.transportMonthlyRateGross) || 0,
+    transportChargeableNet: Number(inv.transportChargeableNet) || 0,
+    transportChargeableGross: Number(inv.transportChargeableGross) || 0,
+
     isAmountOverridden: inv.isAmountOverridden || false,
     originalChargeableAmount: inv.originalChargeableAmount ? Number(inv.originalChargeableAmount) : null,
     invoiceStatus: inv.invoiceStatus,
@@ -69,9 +80,24 @@ export async function calculateMonthBilling(clientId, year, month) {
     vacationDays: data.vacationDays,
     recoveryDays: data.recoveryDays,
     chargeableDays: data.chargeableDays,
-    monthlyRate: Number(data.monthlyRate),
-    chargeableAmount: Number(data.chargeableAmount),
-    isProrated: data.isProrated
+    isProrated: data.isProrated,
+    hasTransport: data.hasTransport,
+
+    attendanceMonthlyRateNet: Number(data.attendanceMonthlyRateNet) || 0,
+    attendanceMonthlyRateGross: Number(data.attendanceMonthlyRateGross) || 0,
+    attendanceChargeableNet: Number(data.attendanceChargeableNet) || 0,
+    attendanceChargeableGross: Number(data.attendanceChargeableGross) || 0,
+
+    transportMonthlyRateNet: Number(data.transportMonthlyRateNet) || 0,
+    transportMonthlyRateGross: Number(data.transportMonthlyRateGross) || 0,
+    transportChargeableNet: Number(data.transportChargeableNet) || 0,
+    transportChargeableGross: Number(data.transportChargeableGross) || 0,
+
+    totalChargeableGross: Number(data.totalChargeableGross) || 0,
+    totalMonthlyRateGross: Number(data.totalMonthlyRateGross) || 0,
+
+    monthlyRate: Number(data.monthlyRate) || 0,
+    chargeableAmount: Number(data.chargeableAmount) || 0
   }
 }
 

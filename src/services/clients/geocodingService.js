@@ -49,10 +49,9 @@ export function haversineKm(lat1, lng1, lat2, lng2) {
  * Determine the distance range bucket from a distance in km.
  */
 export function distanceToRange(km) {
-  if (km < 1) return 'under_1km'
-  if (km < 5) return '1_to_5km'
-  if (km < 10) return '5_to_10km'
-  return 'over_10km'
+  if (km < 2) return '0_to_2km'
+  if (km < 5) return '2_to_5km'
+  return '5_to_10km'
 }
 
 /**

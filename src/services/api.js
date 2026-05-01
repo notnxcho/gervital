@@ -77,15 +77,10 @@ export {
 } from './users/userService'
 
 // ============================================
-// PLAN PRICING API
+// PRICING API (plan + transport)
 // ============================================
-export {
-  getPlanPricing,
-  calculatePlanPrice
-} from './pricing/pricingService'
-
-// Also export synchronous version for components that have cached pricing
-export { calculatePlanPriceSync, calculateProration, calculateBillingBreakdown } from './pricing/pricingService'
+export { getPlanPricing, getPlanPriceSync, calculateProration } from './pricing/pricingService'
+export { getTransportPricing, getTransportPriceSync } from './pricing/transportPricingService'
 
 // ============================================
 // SUPPLIERS & EXPENSES API
