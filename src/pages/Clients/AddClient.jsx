@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check } from 'iconoir-react'
 import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords } from '../../services/api'
 import { geocodeAndCalculateDistance } from '../../services/clients/geocodingService'
-import { getPlanPricing, calculatePlanPriceSync } from '../../services/pricing/pricingService'
+import { getPlanPricing, getPlanPriceSync } from '../../services/pricing/pricingService'
+import { getTransportPricing, getTransportPriceSync } from '../../services/pricing/transportPricingService'
 import Button from '../../components/ui/Button'
 import Input, { Select, Textarea, Checkbox } from '../../components/ui/Input'
 import Card, { CardContent } from '../../components/ui/Card'
@@ -13,7 +14,8 @@ const FREQUENCY_OPTIONS = [
   { value: '1', label: '1 vez por semana' },
   { value: '2', label: '2 veces por semana' },
   { value: '3', label: '3 veces por semana' },
-  { value: '4', label: '4 veces por semana' }
+  { value: '4', label: '4 veces por semana' },
+  { value: '5', label: '5 veces por semana' }
 ]
 
 const SCHEDULE_OPTIONS = [
@@ -88,6 +90,7 @@ export default function AddClient() {
   const [loading, setLoading] = useState(false)
   const [loadingClient, setLoadingClient] = useState(false)
   const [pricingData, setPricingData] = useState([])
+  const [transportPricingData, setTransportPricingData] = useState([])
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [geocoding, setGeocoding] = useState(false)
@@ -96,6 +99,9 @@ export default function AddClient() {
     getPlanPricing()
       .then(setPricingData)
       .catch(err => console.error('Error cargando precios:', err))
+    getTransportPricing()
+      .then(setTransportPricingData)
+      .catch(err => console.error('Error cargando precios de transporte:', err))
   }, [])
 
   useEffect(() => {
@@ -282,11 +288,19 @@ export default function AddClient() {
     }
   }
 
-  const estimatedPrice = calculatePlanPriceSync(
+  const planPrice = getPlanPriceSync(
     pricingData,
     parseInt(formData.frequency),
     formData.schedule
   )
+  const transportPrice = formData.hasTransport && formData.distanceRange
+    ? getTransportPriceSync(
+        transportPricingData,
+        parseInt(formData.frequency),
+        formData.distanceRange
+      )
+    : { priceNet: 0, priceGross: 0 }
+  const estimatedTotalGross = planPrice.priceGross + transportPrice.priceGross
 
   if (loadingClient) {
     return (
@@ -510,10 +524,9 @@ export default function AddClient() {
                     onChange={(e) => updateField('distanceRange', e.target.value)}
                     options={[
                       { value: '', label: 'Sin definir' },
-                      { value: 'under_1km', label: 'Menos de 1 km' },
-                      { value: '1_to_5km', label: '1 a 5 km' },
-                      { value: '5_to_10km', label: '5 a 10 km' },
-                      { value: 'over_10km', label: 'Más de 10 km' }
+                      { value: '0_to_2km', label: '0 a 2 km' },
+                      { value: '2_to_5km', label: '2 a 5 km' },
+                      { value: '5_to_10km', label: '5 a 10 km' }
                     ]}
                     className="col-span-2"
                   />
@@ -589,14 +602,25 @@ export default function AddClient() {
               </div>
 
               {/* Price preview */}
-              <div className="bg-indigo-50 rounded-lg p-4">
+              <div className="bg-indigo-50 rounded-lg p-4 space-y-2">
                 <p className="text-sm text-indigo-700">Precio mensual estimado</p>
                 <p className="text-2xl font-bold text-indigo-900">
-                  ${estimatedPrice.toLocaleString()}
+                  ${estimatedTotalGross.toLocaleString()}
                 </p>
+                <div className="text-xs text-indigo-700 space-y-0.5">
+                  <p>Mensualidad: ${planPrice.priceGross.toLocaleString()}</p>
+                  {formData.hasTransport && (
+                    <p>
+                      Transporte:{' '}
+                      {transportPrice.priceGross > 0
+                        ? `$${transportPrice.priceGross.toLocaleString()}`
+                        : '— (definir distancia)'}
+                    </p>
+                  )}
+                </div>
                 <p className="text-xs text-indigo-600 mt-1">
-                  {formData.frequency}x/semana • {SCHEDULE_OPTIONS.find(s => s.value === formData.schedule)?.label}
-                  {formData.hasTransport && ' • Transporte'}
+                  {formData.frequency}x/semana · {SCHEDULE_OPTIONS.find(s => s.value === formData.schedule)?.label}
+                  {formData.hasTransport && ' · Transporte'}
                 </p>
               </div>
             </div>

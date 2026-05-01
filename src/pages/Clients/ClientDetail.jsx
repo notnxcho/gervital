@@ -8,7 +8,9 @@ import {
   getClientAttendance,
   getClientInvoices,
   getPlanPricing,
-  calculatePlanPriceSync,
+  getPlanPriceSync,
+  getTransportPricing,
+  getTransportPriceSync,
   advanceScheduledAttendance,
   ensureClientMonths,
   calculateMonthBilling,
@@ -89,6 +91,7 @@ export default function ClientDetail() {
   const [attendance, setAttendance] = useState([])
   const [invoices, setInvoices] = useState([])
   const [pricingData, setPricingData] = useState([])
+  const [transportPricingData, setTransportPricingData] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('general')
   const [showOptionsMenu, setShowOptionsMenu] = useState(false)
@@ -118,11 +121,12 @@ export default function ClientDetail() {
     setLoading(true)
     try {
       // Advance past scheduled days and ensure future months exist (parallel with data fetching)
-      const [clientData, attendanceData, invoicesData, pricing] = await Promise.all([
+      const [clientData, attendanceData, invoicesData, pricing, transportPricing] = await Promise.all([
         getClientById(id),
         getClientAttendance(id),
         getClientInvoices(id),
-        getPlanPricing()
+        getPlanPricing(),
+        getTransportPricing()
       ])
       // Run setup functions (non-blocking, best-effort)
       Promise.all([
@@ -137,6 +141,7 @@ export default function ClientDetail() {
       setAttendance(attendanceData)
       setInvoices(invoicesData)
       setPricingData(pricing)
+      setTransportPricingData(transportPricing)
     } catch (error) {
       console.error('Error cargando datos del cliente:', error)
     } finally {
@@ -328,7 +333,7 @@ export default function ClientDetail() {
                 {client.plan.hasTransport ? 'Incluido' : 'No incluido'}
                 {client.plan.hasTransport && client.address?.distanceRange && (
                   <span className="text-sm font-normal text-gray-500 ml-1">
-                    ({({ under_1km: '<1km', '1_to_5km': '1-5km', '5_to_10km': '5-10km', over_10km: '10+km' })[client.address.distanceRange]})
+                    ({({ '0_to_2km': '0-2km', '2_to_5km': '2-5km', '5_to_10km': '5-10km' })[client.address.distanceRange]})
                   </span>
                 )}
               </p>
@@ -462,6 +467,7 @@ export default function ClientDetail() {
               invoice={null}
               attendance={attendance}
               pricingData={pricingData}
+              transportPricingData={transportPricingData}
               user={user}
               onRefresh={loadClientData}
             />
@@ -476,6 +482,7 @@ export default function ClientDetail() {
               invoice={inv}
               attendance={attendance}
               pricingData={pricingData}
+              transportPricingData={transportPricingData}
               user={user}
               onRefresh={loadClientData}
             />
@@ -510,7 +517,7 @@ export default function ClientDetail() {
 // ============================================================
 // MonthCard
 // ============================================================
-function MonthCard({ client, year, month, invoice, attendance, pricingData, user, onRefresh }) {
+function MonthCard({ client, year, month, invoice, attendance, pricingData, transportPricingData, user, onRefresh }) {
   const [processing, setProcessing] = useState(false)
   // Modal state: null | 'payment' | 'undoPayment' | 'invoice' | 'absence' | 'undoAbsence' | 'vacation' | 'undoVacation' | 'recovery' | 'undoRecovery'
   const [modal, setModal] = useState(null)
@@ -573,9 +580,13 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, user
     return attendance.find(a => a.date === dateStr)?.status === 'recovery'
   }).length
 
-  const monthlyRate = calculatePlanPriceSync(pricingData, client.plan.frequency, client.plan.schedule)
+  const planPrice = getPlanPriceSync(pricingData, client.plan.frequency, client.plan.schedule)
+  const transportPrice = client.plan.hasTransport && client.address?.distanceRange
+    ? getTransportPriceSync(transportPricingData, client.plan.frequency, client.address.distanceRange)
+    : { priceNet: 0, priceGross: 0 }
+  const monthlyTotalGross = planPrice.priceGross + transportPrice.priceGross
   const liveChargeableAmount = fullMonthDays > 0
-    ? Math.round((chargeableDays / fullMonthDays) * monthlyRate)
+    ? Math.round((chargeableDays / fullMonthDays) * monthlyTotalGross)
     : 0
 
   // If paid: use snapshot from invoice; otherwise live calculation
@@ -944,7 +955,7 @@ function PaymentModal({ isOpen, onClose, clientId, year, month, liveAmount, user
     // Fetch authoritative billing from server
     setLoadingBilling(true)
     calculateMonthBilling(clientId, year, month)
-      .then(b => { setBilling(b); setAmount(String(b.chargeableAmount)) })
+      .then(b => { setBilling(b); setAmount(String(b.totalChargeableGross)) })
       .catch(() => setAmount(String(liveAmount)))
       .finally(() => setLoadingBilling(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -986,8 +997,16 @@ function PaymentModal({ isOpen, onClose, clientId, year, month, liveAmount, user
             <div className="flex justify-between font-medium text-gray-800 border-t border-gray-200 pt-1">
               <span>Días a cobrar:</span><span>{billing.chargeableDays}</span>
             </div>
-            <div className="flex justify-between font-semibold text-gray-900">
-              <span>Monto calculado:</span><span>${billing.chargeableAmount.toLocaleString()}</span>
+            <div className="flex justify-between text-gray-700 pt-1">
+              <span>Mensualidad:</span><span>${billing.attendanceChargeableGross.toLocaleString()}</span>
+            </div>
+            {billing.hasTransport && (
+              <div className="flex justify-between text-gray-700">
+                <span>Transporte:</span><span>${billing.transportChargeableGross.toLocaleString()}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-semibold text-gray-900 border-t border-gray-300 pt-1">
+              <span>Total a cobrar:</span><span>${billing.totalChargeableGross.toLocaleString()}</span>
             </div>
           </div>
         )}

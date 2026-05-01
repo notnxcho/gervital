@@ -70,7 +70,7 @@ export async function getDashboardMetrics(year, month) {
   // --- Client KPIs ---
   const totalClients = clients.length
   const tierCounts = { A: 0, B: 0, C: 0, D: 0 }
-  const freqCounts = { 1: 0, 2: 0, 3: 0, 4: 0 }
+  const freqCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
   let withTransport = 0
   let totalRecoveryDays = 0
 
