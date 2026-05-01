@@ -8,6 +8,26 @@
 -- ============================================
 
 -- ============================================
+-- ⚠️  FRONTEND COUPLING (must ship in lockstep)
+--
+-- This migration changes return types and column shapes that break
+-- the following frontend modules. They must be updated in the same
+-- release (Phase 2 of the pricing redesign):
+--
+--   src/services/pricing/pricingService.js
+--     - SELECT 'price' column → SELECT 'price_net','price_gross'
+--     - get_plan_price now returns JSONB {net,gross} instead of NUMERIC
+--   src/services/invoices/invoiceService.js
+--     - new granular fields available on calculate_month_billing return
+--   src/services/transport/transportConstants.js
+--     - DISTANCE_RANGES must collapse to 3 buckets
+--   src/services/clients/geocodingService.js
+--     - distanceToRange must return 3-bucket values
+--   src/pages/Clients/AddClient.jsx, ClientDetail.jsx, ClientList.jsx
+--     - frequency 1..5, distance options, price preview with breakdown
+-- ============================================
+
+-- ============================================
 -- Step 1 — client_plans: extend frequency to 1..5
 -- ============================================
 
@@ -18,8 +38,6 @@ ALTER TABLE client_plans ADD CONSTRAINT client_plans_frequency_check
 -- ============================================
 -- Step 2 — plan_pricing: extend frequency, add net/gross columns
 -- ============================================
-
-DELETE FROM plan_pricing;
 
 ALTER TABLE plan_pricing DROP CONSTRAINT IF EXISTS plan_pricing_frequency_check;
 ALTER TABLE plan_pricing ADD CONSTRAINT plan_pricing_frequency_check
@@ -37,7 +55,7 @@ ALTER TABLE plan_pricing DROP COLUMN IF EXISTS price;
 -- Step 3 — transport_pricing: new table
 -- ============================================
 
-CREATE TABLE transport_pricing (
+CREATE TABLE IF NOT EXISTS transport_pricing (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   frequency INTEGER NOT NULL CHECK (frequency IN (1, 2, 3, 4, 5)),
   distance_range TEXT NOT NULL CHECK (distance_range IN ('0_to_2km', '2_to_5km', '5_to_10km')),
@@ -49,9 +67,12 @@ CREATE TABLE transport_pricing (
 );
 
 ALTER TABLE transport_pricing ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "transport_pricing_select" ON transport_pricing;
+DROP POLICY IF EXISTS "transport_pricing_modify" ON transport_pricing;
 CREATE POLICY "transport_pricing_select" ON transport_pricing FOR SELECT TO authenticated USING (true);
 CREATE POLICY "transport_pricing_modify" ON transport_pricing FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
+DROP TRIGGER IF EXISTS set_transport_pricing_updated_at ON transport_pricing;
 CREATE TRIGGER set_transport_pricing_updated_at
   BEFORE UPDATE ON transport_pricing
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -113,7 +134,11 @@ INSERT INTO plan_pricing (frequency, schedule, price_net, price_gross) VALUES
   (2, 'full_day',   39344, 48000),
   (3, 'full_day',   49180, 60000),
   (4, 'full_day',   59836, 73000),
-  (5, 'full_day',   66393, 81000);
+  (5, 'full_day',   66393, 81000)
+ON CONFLICT (frequency, schedule) DO UPDATE
+  SET price_net = EXCLUDED.price_net,
+      price_gross = EXCLUDED.price_gross,
+      updated_at = NOW();
 
 -- ============================================
 -- Step 7 — Seed transport_pricing (5 frequencies × 3 distance ranges)
@@ -134,7 +159,11 @@ INSERT INTO transport_pricing (frequency, distance_range, price_net, price_gross
   (2, '5_to_10km',  9309, 10240),
   (3, '5_to_10km', 13964, 15360),
   (4, '5_to_10km', 18618, 20480),
-  (5, '5_to_10km', 23273, 25600);
+  (5, '5_to_10km', 23273, 25600)
+ON CONFLICT (frequency, distance_range) DO UPDATE
+  SET price_net = EXCLUDED.price_net,
+      price_gross = EXCLUDED.price_gross,
+      updated_at = NOW();
 
 -- ============================================
 -- Step 8 — Pricing RPCs
@@ -152,7 +181,7 @@ BEGIN
   WHERE frequency = p_frequency AND schedule = p_schedule;
 
   IF v_net IS NULL THEN
-    RAISE EXCEPTION 'No plan pricing for frequency=% schedule=%', p_frequency, p_schedule;
+    RAISE EXCEPTION 'No se encontró precio de plan para frecuencia=% horario=%', p_frequency, p_schedule;
   END IF;
 
   RETURN jsonb_build_object('net', v_net, 'gross', v_gross);
@@ -168,7 +197,7 @@ BEGIN
   WHERE frequency = p_frequency AND distance_range = p_distance_range;
 
   IF v_net IS NULL THEN
-    RAISE EXCEPTION 'No transport pricing for frequency=% distance=%', p_frequency, p_distance_range;
+    RAISE EXCEPTION 'No se encontró precio de transporte para frecuencia=% distancia=%', p_frequency, p_distance_range;
   END IF;
 
   RETURN jsonb_build_object('net', v_net, 'gross', v_gross);
@@ -201,8 +230,8 @@ DECLARE
   v_chargeable_days INTEGER;
   v_att_rate_net NUMERIC(12,2);
   v_att_rate_gross NUMERIC(12,2);
-  v_att_charge_net NUMERIC(12,2);
-  v_att_charge_gross NUMERIC(12,2);
+  v_att_charge_net NUMERIC(12,2) := 0;
+  v_att_charge_gross NUMERIC(12,2) := 0;
   v_trans_rate_net NUMERIC(12,2) := 0;
   v_trans_rate_gross NUMERIC(12,2) := 0;
   v_trans_charge_net NUMERIC(12,2) := 0;
@@ -294,9 +323,6 @@ BEGIN
       v_trans_charge_gross := ROUND(v_proration_factor * v_trans_rate_gross);
       v_trans_charge_net := ROUND(v_proration_factor * v_trans_rate_net);
     END IF;
-  ELSE
-    v_att_charge_gross := 0;
-    v_att_charge_net := 0;
   END IF;
 
   RETURN jsonb_build_object(
