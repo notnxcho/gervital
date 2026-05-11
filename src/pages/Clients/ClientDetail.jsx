@@ -300,10 +300,12 @@ export default function ClientDetail() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => navigate(`/clientes/${id}/editar`)}>
-            <Edit className="w-4 h-4" />
-            Editar
-          </Button>
+          {!client.deletedAt && (
+            <Button variant="secondary" onClick={() => navigate(`/clientes/${id}/editar`)}>
+              <Edit className="w-4 h-4" />
+              Editar
+            </Button>
+          )}
           <div className="relative" ref={optionsMenuRef}>
             <Button variant="ghost" size="sm" onClick={() => setShowOptionsMenu(!showOptionsMenu)} className="p-2">
               <MoreVert className="w-5 h-5" />
@@ -554,6 +556,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const [invoiceDropOpen, setInvoiceDropOpen] = useState(false)
   const paymentDropRef = useRef(null)
   const invoiceDropRef = useRef(null)
+  const isDeactivated = !!client.deletedAt
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -640,6 +643,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   }
 
   const handleDayClick = (day) => {
+    if (isDeactivated) return
     const dateStr = format(day, 'yyyy-MM-dd')
     const { status, isJustified, isAssigned } = getDayStatus(day)
     const isWeekend = getDay(day) === 0 || getDay(day) === 6
@@ -701,20 +705,21 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
             {/* Payment badge */}
             <div className="relative flex-1" ref={paymentDropRef}>
               <button
-                onClick={() => { setPaymentDropOpen(!paymentDropOpen); setInvoiceDropOpen(false) }}
+                onClick={isDeactivated ? undefined : () => { setPaymentDropOpen(!paymentDropOpen); setInvoiceDropOpen(false) }}
+                disabled={isDeactivated}
                 className={`w-full flex items-center justify-between gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
                   isPaid
-                    ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                    ? 'bg-green-50 text-green-700 border-green-200'
                     : isOverdue
-                      ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
-                      : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
-                }`}
+                      ? 'bg-red-50 text-red-700 border-red-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                } ${isDeactivated ? 'cursor-default' : isPaid ? 'hover:bg-green-100' : isOverdue ? 'hover:bg-red-100' : 'hover:bg-amber-100'}`}
               >
                 <span className="flex items-center gap-1">
                   {isPaid ? 'Cobrado' : 'Pendiente'}
                   {isOverdue && <span className="px-1 py-0.5 bg-red-600 text-white rounded text-[10px] leading-none">Vencido</span>}
                 </span>
-                <NavArrowDown className="w-3 h-3" />
+                {!isDeactivated && <NavArrowDown className="w-3 h-3" />}
               </button>
               {paymentDropOpen && (
                 <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1">
@@ -747,15 +752,16 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
             {/* Invoice badge */}
             <div className="relative flex-1" ref={invoiceDropRef}>
               <button
-                onClick={() => { setInvoiceDropOpen(!invoiceDropOpen); setPaymentDropOpen(false) }}
+                onClick={isDeactivated ? undefined : () => { setInvoiceDropOpen(!invoiceDropOpen); setPaymentDropOpen(false) }}
+                disabled={isDeactivated}
                 className={`w-full flex items-center justify-between gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
                   isInvoiced
-                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
-                    : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
-                }`}
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    : 'bg-gray-50 text-gray-500 border-gray-200'
+                } ${isDeactivated ? 'cursor-default' : isInvoiced ? 'hover:bg-indigo-100' : 'hover:bg-gray-100'}`}
               >
                 <span>{isInvoiced ? 'Facturado' : 'Sin factura'}</span>
-                <NavArrowDown className="w-3 h-3" />
+                {!isDeactivated && <NavArrowDown className="w-3 h-3" />}
               </button>
               {invoiceDropOpen && (
                 <div className="absolute top-full right-0 mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1">
@@ -821,7 +827,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
               const isWeekend = getDay(day) === 0 || getDay(day) === 6
               const { status, isJustified, isAssigned } = getDayStatus(day)
               const isStartDate = format(day, 'yyyy-MM-dd') === format(clientStart, 'yyyy-MM-dd')
-              const canClick = !isWeekend && (
+              const canClick = !isWeekend && !isDeactivated && (
                 isAssigned ||
                 status === 'recovery' ||
                 (!isAssigned && client.recoveryDaysAvailable > 0 && status === 'not_scheduled' && !isWeekend)
