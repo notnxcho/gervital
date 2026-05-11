@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Phone, MapPin, Calendar, MoreVert, Trash, WarningCircle, Check, NavArrowDown } from 'iconoir-react'
+import { ArrowLeft, Edit, Phone, MapPin, Calendar, MoreVert, Trash, Check, NavArrowDown } from 'iconoir-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -24,7 +24,8 @@ import {
   markVacationRange,
   markDayRecoveryAttended,
   unmarkDayRecoveryAttended,
-  deleteClient,
+  deactivateClient,
+  reactivateClient,
   uploadClientAvatar,
   deleteClientAvatar
 } from '../../services/api'
@@ -33,6 +34,7 @@ import Button from '../../components/ui/Button'
 import Card, { CardContent, CardHeader } from '../../components/ui/Card'
 import Tabs from '../../components/ui/Tabs'
 import Modal from '../../components/ui/Modal'
+import DeactivateClientModal, { DEACTIVATION_REASONS } from './DeactivateClientModal'
 
 const SCHEDULE_LABELS = {
   morning: 'Mañana',
@@ -62,6 +64,10 @@ const COGNITIVE_LEVEL_CONFIG = {
   C: { label: 'Tier C - Asistencia moderada', color: 'bg-amber-100 text-amber-700 border-amber-200' },
   D: { label: 'Tier D - Asistencia alta', color: 'bg-red-100 text-red-700 border-red-200' }
 }
+
+const REASON_LABEL = Object.fromEntries(
+  DEACTIVATION_REASONS.map(r => [r.value, r.label])
+)
 
 // Day cell styling by status
 function getDayStyle(status, isJustified) {
@@ -95,8 +101,9 @@ export default function ClientDetail() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('general')
   const [showOptionsMenu, setShowOptionsMenu] = useState(false)
-  const [deleteModal, setDeleteModal] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [deactivateModal, setDeactivateModal] = useState(false)
+  const [deactivating, setDeactivating] = useState(false)
+  const [reactivating, setReactivating] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   const optionsMenuRef = useRef(null)
@@ -149,15 +156,29 @@ export default function ClientDetail() {
     }
   }
 
-  const handleDeleteClient = async () => {
-    setDeleting(true)
+  const handleDeactivate = async ({ reason, notes }) => {
+    if (!user?.id) return
+    setDeactivating(true)
     try {
-      await deleteClient(id)
-      navigate('/clientes')
+      const updated = await deactivateClient(id, { reason, notes, userId: user.id })
+      setClient(updated)
+      setDeactivateModal(false)
     } catch (error) {
-      console.error('Error eliminando cliente:', error)
+      console.error('Error dando de baja al cliente:', error)
     } finally {
-      setDeleting(false)
+      setDeactivating(false)
+    }
+  }
+
+  const handleReactivate = async () => {
+    setReactivating(true)
+    try {
+      const updated = await reactivateClient(id)
+      setClient(updated)
+    } catch (error) {
+      console.error('Error reactivando cliente:', error)
+    } finally {
+      setReactivating(false)
     }
   }
 
@@ -289,18 +310,37 @@ export default function ClientDetail() {
             </Button>
             {showOptionsMenu && (
               <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1">
-                <button
-                  onClick={() => { setShowOptionsMenu(false); setDeleteModal(true) }}
-                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                >
-                  <Trash className="w-4 h-4" />
-                  Dar de baja
-                </button>
+                {!client.deletedAt && (
+                  <button
+                    onClick={() => { setShowOptionsMenu(false); setDeactivateModal(true) }}
+                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  >
+                    <Trash className="w-4 h-4" />
+                    Dar de baja
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {client.deletedAt && (
+        <div className="mb-4 p-4 rounded-xl border border-amber-300 bg-amber-50 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-amber-900 font-semibold">
+              Cliente dado de baja el {format(new Date(client.deletedAt), "d 'de' MMMM, yyyy", { locale: es })}
+            </p>
+            <p className="text-sm text-amber-800 mt-1">
+              Motivo: {REASON_LABEL[client.deactivationReason] || '—'}
+              {client.deactivationNotes && <> · {client.deactivationNotes}</>}
+            </p>
+          </div>
+          <Button variant="secondary" onClick={handleReactivate} loading={reactivating}>
+            Reactivar cliente
+          </Button>
+        </div>
+      )}
 
       {/* Plan summary */}
       <Card className="mb-6">
@@ -490,26 +530,13 @@ export default function ClientDetail() {
         )}
       </div>
 
-      {/* Delete modal */}
-      <Modal isOpen={deleteModal} onClose={() => setDeleteModal(false)} title="Dar de baja cliente">
-        <div className="flex items-start gap-4 mb-6">
-          <div className="p-3 bg-red-100 rounded-full">
-            <WarningCircle className="w-6 h-6 text-red-600" />
-          </div>
-          <div>
-            <p className="text-gray-900 font-medium">
-              ¿Estás seguro de que deseas dar de baja a {client?.firstName} {client?.lastName}?
-            </p>
-            <p className="text-gray-500 text-sm mt-1">
-              Esta acción eliminará todos los datos del cliente y no se puede deshacer.
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-3 justify-end">
-          <Button variant="secondary" onClick={() => setDeleteModal(false)}>Cancelar</Button>
-          <Button variant="danger" onClick={handleDeleteClient} loading={deleting}>Dar de baja</Button>
-        </div>
-      </Modal>
+      <DeactivateClientModal
+        isOpen={deactivateModal}
+        onClose={() => setDeactivateModal(false)}
+        client={client}
+        onConfirm={handleDeactivate}
+        loading={deactivating}
+      />
     </div>
   )
 }
