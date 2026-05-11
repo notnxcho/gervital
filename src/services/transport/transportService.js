@@ -5,6 +5,7 @@ export async function getTransportClients() {
   const { data, error } = await supabase
     .from('clients_full')
     .select('*')
+    .is('deletedAt', null)
   if (error) throw new Error(error.message)
   return data
     .filter(c => c.plan?.hasTransport)

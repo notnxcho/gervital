@@ -14,7 +14,8 @@ export async function getDashboardMetrics(year, month) {
   const [clientsRes, invoicesRes, attendanceRes, expensesRes] = await Promise.all([
     supabase
       .from('clients_full')
-      .select('id, firstName, lastName, avatarUrl, cognitiveLevel, recoveryDaysAvailable, plan'),
+      .select('id, firstName, lastName, avatarUrl, cognitiveLevel, recoveryDaysAvailable, plan')
+      .is('deletedAt', null),
 
     supabase
       .from('invoices_view')
