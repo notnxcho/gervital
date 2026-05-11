@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Trash, Refresh, SunLight, HalfMoon, Sparks } from 'iconoir-react'
-import { differenceInYears } from 'date-fns'
-import { getClients, deleteClient } from '../../services/api'
+import { differenceInYears, format } from 'date-fns'
+import { es } from 'date-fns/locale'
+import { getClients, deactivateClient } from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
-import Modal from '../../components/ui/Modal'
 import Filters, { getActiveFiltersCount } from '../../components/ui/Filters'
+import DeactivateClientModal, { DEACTIVATION_REASONS } from './DeactivateClientModal'
 
 // MOCKED RES - Días de la semana
 const WEEK_DAYS = [
@@ -61,6 +63,10 @@ const FILTERS_CONFIG = [
   }
 ]
 
+const REASON_LABEL = Object.fromEntries(
+  DEACTIVATION_REASONS.map(r => [r.value, r.label])
+)
+
 // MOCKED RES - Calcular edad desde fecha de nacimiento
 const calculateAge = (birthDate) => {
   if (!birthDate) return null
@@ -68,27 +74,31 @@ const calculateAge = (birthDate) => {
 }
 
 export default function ClientList() {
+  const { user } = useAuth()
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [deleteModal, setDeleteModal] = useState({ open: false, client: null })
-  const [deleting, setDeleting] = useState(false)
+  const [showDeleted, setShowDeleted] = useState(false)
+  const [deactivateModal, setDeactivateModal] = useState({ open: false, client: null })
+  const [deactivating, setDeactivating] = useState(false)
   const [filters, setFilters] = useState({
     cognitiveLevel: null,
     frequency: null,
     hasTransport: null
   })
-  
+
   const navigate = useNavigate()
 
   useEffect(() => {
     loadClients()
-  }, [])
+    // re-load when toggle flips
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDeleted])
 
   const loadClients = async () => {
     setLoading(true)
     try {
-      const data = await getClients()
+      const data = await getClients({ includeDeleted: showDeleted })
       setClients(data)
     } catch (error) {
       console.error('Error cargando clientes:', error)
@@ -98,39 +108,33 @@ export default function ClientList() {
   }
 
   const filteredClients = clients.filter((client) => {
-    // Filtro de búsqueda
     const fullName = `${client.firstName} ${client.lastName}`.toLowerCase()
     const phone = client.emergencyContact?.phone?.toLowerCase() || ''
     const address = client.address?.street?.toLowerCase() || ''
     const searchLower = search.toLowerCase()
     const matchesSearch = fullName.includes(searchLower) || phone.includes(searchLower) || address.includes(searchLower)
-    
-    // Filtro de tier cognitivo
+
     const matchesCognitive = filters.cognitiveLevel === null || client.cognitiveLevel === filters.cognitiveLevel
-    
-    // Filtro de frecuencia
     const matchesFrequency = filters.frequency === null || client.plan.frequency === filters.frequency
-    
-    // Filtro de transporte
     const matchesTransport = filters.hasTransport === null || client.plan.hasTransport === filters.hasTransport
-    
+
     return matchesSearch && matchesCognitive && matchesFrequency && matchesTransport
   })
-  
+
   const activeFiltersCount = getActiveFiltersCount(filters)
 
-  const handleDelete = async () => {
-    if (!deleteModal.client) return
-    
-    setDeleting(true)
+  const handleDeactivate = async ({ reason, notes }) => {
+    if (!deactivateModal.client || !user?.id) return
+
+    setDeactivating(true)
     try {
-      await deleteClient(deleteModal.client.id)
-      setClients(clients.filter(c => c.id !== deleteModal.client.id))
-      setDeleteModal({ open: false, client: null })
+      await deactivateClient(deactivateModal.client.id, { reason, notes, userId: user.id })
+      setDeactivateModal({ open: false, client: null })
+      await loadClients()
     } catch (error) {
-      console.error('Error eliminando cliente:', error)
+      console.error('Error dando de baja al cliente:', error)
     } finally {
-      setDeleting(false)
+      setDeactivating(false)
     }
   }
 
@@ -164,7 +168,17 @@ export default function ClientList() {
           />
         </div>
 
-        <Button 
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={showDeleted}
+              onChange={e => setShowDeleted(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+            />
+            Mostrar bajas
+          </label>
+
+        <Button
           onClick={() => navigate('/clientes/nuevo')}
           className="bg-purple-600 hover:bg-purple-700 rounded-full px-6"
         >
@@ -205,54 +219,34 @@ export default function ClientList() {
                 key={client.id} 
                 client={client} 
                 onView={() => navigate(`/clientes/${client.id}`)}
-                onDelete={() => setDeleteModal({ open: true, client })}
+                onDelete={() => setDeactivateModal({ open: true, client })}
               />
             ))
           )}
         </div>
       )}
 
-      {/* Delete confirmation modal */}
-      <Modal
-        isOpen={deleteModal.open}
-        onClose={() => setDeleteModal({ open: false, client: null })}
-        title="Eliminar cliente"
-      >
-        <p className="text-gray-600 mb-6">
-          ¿Estás seguro de que deseas eliminar a{' '}
-          <span className="font-semibold">
-            {deleteModal.client?.firstName} {deleteModal.client?.lastName}
-          </span>
-          ? Esta acción no se puede deshacer.
-        </p>
-        <div className="flex gap-3 justify-end">
-          <Button
-            variant="secondary"
-            onClick={() => setDeleteModal({ open: false, client: null })}
-          >
-            Cancelar
-          </Button>
-          <Button
-            variant="danger"
-            onClick={handleDelete}
-            loading={deleting}
-          >
-            Eliminar
-          </Button>
-        </div>
-      </Modal>
+      <DeactivateClientModal
+        isOpen={deactivateModal.open}
+        onClose={() => setDeactivateModal({ open: false, client: null })}
+        client={deactivateModal.client}
+        onConfirm={handleDeactivate}
+        loading={deactivating}
+      />
     </div>
   )
 }
 
-// Componente de tarjeta de cliente
 function ClientCard({ client, onView, onDelete }) {
   const age = calculateAge(client.birthDate)
-  
+  const isDeactivated = !!client.deletedAt
+  const deactivatedLabel = isDeactivated
+    ? `Baja: ${REASON_LABEL[client.deactivationReason] || 'Sin motivo'} · ${format(new Date(client.deletedAt), "d MMM yyyy", { locale: es })}`
+    : null
+
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group">
+    <Card className={`overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group ${isDeactivated ? 'opacity-60 grayscale' : ''}`}>
       <div onClick={onView}>
-        {/* Imagen / placeholder con tier cognitivo */}
         <div className="relative h-40 bg-gradient-to-br from-gray-200 to-gray-300">
           {client.avatarUrl ? (
             <img
@@ -267,87 +261,89 @@ function ClientCard({ client, onView, onDelete }) {
               </span>
             </div>
           )}
-          
-          {/* Tier cognitivo badge */}
+
           <div className={`absolute bottom-3 left-3 px-3 py-1 rounded-lg text-sm font-semibold border ${COGNITIVE_LEVEL_COLORS[client.cognitiveLevel] || 'bg-gray-100 text-gray-700'}`}>
             Tier {client.cognitiveLevel}
           </div>
-          
-          {/* Días de recupero badge */}
-          {client.recoveryDaysAvailable > 0 && (
+
+          {client.recoveryDaysAvailable > 0 && !isDeactivated && (
             <div className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-1 bg-white/90 backdrop-blur rounded-lg text-xs font-medium text-gray-700">
               <Refresh className="w-3 h-3" />
               {client.recoveryDaysAvailable}
             </div>
           )}
         </div>
-        
-        {/* Info */}
+
         <div className="p-4">
           <div>
             <h3 className="font-semibold text-gray-900 text-lg">
               {client.firstName} {client.lastName}
             </h3>
-            {age && (
-              <p className="text-gray-500 text-sm">{age} años</p>
-            )}
+            {age && <p className="text-gray-500 text-sm">{age} años</p>}
           </div>
-          
-          {/* Contacto de emergencia */}
-          <div className="mt-3">
-            <p className="text-xs text-gray-400 uppercase tracking-wide">Contacto</p>
-            <p className="text-sm text-gray-700">{client.emergencyContact?.phone}</p>
-          </div>
-          
-          {/* Días de la semana + Horario */}
-          <div className="flex items-center gap-2 mt-4">
-            <div className="flex gap-1.5">
-              {WEEK_DAYS.map((day) => {
-                const isAssigned = client.plan.assignedDays.includes(day.key)
-                return (
-                  <span
-                    key={day.key}
-                    className={`
-                      px-2.5 py-1 rounded-lg text-xs font-medium transition-colors
-                      ${isAssigned 
-                        ? 'bg-purple-100 text-purple-700 border border-purple-200' 
-                        : 'bg-gray-100 text-gray-400 border border-gray-200'}
-                    `}
-                  >
-                    {day.label}
-                  </span>
-                )
-              })}
+
+          {isDeactivated ? (
+            <div className="mt-3">
+              <span className="inline-block px-2 py-1 text-xs font-medium bg-gray-200 text-gray-700 rounded">
+                {deactivatedLabel}
+              </span>
             </div>
-            
-            {/* Horario con tooltip */}
-            {SCHEDULE_CONFIG[client.plan.schedule] && (
-              <div className="relative group/schedule">
-                <div className="p-1.5 rounded-lg bg-gray-100 text-gray-500 border border-gray-200">
-                  {(() => {
-                    const { Icon } = SCHEDULE_CONFIG[client.plan.schedule]
-                    return <Icon className="w-4 h-4" />
-                  })()}
-                </div>
-                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs bg-gray-900 text-white rounded whitespace-nowrap opacity-0 group-hover/schedule:opacity-100 transition-opacity pointer-events-none z-10">
-                  {SCHEDULE_CONFIG[client.plan.schedule].label}
-                </span>
+          ) : (
+            <>
+              <div className="mt-3">
+                <p className="text-xs text-gray-400 uppercase tracking-wide">Contacto</p>
+                <p className="text-sm text-gray-700">{client.emergencyContact?.phone}</p>
               </div>
-            )}
-          </div>
+
+              <div className="flex items-center gap-2 mt-4">
+                <div className="flex gap-1.5">
+                  {WEEK_DAYS.map((day) => {
+                    const isAssigned = client.plan.assignedDays.includes(day.key)
+                    return (
+                      <span
+                        key={day.key}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                          isAssigned
+                            ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                            : 'bg-gray-100 text-gray-400 border border-gray-200'
+                        }`}
+                      >
+                        {day.label}
+                      </span>
+                    )
+                  })}
+                </div>
+
+                {SCHEDULE_CONFIG[client.plan.schedule] && (
+                  <div className="relative group/schedule">
+                    <div className="p-1.5 rounded-lg bg-gray-100 text-gray-500 border border-gray-200">
+                      {(() => {
+                        const { Icon } = SCHEDULE_CONFIG[client.plan.schedule]
+                        return <Icon className="w-4 h-4" />
+                      })()}
+                    </div>
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs bg-gray-900 text-white rounded whitespace-nowrap opacity-0 group-hover/schedule:opacity-100 transition-opacity pointer-events-none z-10">
+                      {SCHEDULE_CONFIG[client.plan.schedule].label}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
-      
-      {/* Delete button (visible on hover) */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          onDelete()
-        }}
-        className="absolute top-2 right-2 p-2 bg-white/80 backdrop-blur rounded-lg text-gray-400 hover:text-red-600 hover:bg-white opacity-0 group-hover:opacity-100 transition-all"
-      >
-        <Trash className="w-4 h-4" />
-      </button>
+
+      {!isDeactivated && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete()
+          }}
+          className="absolute top-2 right-2 p-2 bg-white/80 backdrop-blur rounded-lg text-gray-400 hover:text-red-600 hover:bg-white opacity-0 group-hover:opacity-100 transition-all"
+        >
+          <Trash className="w-4 h-4" />
+        </button>
+      )}
     </Card>
   )
 }
