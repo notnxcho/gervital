@@ -145,7 +145,7 @@ export default function ClientList() {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold text-gray-900">Clientes</h1>
           <span className="text-gray-400">–</span>
-          <span className="text-gray-500">{clients.length}</span>
+          <span className="text-gray-500">{filteredClients.length}</span>
         </div>
         
         {/* Search and Filters */}
@@ -168,15 +168,15 @@ export default function ClientList() {
           />
         </div>
 
-          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap">
-            <input
-              type="checkbox"
-              checked={showDeleted}
-              onChange={e => setShowDeleted(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-            />
-            Mostrar bajas
-          </label>
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={showDeleted}
+            onChange={e => setShowDeleted(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+          />
+          Mostrar bajas
+        </label>
 
         <Button
           onClick={() => navigate('/clientes/nuevo')}
