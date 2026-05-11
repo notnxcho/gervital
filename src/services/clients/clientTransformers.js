@@ -52,6 +52,9 @@ export function transformClientFromDb(dbClient) {
     birthDate: dbClient.birthDate ? String(dbClient.birthDate).split('T')[0] : null,
     startDate: dbClient.startDate ? String(dbClient.startDate).split('T')[0] : null,
     createdAt: dbClient.createdAt ? String(dbClient.createdAt).split('T')[0] : null,
+    deletedAt: dbClient.deletedAt || null,
+    deactivationReason: dbClient.deactivationReason || null,
+    deactivationNotes: dbClient.deactivationNotes || null,
     recoveryDaysAvailable: dbClient.recoveryDaysAvailable || 0,
     plan: dbClient.plan || {
       frequency: 1,

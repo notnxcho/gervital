@@ -6,14 +6,22 @@ import {
 } from './clientTransformers'
 
 /**
- * Get all clients with nested data
+ * Get clients with nested data.
+ * @param {object} [options]
+ * @param {boolean} [options.includeDeleted=false] - When true, include soft-deleted clients
  * @returns {Promise<Array>}
  */
-export async function getClients() {
-  const { data, error } = await supabase
+export async function getClients({ includeDeleted = false } = {}) {
+  let query = supabase
     .from('clients_full')
     .select('*')
     .order('lastName', { ascending: true })
+
+  if (!includeDeleted) {
+    query = query.is('deletedAt', null)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     throw new Error(error.message)
@@ -84,21 +92,6 @@ export async function updateClient(id, clientData) {
 }
 
 /**
- * Delete a client (cascade deletes related records)
- * @param {string} id - Client UUID
- */
-export async function deleteClient(id) {
-  const { error } = await supabase
-    .from('clients')
-    .delete()
-    .eq('id', id)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-}
-
-/**
  * Update client address geocoding data (lat/lng)
  * @param {string} clientId - Client UUID
  * @param {number|null} latitude
@@ -125,6 +118,47 @@ export async function updateRecoveryDays(id, days) {
     .from('clients')
     .update({ recovery_days_available: days })
     .eq('id', id)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return getClientById(id)
+}
+
+/**
+ * Soft-delete a client with a reason and optional notes.
+ * @param {string} id - Client UUID
+ * @param {object} payload
+ * @param {string} payload.reason - One of the discrete reasons enforced by the RPC
+ * @param {string} [payload.notes] - Free-text notes (required when reason === 'other')
+ * @param {string} payload.userId - UUID of the system user performing the action
+ * @returns {Promise<object>} The updated client
+ */
+export async function deactivateClient(id, { reason, notes, userId }) {
+  const { error } = await supabase.rpc('deactivate_client', {
+    p_client_id: id,
+    p_reason: reason,
+    p_notes: notes || null,
+    p_user_id: userId
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return getClientById(id)
+}
+
+/**
+ * Reactivate a soft-deleted client.
+ * @param {string} id - Client UUID
+ * @returns {Promise<object>} The updated client
+ */
+export async function reactivateClient(id) {
+  const { error } = await supabase.rpc('reactivate_client', {
+    p_client_id: id
+  })
 
   if (error) {
     throw new Error(error.message)
