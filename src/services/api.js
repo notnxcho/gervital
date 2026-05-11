@@ -27,7 +27,8 @@ export {
   getClientById,
   createClient,
   updateClient,
-  deleteClient,
+  deactivateClient,
+  reactivateClient,
   updateClientAddressCoords
 } from './clients/clientService'
 
