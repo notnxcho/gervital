@@ -2636,6 +2636,10 @@ video {
   opacity: 1;
 }
 
+.group\/flag:hover .group-hover\/flag\:opacity-100 {
+  opacity: 1;
+}
+
 .group\/schedule:hover .group-hover\/schedule\:opacity-100 {
   opacity: 1;
 }

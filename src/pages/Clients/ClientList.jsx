@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Trash, Refresh, SunLight, HalfMoon, Sparks } from 'iconoir-react'
+import { Plus, Search, Trash, Refresh } from 'iconoir-react'
 import { differenceInYears, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getClients, deactivateClient } from '../../services/api'
@@ -12,11 +12,11 @@ import DeactivateClientModal, { DEACTIVATION_REASONS } from './DeactivateClientM
 
 // MOCKED RES - Días de la semana
 const WEEK_DAYS = [
-  { key: 'monday', label: 'Lun' },
-  { key: 'tuesday', label: 'Mar' },
-  { key: 'wednesday', label: 'Mie' },
-  { key: 'thursday', label: 'Jue' },
-  { key: 'friday', label: 'Vie' }
+  { key: 'monday', label: 'L' },
+  { key: 'tuesday', label: 'M' },
+  { key: 'wednesday', label: 'M' },
+  { key: 'thursday', label: 'J' },
+  { key: 'friday', label: 'V' }
 ]
 
 // MOCKED RES - Colores del tier cognitivo
@@ -27,12 +27,19 @@ const COGNITIVE_LEVEL_COLORS = {
   D: 'bg-red-100 text-red-700 border-red-200'
 }
 
-// MOCKED RES - Labels y iconos de horario
+// MOCKED RES - Labels de horario (badge corto + nombre largo para tooltip)
 const SCHEDULE_CONFIG = {
-  morning: { label: 'Mañana', Icon: SunLight },
-  afternoon: { label: 'Tarde', Icon: HalfMoon },
-  full_day: { label: 'Día completo', Icon: Sparks }
+  morning: { badge: 'AM', label: 'Mañana' },
+  afternoon: { badge: 'PM', label: 'Tarde' },
+  full_day: { badge: 'TD', label: 'Día completo' }
 }
+
+// MOCKED RES - Condiciones médicas mostradas como punto + inicial
+const MEDICAL_FLAGS = [
+  { key: 'isDiabetic', label: 'Diabético', initial: 'D', dot: 'bg-blue-500' },
+  { key: 'isCeliac', label: 'Celíaco', initial: 'C', dot: 'bg-amber-500' },
+  { key: 'isHypertensive', label: 'Hipertenso', initial: 'H', dot: 'bg-red-500' }
+]
 
 // Configuración de filtros
 const FILTERS_CONFIG = [
@@ -260,7 +267,7 @@ function ClientCard({ client, onView, onDelete }) {
           )}
 
           <div className={`absolute bottom-3 left-3 px-3 py-1 rounded-lg text-sm font-semibold border ${COGNITIVE_LEVEL_COLORS[client.cognitiveLevel] || 'bg-gray-100 text-gray-700'}`}>
-            Tier {client.cognitiveLevel}
+            {client.cognitiveLevel}
           </div>
 
           {client.recoveryDaysAvailable > 0 && !isDeactivated && (
@@ -287,18 +294,31 @@ function ClientCard({ client, onView, onDelete }) {
             </div>
           ) : (
             <>
-              <div className="mt-3">
-                <p className="text-xs text-gray-400 uppercase tracking-wide">Contacto</p>
-                <p className="text-sm text-gray-700">{client.emergencyContact?.phone}</p>
-              </div>
+              {(() => {
+                const flags = MEDICAL_FLAGS.filter(f => client.medicalInfo?.[f.key])
+                if (flags.length === 0) return null
+                return (
+                  <div className="flex items-center gap-2 mt-3">
+                    {flags.map(f => (
+                      <div key={f.key} className="relative group/flag flex items-center gap-1">
+                        <span className={`w-2 h-2 rounded-full ${f.dot}`}></span>
+                        <span className="text-xs font-medium text-gray-600">{f.initial}</span>
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs bg-gray-900 text-white rounded whitespace-nowrap opacity-0 group-hover/flag:opacity-100 transition-opacity pointer-events-none z-10">
+                          {f.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
 
               <div className="flex items-center gap-2 mt-4">
                 <div className="flex gap-1.5">
-                  {WEEK_DAYS.map((day) => {
+                  {WEEK_DAYS.map((day, index) => {
                     const isAssigned = client.plan.assignedDays.includes(day.key)
                     return (
                       <span
-                        key={day.key}
+                        key={index}
                         className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                           isAssigned
                             ? 'bg-purple-100 text-purple-700 border border-purple-200'
@@ -312,12 +332,9 @@ function ClientCard({ client, onView, onDelete }) {
                 </div>
 
                 {SCHEDULE_CONFIG[client.plan.schedule] && (
-                  <div className="relative group/schedule">
-                    <div className="p-1.5 rounded-lg bg-gray-100 text-gray-500 border border-gray-200">
-                      {(() => {
-                        const { Icon } = SCHEDULE_CONFIG[client.plan.schedule]
-                        return <Icon className="w-4 h-4" />
-                      })()}
+                  <div className="relative group/schedule ml-auto">
+                    <div className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 text-xs font-semibold">
+                      {SCHEDULE_CONFIG[client.plan.schedule].badge}
                     </div>
                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs bg-gray-900 text-white rounded whitespace-nowrap opacity-0 group-hover/schedule:opacity-100 transition-opacity pointer-events-none z-10">
                       {SCHEDULE_CONFIG[client.plan.schedule].label}
