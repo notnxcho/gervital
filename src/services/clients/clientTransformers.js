@@ -33,7 +33,10 @@ export function transformClientToDb(clientData) {
     p_med_mobility: clientData.medicalInfo?.mobilityRestrictions || null,
     p_med_medication: clientData.medicalInfo?.medication || null,
     p_med_medication_schedule: clientData.medicalInfo?.medicationSchedule || null,
-    p_med_notes: clientData.medicalInfo?.notes || null
+    p_med_notes: clientData.medicalInfo?.notes || null,
+    p_med_is_diabetic: clientData.medicalInfo?.isDiabetic || false,
+    p_med_is_celiac: clientData.medicalInfo?.isCeliac || false,
+    p_med_is_hypertensive: clientData.medicalInfo?.isHypertensive || false
   }
 }
 
@@ -80,7 +83,10 @@ export function transformClientFromDb(dbClient) {
       mobilityRestrictions: '',
       medication: '',
       medicationSchedule: '',
-      notes: ''
+      notes: '',
+      isDiabetic: false,
+      isCeliac: false,
+      isHypertensive: false
     }
   }
 }
@@ -138,6 +144,9 @@ export function transformUpdateToDb(clientId, updateData) {
     if (updateData.medicalInfo.medication !== undefined) params.p_med_medication = updateData.medicalInfo.medication
     if (updateData.medicalInfo.medicationSchedule !== undefined) params.p_med_medication_schedule = updateData.medicalInfo.medicationSchedule
     if (updateData.medicalInfo.notes !== undefined) params.p_med_notes = updateData.medicalInfo.notes
+    if (updateData.medicalInfo.isDiabetic !== undefined) params.p_med_is_diabetic = updateData.medicalInfo.isDiabetic
+    if (updateData.medicalInfo.isCeliac !== undefined) params.p_med_is_celiac = updateData.medicalInfo.isCeliac
+    if (updateData.medicalInfo.isHypertensive !== undefined) params.p_med_is_hypertensive = updateData.medicalInfo.isHypertensive
   }
 
   return params
