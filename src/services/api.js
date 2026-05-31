@@ -56,6 +56,15 @@ export {
 } from './attendance/attendanceService'
 
 // ============================================
+// RECOVERY API
+// ============================================
+export {
+  getRecoveryCredits,
+  addRecoveryCredit,
+  revokeRecoveryCredit
+} from './recovery/recoveryService'
+
+// ============================================
 // INVOICES API
 // ============================================
 export {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Phone, MapPin, Calendar, MoreVert, Trash, Check, NavArrowDown } from 'iconoir-react'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths } from 'date-fns'
+import { ArrowLeft, Edit, Phone, MapPin, Calendar, MoreVert, Trash, Check, NavArrowDown, NavArrowRight } from 'iconoir-react'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, differenceInCalendarDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   getClientById,
@@ -24,6 +24,7 @@ import {
   markVacationRange,
   markDayRecoveryAttended,
   unmarkDayRecoveryAttended,
+  getRecoveryCredits,
   deactivateClient,
   reactivateClient,
   uploadClientAvatar,
@@ -35,6 +36,7 @@ import Card, { CardContent, CardHeader } from '../../components/ui/Card'
 import Tabs from '../../components/ui/Tabs'
 import Modal from '../../components/ui/Modal'
 import DeactivateClientModal, { DEACTIVATION_REASONS } from './DeactivateClientModal'
+import RecoveryCreditsModal from './RecoveryCreditsModal'
 
 const SCHEDULE_LABELS = {
   morning: 'Mañana',
@@ -105,6 +107,8 @@ export default function ClientDetail() {
   const [deactivating, setDeactivating] = useState(false)
   const [reactivating, setReactivating] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [recoveryCredits, setRecoveryCredits] = useState([])
+  const [recoveryModalOpen, setRecoveryModalOpen] = useState(false)
 
   const optionsMenuRef = useRef(null)
   const avatarInputRef = useRef(null)
@@ -128,12 +132,13 @@ export default function ClientDetail() {
     setLoading(true)
     try {
       // Advance past scheduled days and ensure future months exist (parallel with data fetching)
-      const [clientData, attendanceData, invoicesData, pricing, transportPricing] = await Promise.all([
+      const [clientData, attendanceData, invoicesData, pricing, transportPricing, recoveryData] = await Promise.all([
         getClientById(id),
         getClientAttendance(id),
         getClientInvoices(id),
         getPlanPricing(),
-        getTransportPricing()
+        getTransportPricing(),
+        getRecoveryCredits(id)
       ])
       // Run setup functions (non-blocking, best-effort)
       Promise.all([
@@ -145,6 +150,7 @@ export default function ClientDetail() {
       })
 
       setClient(clientData)
+      setRecoveryCredits(recoveryData)
       setAttendance(attendanceData)
       setInvoices(invoicesData)
       setPricingData(pricing)
@@ -153,6 +159,19 @@ export default function ClientDetail() {
       console.error('Error cargando datos del cliente:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const refreshRecovery = async () => {
+    try {
+      const [clientData, recoveryData] = await Promise.all([
+        getClientById(id),
+        getRecoveryCredits(id)
+      ])
+      setClient(clientData)
+      setRecoveryCredits(recoveryData)
+    } catch (error) {
+      console.error('Error actualizando días de recupero:', error)
     }
   }
 
@@ -234,6 +253,14 @@ export default function ClientDetail() {
       </div>
     )
   }
+
+  const nextExpiry = (() => {
+    if (!recoveryCredits.length) return { label: 'Sin días', className: 'text-gray-400' }
+    const soonest = recoveryCredits[0].expiresAt // service returns soonest-first
+    const daysLeft = differenceInCalendarDays(new Date(soonest), new Date())
+    const className = daysLeft <= 7 ? 'text-red-600' : daysLeft <= 14 ? 'text-amber-600' : 'text-gray-400'
+    return { label: `Vence el ${format(new Date(soonest), "d 'de' MMM", { locale: es })}`, className }
+  })()
 
   return (
     <div>
@@ -381,10 +408,18 @@ export default function ClientDetail() {
               </p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-500">Días de recupero</p>
-            <p className="text-2xl font-bold text-indigo-600">{client.recoveryDaysAvailable}</p>
-          </div>
+          <button
+            type="button"
+            onClick={() => setRecoveryModalOpen(true)}
+            className="flex items-center gap-3 text-right rounded-lg px-2 py-1 hover:bg-gray-50 transition-colors"
+          >
+            <div>
+              <p className="text-sm text-gray-500">Días de recupero</p>
+              <p className="text-2xl font-bold text-indigo-600">{client.recoveryDaysAvailable}</p>
+              <p className={`text-xs ${nextExpiry.className}`}>{nextExpiry.label}</p>
+            </div>
+            <NavArrowRight className="w-5 h-5 text-gray-400" />
+          </button>
         </CardContent>
       </Card>
 
@@ -538,6 +573,16 @@ export default function ClientDetail() {
         client={client}
         onConfirm={handleDeactivate}
         loading={deactivating}
+      />
+
+      <RecoveryCreditsModal
+        isOpen={recoveryModalOpen}
+        onClose={() => setRecoveryModalOpen(false)}
+        credits={recoveryCredits}
+        canMutate={!client.deletedAt}
+        userName={user?.name}
+        clientId={id}
+        onChanged={refreshRecovery}
       />
     </div>
   )

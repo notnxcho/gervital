@@ -108,25 +108,6 @@ export async function updateClientAddressCoords(clientId, latitude, longitude) {
 }
 
 /**
- * Update client's recovery days available
- * @param {string} id - Client UUID
- * @param {number} days - New recovery days count
- * @returns {Promise<object>}
- */
-export async function updateRecoveryDays(id, days) {
-  const { error } = await supabase
-    .from('clients')
-    .update({ recovery_days_available: days })
-    .eq('id', id)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return getClientById(id)
-}
-
-/**
  * Soft-delete a client with a reason and optional notes.
  * @param {string} id - Client UUID
  * @param {object} payload
