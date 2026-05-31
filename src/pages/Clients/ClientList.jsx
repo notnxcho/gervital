@@ -266,8 +266,28 @@ function ClientCard({ client, onView, onDelete }) {
             </div>
           )}
 
-          <div className={`absolute bottom-3 left-3 px-3 py-1 rounded-lg text-sm font-semibold border ${COGNITIVE_LEVEL_COLORS[client.cognitiveLevel] || 'bg-gray-100 text-gray-700'}`}>
-            {client.cognitiveLevel}
+          <div className="absolute bottom-3 left-3 flex items-center gap-2">
+            <div className={`px-3 py-1 rounded-lg text-sm font-semibold border ${COGNITIVE_LEVEL_COLORS[client.cognitiveLevel] || 'bg-gray-100 text-gray-700'}`}>
+              {client.cognitiveLevel}
+            </div>
+
+            {(() => {
+              const flags = MEDICAL_FLAGS.filter(f => client.medicalInfo?.[f.key])
+              if (flags.length === 0) return null
+              return (
+                <div className="flex items-center gap-2 px-2 py-1 bg-white/90 backdrop-blur rounded-lg">
+                  {flags.map(f => (
+                    <div key={f.key} className="relative group/flag flex items-center gap-1">
+                      <span className={`w-2 h-2 rounded-full ${f.dot}`}></span>
+                      <span className="text-xs font-semibold text-gray-700">{f.initial}</span>
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs bg-gray-900 text-white rounded whitespace-nowrap opacity-0 group-hover/flag:opacity-100 transition-opacity pointer-events-none z-10">
+                        {f.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
 
           {client.recoveryDaysAvailable > 0 && !isDeactivated && (
@@ -294,24 +314,6 @@ function ClientCard({ client, onView, onDelete }) {
             </div>
           ) : (
             <>
-              {(() => {
-                const flags = MEDICAL_FLAGS.filter(f => client.medicalInfo?.[f.key])
-                if (flags.length === 0) return null
-                return (
-                  <div className="flex items-center gap-2 mt-3">
-                    {flags.map(f => (
-                      <div key={f.key} className="relative group/flag flex items-center gap-1">
-                        <span className={`w-2 h-2 rounded-full ${f.dot}`}></span>
-                        <span className="text-xs font-medium text-gray-600">{f.initial}</span>
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs bg-gray-900 text-white rounded whitespace-nowrap opacity-0 group-hover/flag:opacity-100 transition-opacity pointer-events-none z-10">
-                          {f.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })()}
-
               <div className="flex items-center gap-2 mt-4">
                 <div className="flex gap-1.5">
                   {WEEK_DAYS.map((day) => {
