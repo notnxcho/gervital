@@ -314,11 +314,11 @@ function ClientCard({ client, onView, onDelete }) {
 
               <div className="flex items-center gap-2 mt-4">
                 <div className="flex gap-1.5">
-                  {WEEK_DAYS.map((day, index) => {
+                  {WEEK_DAYS.map((day) => {
                     const isAssigned = client.plan.assignedDays.includes(day.key)
                     return (
                       <span
-                        key={index}
+                        key={day.key}
                         className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                           isAssigned
                             ? 'bg-purple-100 text-purple-700 border border-purple-200'
