@@ -77,7 +77,11 @@ const INITIAL_FORM_DATA = {
   mobilityRestrictions: '',
   medication: '',
   medicationSchedule: '',
-  notes: ''
+  notes: '',
+  // Condiciones
+  isDiabetic: false,
+  isCeliac: false,
+  isHypertensive: false
 }
 
 export default function AddClient() {
@@ -138,7 +142,10 @@ export default function AddClient() {
           mobilityRestrictions: client.medicalInfo?.mobilityRestrictions || '',
           medication: client.medicalInfo?.medication || '',
           medicationSchedule: client.medicalInfo?.medicationSchedule || '',
-          notes: client.medicalInfo?.notes || ''
+          notes: client.medicalInfo?.notes || '',
+          isDiabetic: client.medicalInfo?.isDiabetic || false,
+          isCeliac: client.medicalInfo?.isCeliac || false,
+          isHypertensive: client.medicalInfo?.isHypertensive || false
         })
       })
       .catch(err => console.error('Error cargando cliente:', err))
@@ -258,7 +265,10 @@ export default function AddClient() {
           mobilityRestrictions: formData.mobilityRestrictions,
           medication: formData.medication,
           medicationSchedule: formData.medicationSchedule,
-          notes: formData.notes
+          notes: formData.notes,
+          isDiabetic: formData.isDiabetic,
+          isCeliac: formData.isCeliac,
+          isHypertensive: formData.isHypertensive
         }
       }
       
@@ -652,6 +662,27 @@ export default function AddClient() {
                     onChange={(e) => updateField('mobilityRestrictions', e.target.value)}
                     placeholder="Ej: Usa bastón, silla de ruedas, dificultad para escaleras..."
                     rows={2}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Condiciones</h3>
+                <div className="flex flex-wrap gap-6">
+                  <Checkbox
+                    label="Diabético"
+                    checked={formData.isDiabetic}
+                    onChange={(e) => updateField('isDiabetic', e.target.checked)}
+                  />
+                  <Checkbox
+                    label="Celíaco"
+                    checked={formData.isCeliac}
+                    onChange={(e) => updateField('isCeliac', e.target.checked)}
+                  />
+                  <Checkbox
+                    label="Hipertenso"
+                    checked={formData.isHypertensive}
+                    onChange={(e) => updateField('isHypertensive', e.target.checked)}
                   />
                 </div>
               </div>
