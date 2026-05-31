@@ -495,6 +495,26 @@ export default function ClientDetail() {
                 <div><p className="text-sm text-gray-500">Medicación</p><p className="font-medium text-gray-900">{client.medicalInfo?.medication || '-'}</p></div>
                 <div><p className="text-sm text-gray-500">Horario de medicación</p><p className="font-medium text-gray-900">{client.medicalInfo?.medicationSchedule || '-'}</p></div>
               </div>
+              <div>
+                <p className="text-sm text-gray-500">Condiciones</p>
+                {(() => {
+                  const conditions = [
+                    { active: client.medicalInfo?.isDiabetic, label: 'Diabético', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+                    { active: client.medicalInfo?.isCeliac, label: 'Celíaco', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+                    { active: client.medicalInfo?.isHypertensive, label: 'Hipertenso', color: 'bg-red-100 text-red-700 border-red-200' }
+                  ].filter(c => c.active)
+                  if (conditions.length === 0) return <p className="font-medium text-gray-900">-</p>
+                  return (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {conditions.map(c => (
+                        <span key={c.label} className={`px-2.5 py-1 rounded-lg text-xs font-medium border ${c.color}`}>
+                          {c.label}
+                        </span>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
               {client.medicalInfo?.notes && (
                 <div><p className="text-sm text-gray-500">Notas adicionales</p><p className="font-medium text-gray-900">{client.medicalInfo.notes}</p></div>
               )}
