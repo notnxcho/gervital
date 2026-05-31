@@ -1,0 +1,123 @@
+/* Client card — estilos portados 1:1 del mockup
+   (tasks/client-cards-mockups.html, variante 1). NO usar Tailwind acá:
+   estos estilos son el origen de verdad del card. */
+
+.client-card {
+  position: relative;
+  height: 340px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #ddd;
+  box-shadow: 0 1px 2px rgba(26, 22, 37, .06), 0 1px 3px rgba(26, 22, 37, .05);
+  transition: transform .35s cubic-bezier(.2, .8, .2, 1), box-shadow .35s;
+}
+.client-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px -12px rgba(26, 22, 37, .28), 0 6px 14px -8px rgba(26, 22, 37, .18);
+}
+.client-card.is-deactivated { opacity: .6; filter: grayscale(1); }
+
+.client-card .cc-photo {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; transition: transform .6s cubic-bezier(.2, .8, .2, 1);
+}
+.client-card:hover .cc-photo { transform: scale(1.05); }
+
+.client-card .cc-initials {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 72px; color: rgba(255, 255, 255, .9);
+  background: linear-gradient(135deg, #8b7fd1, #b39ddb 60%, #d6c8f0);
+}
+
+.client-card .cc-scrim {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(10, 8, 18, .42) 0%, rgba(10, 8, 18, 0) 26%),
+    linear-gradient(to top, rgba(10, 8, 18, .92) 0%, rgba(10, 8, 18, .78) 22%, rgba(10, 8, 18, .30) 48%, rgba(10, 8, 18, 0) 70%);
+}
+
+/* Tab tier (esquina superior izquierda, al ras del borde) */
+.client-card .cc-tier-tab {
+  position: absolute; top: 0; left: 0;
+  /* background (gradiente con el tinte del tier) se setea inline */
+  background: #fff;
+  border-radius: 12px 0 10px 0;
+  padding: 6px 14px 7px;
+  box-shadow: 0 4px 12px rgba(26, 22, 37, .12);
+}
+.client-card .cc-tier-letter {
+  font-weight: 600; font-size: 14px; line-height: 1;
+  color: #1a1625;
+}
+
+/* Tab flags médicos (esquina superior derecha, al ras del borde) */
+.client-card .cc-med-tab {
+  position: absolute; top: 0; right: 0;
+  background: rgba(12, 10, 20, .34);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  border-radius: 0 12px 0 10px;
+  padding: 8px 13px 10px;
+  display: flex; align-items: center; gap: 8px; line-height: 1;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+.client-card .cc-med {
+  display: flex; align-items: center; gap: 4px;
+  color: #fff; font-weight: 700; font-size: 12px;
+}
+.client-card .cc-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+/* Cuerpo */
+.client-card .cc-body { position: absolute; left: 18px; right: 18px; bottom: 16px; color: #fff; }
+.client-card .cc-name {
+  font-weight: 700; font-size: 22px; line-height: 1.05; letter-spacing: -.01em;
+}
+.client-card .cc-age { color: rgba(255, 255, 255, .7); font-size: 13px; margin-top: 2px; }
+
+.client-card .cc-meta { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.client-card .cc-days { display: flex; gap: 5px; }
+.client-card .cc-day {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 8px;
+  font-size: 12px; font-weight: 600;
+  background: rgba(255, 255, 255, .16); color: rgba(255, 255, 255, .55);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+}
+.client-card .cc-day.is-on { background: #fff; color: #1a1625; }
+
+.client-card .cc-right { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.client-card .cc-tchip {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, .2); border: 1px solid rgba(255, 255, 255, .28);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  color: #fff; padding: 5px; border-radius: 8px;
+}
+.client-card .cc-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255, 255, 255, .16);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  padding: 5px 9px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #fff;
+}
+.client-card .cc-recovery {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(124, 58, 237, .92);
+  padding: 5px 9px; border-radius: 8px; font-size: 12px; font-weight: 700; color: #fff;
+}
+
+.client-card .cc-deactivated {
+  display: inline-block; margin-top: 12px;
+  background: rgba(255, 255, 255, .2); color: #fff;
+  padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 500;
+}
+
+/* Tooltip del turno */
+.client-card .cc-schedule { position: relative; }
+.client-card .cc-tip {
+  position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+  margin-bottom: 8px; padding: 4px 8px; font-size: 12px;
+  background: #111827; color: #fff; border-radius: 6px; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 10;
+}
+.client-card .cc-schedule:hover .cc-tip { opacity: 1; }

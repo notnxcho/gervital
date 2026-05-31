@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Trash, Refresh } from 'iconoir-react'
+import { Plus, Search } from 'iconoir-react'
 import { differenceInYears, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getClients, deactivateClient } from '../../services/api'
@@ -9,6 +9,7 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Filters, { getActiveFiltersCount } from '../../components/ui/Filters'
 import DeactivateClientModal, { DEACTIVATION_REASONS } from './DeactivateClientModal'
+import './ClientCard.css'
 
 // MOCKED RES - Días de la semana
 const WEEK_DAYS = [
@@ -19,12 +20,12 @@ const WEEK_DAYS = [
   { key: 'friday', label: 'V' }
 ]
 
-// MOCKED RES - Colores del tier cognitivo
-const COGNITIVE_LEVEL_COLORS = {
-  A: 'bg-green-100 text-green-700 border-green-200',
-  B: 'bg-blue-100 text-blue-700 border-blue-200',
-  C: 'bg-amber-100 text-amber-700 border-amber-200',
-  D: 'bg-red-100 text-red-700 border-red-200'
+// MOCKED RES - Color del tier cognitivo (letra sobre el tab de vidrio oscuro)
+const TIER_HEX = {
+  A: '#34d399',
+  B: '#38bdf8',
+  C: '#fbbf24',
+  D: '#fb7185'
 }
 
 // MOCKED RES - Labels de horario (badge corto + nombre largo para tooltip)
@@ -36,9 +37,9 @@ const SCHEDULE_CONFIG = {
 
 // MOCKED RES - Condiciones médicas mostradas como punto + inicial
 const MEDICAL_FLAGS = [
-  { key: 'isDiabetic', label: 'Diabético', initial: 'D', dot: 'bg-blue-500' },
-  { key: 'isCeliac', label: 'Celíaco', initial: 'C', dot: 'bg-amber-500' },
-  { key: 'isHypertensive', label: 'Hipertenso', initial: 'H', dot: 'bg-red-500' }
+  { key: 'isDiabetic', label: 'Diabético', initial: 'D', color: '#3b82f6' },
+  { key: 'isCeliac', label: 'Celíaco', initial: 'C', color: '#f59e0b' },
+  { key: 'isHypertensive', label: 'Hipertenso', initial: 'H', color: '#ef4444' }
 ]
 
 // Configuración de filtros
@@ -86,6 +87,19 @@ const REASON_LABEL = Object.fromEntries(
 const calculateAge = (birthDate) => {
   if (!birthDate) return null
   return differenceInYears(new Date(), new Date(birthDate))
+}
+
+// Icono de transporte (van)
+function VanIcon({ size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 16V7a1 1 0 0 1 1-1h9v10" />
+      <path d="M13 8h4l3 3.5V16" />
+      <path d="M3 16h2m12 0h2m-2 0H8" />
+      <circle cx="6.5" cy="16.5" r="1.7" />
+      <circle cx="17.5" cy="16.5" r="1.7" />
+    </svg>
+  )
 }
 
 export default function ClientList() {
@@ -198,7 +212,7 @@ export default function ClientList() {
         </div>
       ) : (
         /* Client grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(290px,1fr))]">
           {filteredClients.length === 0 ? (
             <div className="col-span-full">
               <Card className="p-8 text-center">
@@ -219,11 +233,10 @@ export default function ClientList() {
             </div>
           ) : (
             filteredClients.map((client) => (
-              <ClientCard 
-                key={client.id} 
-                client={client} 
+              <ClientCard
+                key={client.id}
+                client={client}
                 onView={() => navigate(`/clientes/${client.id}`)}
-                onDelete={() => setDeactivateModal({ open: true, client })}
               />
             ))
           )}
@@ -241,125 +254,86 @@ export default function ClientList() {
   )
 }
 
-function ClientCard({ client, onView, onDelete }) {
+function ClientCard({ client, onView }) {
   const age = calculateAge(client.birthDate)
   const isDeactivated = !!client.deletedAt
   const deactivatedLabel = isDeactivated
     ? `Baja: ${REASON_LABEL[client.deactivationReason] || 'Sin motivo'} · ${format(new Date(client.deletedAt), "d MMM yyyy", { locale: es })}`
     : null
+  const flags = MEDICAL_FLAGS.filter(f => client.medicalInfo?.[f.key])
+  const schedule = SCHEDULE_CONFIG[client.plan.schedule]
 
   return (
-    <Card className={`overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group ${isDeactivated ? 'opacity-60 grayscale' : ''}`}>
-      <div onClick={onView}>
-        <div className="relative h-40 bg-gradient-to-br from-gray-200 to-gray-300">
-          {client.avatarUrl ? (
-            <img
-              src={client.avatarUrl}
-              alt={`${client.firstName} ${client.lastName}`}
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-6xl text-gray-400 font-light">
-                {client.firstName[0]}{client.lastName[0]}
-              </span>
-            </div>
-          )}
+    <div onClick={onView} className={`client-card${isDeactivated ? ' is-deactivated' : ''}`}>
+      {/* Foto / iniciales */}
+      {client.avatarUrl ? (
+        <img className="cc-photo" src={client.avatarUrl} alt={`${client.firstName} ${client.lastName}`} />
+      ) : (
+        <div className="cc-initials">{client.firstName[0]}{client.lastName[0]}</div>
+      )}
 
-          <div className="absolute bottom-3 left-3 flex items-center gap-2">
-            <div className={`px-3 py-1 rounded-lg text-sm font-semibold border ${COGNITIVE_LEVEL_COLORS[client.cognitiveLevel] || 'bg-gray-100 text-gray-700'}`}>
-              {client.cognitiveLevel}
-            </div>
+      {/* Degradado */}
+      <div className="cc-scrim" />
 
-            {(() => {
-              const flags = MEDICAL_FLAGS.filter(f => client.medicalInfo?.[f.key])
-              if (flags.length === 0) return null
-              return (
-                <div className="flex items-center gap-2 px-2 py-1 bg-white/90 backdrop-blur rounded-lg">
-                  {flags.map(f => (
-                    <div key={f.key} className="relative group/flag flex items-center gap-1">
-                      <span className={`w-2 h-2 rounded-full ${f.dot}`}></span>
-                      <span className="text-xs font-semibold text-gray-700">{f.initial}</span>
-                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs bg-gray-900 text-white rounded whitespace-nowrap opacity-0 group-hover/flag:opacity-100 transition-opacity pointer-events-none z-10">
-                        {f.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )
-            })()}
-          </div>
-
-          {client.recoveryDaysAvailable > 0 && !isDeactivated && (
-            <div className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-1 bg-white/90 backdrop-blur rounded-lg text-xs font-medium text-gray-700">
-              <Refresh className="w-3 h-3" />
-              {client.recoveryDaysAvailable}
-            </div>
-          )}
-        </div>
-
-        <div className="p-4">
-          <div>
-            <h3 className="font-semibold text-gray-900 text-lg">
-              {client.firstName} {client.lastName}
-            </h3>
-            {age && <p className="text-gray-500 text-sm">{age} años</p>}
-          </div>
-
-          {isDeactivated ? (
-            <div className="mt-3">
-              <span className="inline-block px-2 py-1 text-xs font-medium bg-gray-200 text-gray-700 rounded">
-                {deactivatedLabel}
-              </span>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 mt-4">
-                <div className="flex gap-1.5">
-                  {WEEK_DAYS.map((day) => {
-                    const isAssigned = client.plan.assignedDays.includes(day.key)
-                    return (
-                      <span
-                        key={day.key}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                          isAssigned
-                            ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                            : 'bg-gray-100 text-gray-400 border border-gray-200'
-                        }`}
-                      >
-                        {day.label}
-                      </span>
-                    )
-                  })}
-                </div>
-
-                {SCHEDULE_CONFIG[client.plan.schedule] && (
-                  <div className="relative group/schedule ml-auto">
-                    <div className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 text-xs font-semibold">
-                      {SCHEDULE_CONFIG[client.plan.schedule].badge}
-                    </div>
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs bg-gray-900 text-white rounded whitespace-nowrap opacity-0 group-hover/schedule:opacity-100 transition-opacity pointer-events-none z-10">
-                      {SCHEDULE_CONFIG[client.plan.schedule].label}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+      {/* Tab tier (esquina superior izquierda) */}
+      <div
+        className="cc-tier-tab"
+        style={{ background: `linear-gradient(135deg, ${TIER_HEX[client.cognitiveLevel] || '#94a3b8'}4d, #ffffff 78%)` }}
+      >
+        <span className="cc-tier-letter">{client.cognitiveLevel}</span>
       </div>
 
-      {!isDeactivated && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-          className="absolute top-2 right-2 p-2 bg-white/80 backdrop-blur rounded-lg text-gray-400 hover:text-red-600 hover:bg-white opacity-0 group-hover:opacity-100 transition-all"
-        >
-          <Trash className="w-4 h-4" />
-        </button>
+      {/* Tab flags médicos (esquina superior derecha) */}
+      {flags.length > 0 && (
+        <div className="cc-med-tab">
+          {flags.map(f => (
+            <span key={f.key} className="cc-med">
+              <span className="cc-dot" style={{ background: f.color }} />
+              {f.initial}
+            </span>
+          ))}
+        </div>
       )}
-    </Card>
+
+      {/* Cuerpo */}
+      <div className="cc-body">
+        <h3 className="cc-name">{client.firstName} {client.lastName}</h3>
+        {age && <p className="cc-age">{age} años</p>}
+
+        {isDeactivated ? (
+          <div><span className="cc-deactivated">{deactivatedLabel}</span></div>
+        ) : (
+          <div className="cc-meta">
+            <div className="cc-days">
+              {WEEK_DAYS.map((day) => (
+                <span
+                  key={day.key}
+                  className={`cc-day${client.plan.assignedDays.includes(day.key) ? ' is-on' : ''}`}
+                >
+                  {day.label}
+                </span>
+              ))}
+            </div>
+
+            <div className="cc-right">
+              {client.plan.hasTransport && (
+                <span className="cc-tchip"><VanIcon /></span>
+              )}
+
+              {schedule && (
+                <div className="cc-schedule">
+                  <span className="cc-badge">{schedule.badge}</span>
+                  <span className="cc-tip">{schedule.label}</span>
+                </div>
+              )}
+
+              {client.recoveryDaysAvailable > 0 && (
+                <span className="cc-recovery">↻ {client.recoveryDaysAvailable}</span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
