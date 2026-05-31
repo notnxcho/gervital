@@ -321,6 +321,9 @@ export default function Dashboard() {
                       {/* Name */}
                       <span className="text-sm font-medium text-gray-800 flex-1 truncate">
                         {client.firstName} {client.lastName}
+                        {client.isDeactivated && (
+                          <span className="ml-2 text-xs font-normal text-gray-500">(desactivado)</span>
+                        )}
                       </span>
 
                       {/* Status badge */}

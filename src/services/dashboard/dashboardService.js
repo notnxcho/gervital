@@ -14,8 +14,7 @@ export async function getDashboardMetrics(year, month) {
   const [clientsRes, invoicesRes, attendanceRes, expensesRes] = await Promise.all([
     supabase
       .from('clients_full')
-      .select('id, firstName, lastName, avatarUrl, cognitiveLevel, recoveryDaysAvailable, plan')
-      .is('deletedAt', null),
+      .select('id, firstName, lastName, avatarUrl, cognitiveLevel, recoveryDaysAvailable, plan, deletedAt'),
 
     supabase
       .from('invoices_view')
@@ -69,13 +68,15 @@ export async function getDashboardMetrics(year, month) {
   const collectionRate = totalBilling > 0 ? (totalCollected / totalBilling) * 100 : 0
 
   // --- Client KPIs ---
-  const totalClients = clients.length
+  // Metrics only over active clients; the full list still feeds the unpaid-invoices lookup.
+  const activeClients = clients.filter(c => !c.deletedAt)
+  const totalClients = activeClients.length
   const tierCounts = { A: 0, B: 0, C: 0, D: 0 }
   const freqCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
   let withTransport = 0
   let totalRecoveryDays = 0
 
-  for (const client of clients) {
+  for (const client of activeClients) {
     const level = client.cognitiveLevel
     if (level && tierCounts[level] !== undefined) tierCounts[level]++
     totalRecoveryDays += client.recoveryDaysAvailable || 0
@@ -97,6 +98,7 @@ export async function getDashboardMetrics(year, month) {
         firstName: c?.firstName || '',
         lastName: c?.lastName || '',
         avatarUrl: c?.avatarUrl || null,
+        isDeactivated: !!c?.deletedAt,
         amount: Number(inv.chargeableAmount || 0),
         status: inv.paymentStatus // 'pending' or 'overdue'
       }

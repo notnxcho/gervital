@@ -60,6 +60,14 @@ const FILTERS_CONFIG = [
       { value: true, label: 'Con transporte' },
       { value: false, label: 'Sin transporte' }
     ]
+  },
+  {
+    key: 'showDeleted',
+    label: 'Bajas',
+    type: 'full',
+    options: [
+      { value: true, label: 'Mostrar bajas' }
+    ]
   }
 ]
 
@@ -78,27 +86,26 @@ export default function ClientList() {
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [showDeleted, setShowDeleted] = useState(false)
   const [deactivateModal, setDeactivateModal] = useState({ open: false, client: null })
   const [deactivating, setDeactivating] = useState(false)
   const [filters, setFilters] = useState({
     cognitiveLevel: null,
     frequency: null,
-    hasTransport: null
+    hasTransport: null,
+    showDeleted: null
   })
 
   const navigate = useNavigate()
 
   useEffect(() => {
     loadClients()
-    // re-load when toggle flips
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showDeleted])
+  }, [filters.showDeleted])
 
   const loadClients = async () => {
     setLoading(true)
     try {
-      const data = await getClients({ includeDeleted: showDeleted })
+      const data = await getClients({ includeDeleted: filters.showDeleted === true })
       setClients(data)
     } catch (error) {
       console.error('Error cargando clientes:', error)
@@ -168,16 +175,6 @@ export default function ClientList() {
           />
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap">
-          <input
-            type="checkbox"
-            checked={showDeleted}
-            onChange={e => setShowDeleted(e.target.checked)}
-            className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-          />
-          Mostrar bajas
-        </label>
-
         <Button
           onClick={() => navigate('/clientes/nuevo')}
           className="bg-purple-600 hover:bg-purple-700 rounded-full px-6"
@@ -205,7 +202,7 @@ export default function ClientList() {
                 </p>
                 {activeFiltersCount > 0 && (
                   <button
-                    onClick={() => setFilters({ cognitiveLevel: null, frequency: null, hasTransport: null })}
+                    onClick={() => setFilters({ cognitiveLevel: null, frequency: null, hasTransport: null, showDeleted: null })}
                     className="mt-2 text-purple-600 hover:text-purple-700 text-sm font-medium"
                   >
                     Limpiar filtros
