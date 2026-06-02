@@ -8,6 +8,7 @@ import { getTransportPricing, getTransportPriceSync } from '../../services/prici
 import Button from '../../components/ui/Button'
 import Input, { Select, Textarea, Checkbox } from '../../components/ui/Input'
 import Card, { CardContent } from '../../components/ui/Card'
+import { useAuth } from '../../context/AuthContext'
 
 // MOCKED RES - Opciones de planes
 const FREQUENCY_OPTIONS = [
@@ -86,6 +87,7 @@ const INITIAL_FORM_DATA = {
 
 export default function AddClient() {
   const navigate = useNavigate()
+  const { hasAccess } = useAuth()
   const { id } = useParams()
   const isEditMode = Boolean(id)
   const [currentStep, setCurrentStep] = useState(1)
@@ -612,6 +614,7 @@ export default function AddClient() {
               </div>
 
               {/* Price preview */}
+              {hasAccess('billing') && (
               <div className="bg-indigo-50 rounded-lg p-4 space-y-2">
                 <p className="text-sm text-indigo-700">Precio mensual estimado</p>
                 <p className="text-2xl font-bold text-indigo-900">
@@ -633,6 +636,7 @@ export default function AddClient() {
                   {formData.hasTransport && ' · Transporte'}
                 </p>
               </div>
+              )}
             </div>
           )}
 
