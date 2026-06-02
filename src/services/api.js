@@ -83,7 +83,8 @@ export {
   getUsers,
   createUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  resetPassword
 } from './users/userService'
 
 // ============================================

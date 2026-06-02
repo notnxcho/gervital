@@ -1,5 +1,20 @@
 import { supabase } from '../supabase/client'
 
+// Invoke the admin-users edge function, surfacing the server error message
+async function invokeAdminUsers(body) {
+  const { data, error } = await supabase.functions.invoke('admin-users', { body })
+  if (error) {
+    let message = error.message
+    try {
+      const ctx = await error.context?.json?.()
+      if (ctx?.error) message = ctx.error
+    } catch (_) { /* ignore parse errors */ }
+    throw new Error(message)
+  }
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
 /**
  * Get all system users
  * @returns {Promise<Array>}
@@ -40,39 +55,26 @@ export async function getUserById(id) {
 }
 
 /**
- * Create a new user
- * Note: This creates the user in Supabase Auth, which triggers
- * the handle_new_user function to create the profile
- * @param {object} userData - { name, email, role, password }
+ * Create a new user via the admin-users edge function.
+ * Initial password is set server-side to the project default.
+ * @param {object} userData - { name, email, role }
  * @returns {Promise<object>}
  */
 export async function createUser(userData) {
-  // Create user in Supabase Auth with metadata
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+  const data = await invokeAdminUsers({
+    action: 'create',
+    name: userData.name,
     email: userData.email,
-    password: userData.password || generateTempPassword(),
-    email_confirm: true,
-    user_metadata: {
-      name: userData.name,
-      role: userData.role
-    }
+    role: userData.role
   })
 
-  if (authError) {
-    // If admin API fails, try regular signup (for development)
-    // This won't work in production without proper admin setup
-    throw new Error(authError.message)
-  }
-
-  // The trigger should have created the user profile
-  // Wait a moment for the trigger to complete
+  // The handle_new_user trigger creates the profile; wait then fetch it
   await new Promise(resolve => setTimeout(resolve, 500))
 
-  // Fetch the created user
   const { data: user, error: fetchError } = await supabase
     .from('users_view')
     .select('*')
-    .eq('authId', authData.user.id)
+    .eq('authId', data.authId)
     .single()
 
   if (fetchError) {
@@ -117,12 +119,10 @@ export async function updateUser(id, userData) {
 }
 
 /**
- * Delete a user
- * This deletes from public.users, which cascades from auth.users deletion
- * @param {string} id - User UUID
+ * Delete a user. Removes the auth user (cascades to public.users).
+ * @param {string} id - public.users.id
  */
 export async function deleteUser(id) {
-  // Get the auth_id first
   const { data: user, error: fetchError } = await supabase
     .from('users')
     .select('auth_id')
@@ -133,42 +133,20 @@ export async function deleteUser(id) {
     throw new Error('Usuario no encontrado')
   }
 
-  // Delete from auth.users (will cascade to public.users via trigger)
-  if (user.auth_id) {
-    const { error: authError } = await supabase.auth.admin.deleteUser(user.auth_id)
-    if (authError) {
-      // Fallback: delete directly from public.users
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', id)
-
-      if (error) {
-        throw new Error(error.message)
-      }
-    }
-  } else {
-    // No auth_id, just delete from public.users
-    const { error } = await supabase
-      .from('users')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      throw new Error(error.message)
-    }
+  if (!user.auth_id) {
+    const { error } = await supabase.from('users').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    return
   }
+
+  await invokeAdminUsers({ action: 'delete', authId: user.auth_id })
 }
 
 /**
- * Generate a temporary password
- * @returns {string}
+ * Reset a user's password to the project default. Superadmin only (enforced
+ * server-side by the edge function).
+ * @param {string} authId - auth.users id
  */
-function generateTempPassword() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%'
-  let password = ''
-  for (let i = 0; i < 16; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return password
+export async function resetPassword(authId) {
+  await invokeAdminUsers({ action: 'reset_password', authId })
 }
