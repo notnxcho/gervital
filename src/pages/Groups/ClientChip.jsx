@@ -1,5 +1,5 @@
 import { useDraggable } from '@dnd-kit/core'
-import { Xmark } from 'iconoir-react'
+import { Xmark, Check } from 'iconoir-react'
 
 const COGNITIVE_LEVEL_COLORS = {
   A: 'bg-green-100 text-green-700',
@@ -8,7 +8,7 @@ const COGNITIVE_LEVEL_COLORS = {
   D: 'bg-red-100 text-red-700'
 }
 
-export function PoolClientChip({ client }) {
+export function PoolClientChip({ client, assignedToAll }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `pool-${client.id}`,
     data: { type: 'pool-client', client }
@@ -25,7 +25,14 @@ export function PoolClientChip({ client }) {
         isDragging ? 'opacity-40' : ''
       }`}
     >
-      {client.avatarUrl ? (
+      {assignedToAll ? (
+        <div
+          className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0"
+          title="Asignado a todos los horarios"
+        >
+          <Check className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
+        </div>
+      ) : client.avatarUrl ? (
         <img src={client.avatarUrl} alt={initials} className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
       ) : (
         <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-semibold text-gray-600 flex-shrink-0">

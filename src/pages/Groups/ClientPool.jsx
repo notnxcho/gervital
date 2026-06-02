@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { PoolClientChip } from './ClientChip'
 
-export default function ClientPool({ clients }) {
+export default function ClientPool({ clients, clientsInAllSlots }) {
   const [search, setSearch] = useState('')
 
   const filtered = search
@@ -28,7 +28,11 @@ export default function ClientPool({ clients }) {
       />
       <div className="flex flex-col gap-1.5">
         {filtered.map(client => (
-          <PoolClientChip key={client.id} client={client} />
+          <PoolClientChip
+            key={client.id}
+            client={client}
+            assignedToAll={clientsInAllSlots?.has(client.id)}
+          />
         ))}
         {filtered.length === 0 && (
           <p className="text-xs text-gray-400 text-center py-4">Sin resultados</p>

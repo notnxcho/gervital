@@ -79,6 +79,21 @@ export default function DailyGroups() {
     )
   }, [allClients, dayName, activeShift])
 
+  // Clients assigned to every time slot of the active shift
+  const clientsInAllSlots = useMemo(() => {
+    const result = new Set()
+    if (timeSlots.length === 0) return result
+    const slotSets = timeSlots.map(slot => {
+      const ids = new Set()
+      slot.activities.forEach(a => a.clientIds.forEach(id => ids.add(id)))
+      return ids
+    })
+    for (const id of slotSets[0]) {
+      if (slotSets.every(s => s.has(id))) result.add(id)
+    }
+    return result
+  }, [timeSlots])
+
   // ── Navigation helpers ────────────────────────────────────────────────────
 
   const canGoBack = differenceInCalendarDays(today, selectedDate) < 14
@@ -98,16 +113,16 @@ export default function DailyGroups() {
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
-  const loadSlots = useCallback(async (dStr, shift) => {
-    setLoading(true)
+  const loadSlots = useCallback(async (dStr, shift, { silent = false } = {}) => {
+    if (!silent) setLoading(true)
     try {
       const slots = await getTimeSlotsForDate(dStr, shift)
       setTimeSlots(slots)
     } catch (err) {
       console.error('Error loading time slots:', err)
-      setTimeSlots([])
+      if (!silent) setTimeSlots([])
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -144,7 +159,7 @@ export default function DailyGroups() {
         time: defaultTime,
         position
       })
-      await loadSlots(dateStr, activeShift)
+      await loadSlots(dateStr, activeShift, { silent: true })
     } catch (err) {
       console.error('Error creating time slot:', err)
     }
@@ -153,7 +168,7 @@ export default function DailyGroups() {
   async function handleUpdateSlot(slotId, fields) {
     try {
       await updateTimeSlot(slotId, fields)
-      await loadSlots(dateStr, activeShift)
+      await loadSlots(dateStr, activeShift, { silent: true })
     } catch (err) {
       console.error('Error updating time slot:', err)
     }
@@ -162,7 +177,7 @@ export default function DailyGroups() {
   async function handleDeleteSlot(slotId) {
     try {
       await deleteTimeSlot(slotId)
-      await loadSlots(dateStr, activeShift)
+      await loadSlots(dateStr, activeShift, { silent: true })
     } catch (err) {
       console.error('Error deleting time slot:', err)
     }
@@ -179,7 +194,7 @@ export default function DailyGroups() {
         responsible: null,
         position
       })
-      await loadSlots(dateStr, activeShift)
+      await loadSlots(dateStr, activeShift, { silent: true })
     } catch (err) {
       console.error('Error creating activity:', err)
     }
@@ -188,7 +203,7 @@ export default function DailyGroups() {
   async function handleUpdateActivity(activityId, fields) {
     try {
       await updateActivity(activityId, fields)
-      await loadSlots(dateStr, activeShift)
+      await loadSlots(dateStr, activeShift, { silent: true })
     } catch (err) {
       console.error('Error updating activity:', err)
     }
@@ -197,7 +212,7 @@ export default function DailyGroups() {
   async function handleDeleteActivity(activityId) {
     try {
       await deleteActivity(activityId)
-      await loadSlots(dateStr, activeShift)
+      await loadSlots(dateStr, activeShift, { silent: true })
     } catch (err) {
       console.error('Error deleting activity:', err)
     }
@@ -206,11 +221,19 @@ export default function DailyGroups() {
   // ── Client assignment handlers ────────────────────────────────────────────
 
   async function handleRemoveClient(activityId, clientId) {
+    // Optimistic: drop the chip immediately, restore snapshot if the delete fails
+    const snapshot = timeSlots
+    setTimeSlots(prev => prev.map(slot => ({
+      ...slot,
+      activities: slot.activities.map(a =>
+        a.id !== activityId ? a : { ...a, clientIds: a.clientIds.filter(id => id !== clientId) }
+      )
+    })))
     try {
       await removeClientFromActivity(activityId, clientId)
-      await loadSlots(dateStr, activeShift)
     } catch (err) {
       console.error('Error removing client:', err)
+      setTimeSlots(snapshot)
     }
   }
 
@@ -254,9 +277,28 @@ export default function DailyGroups() {
       if (alreadyInSlot) return
     }
 
+    // Optimistic: show the chip immediately, roll back if the insert fails
+    setTimeSlots(prev => prev.map(slot =>
+      slot.id !== slotId ? slot : {
+        ...slot,
+        activities: slot.activities.map(a =>
+          a.id !== activityId ? a : { ...a, clientIds: [...a.clientIds, client.id] }
+        )
+      }
+    ))
+
     assignClientToActivity(activityId, client.id)
-      .then(() => loadSlots(dateStr, activeShift))
-      .catch(err => console.error('Error assigning client:', err))
+      .catch(err => {
+        console.error('Error assigning client:', err)
+        setTimeSlots(prev => prev.map(slot =>
+          slot.id !== slotId ? slot : {
+            ...slot,
+            activities: slot.activities.map(a =>
+              a.id !== activityId ? a : { ...a, clientIds: a.clientIds.filter(id => id !== client.id) }
+            )
+          }
+        ))
+      })
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -400,7 +442,7 @@ export default function DailyGroups() {
             </div>
 
             {/* Client pool sidebar */}
-            <ClientPool clients={shiftClients} />
+            <ClientPool clients={shiftClients} clientsInAllSlots={clientsInAllSlots} />
           </div>
 
           {/* Drag overlay */}
