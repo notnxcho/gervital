@@ -30,7 +30,7 @@ import {
   uploadClientAvatar,
   deleteClientAvatar
 } from '../../services/api'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth, roleHasAccess } from '../../context/AuthContext'
 import Button from '../../components/ui/Button'
 import Card, { CardContent, CardHeader } from '../../components/ui/Card'
 import Tabs from '../../components/ui/Tabs'
@@ -642,6 +642,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const today = new Date()
   const isPaid = invoice?.paymentStatus === 'paid'
   const isInvoiced = invoice?.invoiceStatus === 'invoiced'
+  const canViewBilling = roleHasAccess(user?.role, 'billing')
   // Overdue: unpaid and past the 11th of the invoice's month
   const dueDate = new Date(year, month, 11, 23, 59, 59)
   const isOverdue = !isPaid && today > dueDate
@@ -766,6 +767,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
           </h3>
 
           {/* Payment + Invoice badges */}
+          {canViewBilling && (
           <div className="flex gap-2">
             {/* Payment badge */}
             <div className="relative flex-1" ref={paymentDropRef}>
@@ -859,6 +861,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
               )}
             </div>
           </div>
+          )}
 
           {/* Stats row */}
           <div className="flex items-baseline gap-2 mt-2">
@@ -871,9 +874,11 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
             {vacationPct > 0 && (
               <span className="text-xs text-orange-600">(-{vacationPct}%)</span>
             )}
-            <span className="ml-auto text-base font-bold text-gray-900">
-              ${displayAmount.toLocaleString()}
-            </span>
+            {canViewBilling && (
+              <span className="ml-auto text-base font-bold text-gray-900">
+                ${displayAmount.toLocaleString()}
+              </span>
+            )}
           </div>
         </CardHeader>
 
