@@ -3,6 +3,23 @@ import { supabase } from '../services/supabase/client'
 
 const AuthContext = createContext(null)
 
+// Feature -> roles allowed. Single source of truth for RBAC.
+const FEATURE_ROLES = {
+  clients: ['operador', 'admin', 'superadmin'],
+  suppliers: ['operador', 'admin', 'superadmin'],
+  billing: ['admin', 'superadmin'],
+  salaries: ['superadmin'],
+  dashboard_financials: ['superadmin'],
+  users: ['superadmin'],
+  statistics: ['superadmin']
+}
+
+// Pure helper usable outside the hook (e.g. in nested components with only `role`)
+export function roleHasAccess(role, feature) {
+  const allowed = FEATURE_ROLES[feature]
+  return Array.isArray(allowed) && allowed.includes(role)
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -156,17 +173,7 @@ export function AuthProvider({ children }) {
   // Check if the user has access to a feature based on role
   const hasAccess = (feature) => {
     if (!profile) return false
-
-    // Superadmin has access to everything
-    if (profile.role === 'superadmin') return true
-
-    // Admin doesn't have access to these features
-    const restrictedForAdmin = ['suppliers', 'statistics']
-    if (profile.role === 'admin' && restrictedForAdmin.includes(feature)) {
-      return false
-    }
-
-    return true
+    return roleHasAccess(profile.role, feature)
   }
 
   const value = {
