@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash } from 'iconoir-react'
-import { getUsers, createUser, updateUser, deleteUser } from '../../services/api'
+import { Plus, Edit, Trash, Lock } from 'iconoir-react'
+import { getUsers, createUser, updateUser, deleteUser, resetPassword } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import Button from '../../components/ui/Button'
 import Input, { Select } from '../../components/ui/Input'
@@ -9,19 +9,29 @@ import Modal from '../../components/ui/Modal'
 
 // MOCKED RES - Opciones de roles
 const ROLE_OPTIONS = [
+  { value: 'operador', label: 'Operador' },
   { value: 'admin', label: 'Admin' },
   { value: 'superadmin', label: 'Superadmin' }
 ]
 
 const ROLE_LABELS = {
+  operador: 'Operador',
   admin: 'Admin',
   superadmin: 'Superadmin'
 }
 
 const ROLE_DESCRIPTIONS = {
-  admin: 'Acceso a clientes, asistencia y transporte',
-  superadmin: 'Acceso completo a todas las funcionalidades'
+  operador: 'Clientes, grupos, transporte, proveedores y gastos (sin información financiera)',
+  admin: 'Todo lo del operador + precios, facturación y cobranza',
+  superadmin: 'Acceso completo: usuarios, dashboard financiero y sueldos'
 }
+
+const ROLE_BADGE = {
+  operador: { bg: 'bg-teal-100', text: 'text-teal-700' },
+  admin: { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+  superadmin: { bg: 'bg-purple-100', text: 'text-purple-700' }
+}
+const roleBadge = (role) => ROLE_BADGE[role] || ROLE_BADGE.operador
 
 export default function AccessList() {
   const [users, setUsers] = useState([])
@@ -29,7 +39,9 @@ export default function AccessList() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [deleteModal, setDeleteModal] = useState({ open: false, user: null })
-  const [formData, setFormData] = useState({ name: '', email: '', role: 'admin' })
+  const [resetModal, setResetModal] = useState({ open: false, user: null })
+  const [resetDone, setResetDone] = useState(false)
+  const [formData, setFormData] = useState({ name: '', email: '', role: 'operador' })
   const [formLoading, setFormLoading] = useState(false)
   const [errors, setErrors] = useState({})
   
@@ -53,7 +65,7 @@ export default function AccessList() {
 
   const openCreateModal = () => {
     setEditingUser(null)
-    setFormData({ name: '', email: '', role: 'admin' })
+    setFormData({ name: '', email: '', role: 'operador' })
     setErrors({})
     setModalOpen(true)
   }
@@ -96,7 +108,7 @@ export default function AccessList() {
 
   const handleDelete = async () => {
     if (!deleteModal.user) return
-    
+
     setFormLoading(true)
     try {
       await deleteUser(deleteModal.user.id)
@@ -104,6 +116,19 @@ export default function AccessList() {
       setDeleteModal({ open: false, user: null })
     } catch (error) {
       console.error('Error eliminando usuario:', error)
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  const handleResetPassword = async () => {
+    if (!resetModal.user) return
+    setFormLoading(true)
+    try {
+      await resetPassword(resetModal.user.authId)
+      setResetDone(true)
+    } catch (error) {
+      console.error('Error reseteando contraseña:', error)
     } finally {
       setFormLoading(false)
     }
@@ -126,16 +151,27 @@ export default function AccessList() {
       </div>
 
       {/* Roles info */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="p-4">
+          <h3 className="font-medium text-gray-900">Operador</h3>
+          <p className="text-sm text-gray-500 mt-1">{ROLE_DESCRIPTIONS.operador}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">Clientes</span>
+            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">Grupos</span>
+            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">Transporte</span>
+            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">Proveedores</span>
+            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">❌ Finanzas</span>
+          </div>
+        </Card>
         <Card className="p-4">
           <h3 className="font-medium text-gray-900">Admin</h3>
           <p className="text-sm text-gray-500 mt-1">{ROLE_DESCRIPTIONS.admin}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">Clientes</span>
-            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">Asistencia</span>
-            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">Transporte</span>
-            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">❌ Proveedores</span>
-            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">❌ Estadísticas</span>
+            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">Operación</span>
+            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">Facturación</span>
+            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">Cobranza</span>
+            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">❌ Usuarios</span>
+            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">❌ Sueldos</span>
           </div>
         </Card>
         <Card className="p-4">
@@ -165,12 +201,8 @@ export default function AccessList() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     {/* Avatar */}
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                      user.role === 'superadmin' ? 'bg-purple-100' : 'bg-indigo-100'
-                    }`}>
-                      <span className={`font-semibold text-lg ${
-                        user.role === 'superadmin' ? 'text-purple-600' : 'text-indigo-600'
-                      }`}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${roleBadge(user.role).bg}`}>
+                      <span className={`font-semibold text-lg ${roleBadge(user.role).text}`}>
                         {user.name.split(' ').map(n => n[0]).join('')}
                       </span>
                     </div>
@@ -191,11 +223,7 @@ export default function AccessList() {
 
                   {/* Role and actions */}
                   <div className="flex items-center gap-4">
-                    <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-                      user.role === 'superadmin'
-                        ? 'bg-purple-100 text-purple-700'
-                        : 'bg-indigo-100 text-indigo-700'
-                    }`}>
+                    <span className={`px-3 py-1 text-sm font-medium rounded-full ${roleBadge(user.role).bg} ${roleBadge(user.role).text}`}>
                       {ROLE_LABELS[user.role]}
                     </span>
                     
@@ -206,6 +234,14 @@ export default function AccessList() {
                         onClick={() => openEditModal(user)}
                       >
                         <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setResetDone(false); setResetModal({ open: true, user }) }}
+                        title="Resetear contraseña"
+                      >
+                        <Lock className="w-4 h-4" />
                       </Button>
                       {user.id !== currentUser?.id && (
                         <Button
@@ -258,7 +294,8 @@ export default function AccessList() {
           {!editingUser && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
               <p className="text-sm text-amber-800">
-                Se enviará un email al usuario con instrucciones para establecer su contraseña.
+                Contraseña inicial: <span className="font-mono font-semibold">Password1234!</span>
+                <br />El usuario podrá cambiarla luego desde su menú.
               </p>
             </div>
           )}
@@ -304,6 +341,41 @@ export default function AccessList() {
             Eliminar
           </Button>
         </div>
+      </Modal>
+
+      {/* Reset password modal */}
+      <Modal
+        isOpen={resetModal.open}
+        onClose={() => setResetModal({ open: false, user: null })}
+        title="Resetear contraseña"
+      >
+        {resetDone ? (
+          <>
+            <p className="text-gray-600 mb-6">
+              La contraseña de <span className="font-semibold">{resetModal.user?.name}</span> se
+              restableció a <span className="font-mono font-semibold">Password1234!</span>.
+              Comunicásela al usuario.
+            </p>
+            <div className="flex justify-end">
+              <Button onClick={() => setResetModal({ open: false, user: null })}>Listo</Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-gray-600 mb-6">
+              ¿Resetear la contraseña de <span className="font-semibold">{resetModal.user?.name}</span> a
+              la contraseña inicial <span className="font-mono font-semibold">Password1234!</span>?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="secondary" onClick={() => setResetModal({ open: false, user: null })}>
+                Cancelar
+              </Button>
+              <Button onClick={handleResetPassword} loading={formLoading}>
+                Resetear
+              </Button>
+            </div>
+          </>
+        )}
       </Modal>
     </div>
   )
