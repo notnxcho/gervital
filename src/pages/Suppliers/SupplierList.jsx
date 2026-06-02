@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { format, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useAuth } from '../../context/AuthContext'
 import { 
   Plus, 
   NavArrowLeft, 
@@ -11,17 +12,23 @@ import {
   Edit,
   Building
 } from 'iconoir-react'
-import { 
-  getSuppliers, 
-  getExpensesByMonth, 
-  createSupplier, 
-  createExpense, 
+import {
+  getSuppliers,
+  getExpensesByMonth,
+  createSupplier,
+  createExpense,
   markExpenseAsPaid,
   deleteExpense,
   deleteSupplier,
   updateSupplier,
   updateExpense,
-  SUPPLIER_CATEGORIES 
+  SUPPLIER_CATEGORIES,
+  getSalaries,
+  createSalary,
+  deactivateSalary,
+  deleteSalary,
+  SALARY_ONE_TIME_TYPES,
+  salaryOneTimeLabel
 } from '../../services/api'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -29,15 +36,18 @@ import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 
 export default function SupplierList() {
+  const { hasAccess } = useAuth()
   const [suppliers, setSuppliers] = useState([])
   const [expenses, setExpenses] = useState([])
+  const [salaries, setSalaries] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date())
-  
+
   // Modals
   const [supplierModal, setSupplierModal] = useState({ open: false, supplier: null })
   const [expenseModal, setExpenseModal] = useState({ open: false, expense: null })
   const [deleteModal, setDeleteModal] = useState({ open: false, type: null, item: null })
+  const [salaryModal, setSalaryModal] = useState({ open: false, kind: 'recurring' })
   
   const year = selectedDate.getFullYear()
   const month = selectedDate.getMonth()
@@ -56,6 +66,10 @@ export default function SupplierList() {
       ])
       setSuppliers(suppliersData)
       setExpenses(expensesData)
+      if (hasAccess('salaries')) {
+        const salariesData = await getSalaries()
+        setSalaries(salariesData)
+      }
     } catch (error) {
       console.error('Error cargando datos:', error)
     } finally {
@@ -111,6 +125,24 @@ export default function SupplierList() {
       loadData()
     } catch (error) {
       console.error('Error eliminando proveedor:', error)
+    }
+  }
+
+  const handleDeactivateSalary = async (id) => {
+    try {
+      await deactivateSalary(id)
+      loadData()
+    } catch (error) {
+      console.error('Error dando de baja sueldo:', error)
+    }
+  }
+
+  const handleDeleteSalary = async (id) => {
+    try {
+      await deleteSalary(id)
+      loadData()
+    } catch (error) {
+      console.error('Error eliminando sueldo:', error)
     }
   }
 
@@ -298,6 +330,109 @@ export default function SupplierList() {
         </div>
       </div>
 
+      {/* Sueldos (solo superadmin) */}
+      {hasAccess('salaries') && (
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Sueldos</h3>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setSalaryModal({ open: true, kind: 'recurring' })}
+              >
+                <Plus className="w-4 h-4" />
+                Costo recurrente
+              </Button>
+              <Button
+                onClick={() => setSalaryModal({ open: true, kind: 'one_time' })}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Plus className="w-4 h-4" />
+                Costo puntual
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Recurrentes activos */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Recurrentes mensuales</h4>
+              {salaries.filter(s => s.kind === 'recurring' && s.active).length === 0 ? (
+                <Card className="p-6 text-center"><p className="text-gray-500">Sin costos recurrentes</p></Card>
+              ) : (
+                <div className="space-y-3">
+                  {salaries.filter(s => s.kind === 'recurring' && s.active).map(s => (
+                    <Card key={s.id} className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h5 className="font-medium text-gray-900">{s.concept || 'Sin concepto'}</h5>
+                          {s.description && <p className="text-xs text-gray-400 mt-1">{s.description}</p>}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-semibold text-gray-900">${s.amount.toLocaleString('es-AR')}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100 justify-end">
+                        <button
+                          onClick={() => handleDeactivateSalary(s.id)}
+                          className="px-3 py-1.5 text-xs text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                        >
+                          Dar de baja
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSalary(s.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Puntuales */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Puntuales</h4>
+              {salaries.filter(s => s.kind === 'one_time').length === 0 ? (
+                <Card className="p-6 text-center"><p className="text-gray-500">Sin costos puntuales</p></Card>
+              ) : (
+                <div className="space-y-3">
+                  {salaries.filter(s => s.kind === 'one_time').map(s => (
+                    <Card key={s.id} className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h5 className="font-medium text-gray-900">{salaryOneTimeLabel(s.oneTimeType)}</h5>
+                            {s.concept && <span className="text-xs text-gray-500">· {s.concept}</span>}
+                          </div>
+                          {s.description && <p className="text-xs text-gray-400 mt-1">{s.description}</p>}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-semibold text-gray-900">${s.amount.toLocaleString('es-AR')}</p>
+                          {s.date && (
+                            <p className="text-xs text-gray-400">{format(new Date(s.date), 'd MMM yyyy', { locale: es })}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100 justify-end">
+                        <button
+                          onClick={() => handleDeleteSalary(s.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Supplier Modal */}
       <SupplierModal
         isOpen={supplierModal.open}
@@ -314,6 +449,14 @@ export default function SupplierList() {
         suppliers={suppliers}
         selectedYear={year}
         selectedMonth={month}
+        onSave={loadData}
+      />
+
+      {/* Salary Modal */}
+      <SalaryModal
+        isOpen={salaryModal.open}
+        kind={salaryModal.kind}
+        onClose={() => setSalaryModal({ open: false, kind: 'recurring' })}
         onSave={loadData}
       />
 
@@ -535,6 +678,111 @@ function SupplierModal({ isOpen, onClose, supplier, onSave }) {
           <Button type="submit" loading={loading}>
             {supplier ? 'Guardar cambios' : 'Crear proveedor'}
           </Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+// Modal de sueldo (recurrente o puntual)
+function SalaryModal({ isOpen, kind, onClose, onSave }) {
+  const [loading, setLoading] = useState(false)
+  const [form, setForm] = useState({
+    oneTimeType: 'aguinaldo',
+    concept: '',
+    description: '',
+    amount: '',
+    date: ''
+  })
+
+  useEffect(() => {
+    setForm({ oneTimeType: 'aguinaldo', concept: '', description: '', amount: '', date: '' })
+  }, [isOpen, kind])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    try {
+      await createSalary({
+        kind,
+        oneTimeType: form.oneTimeType,
+        concept: form.concept,
+        description: form.description,
+        amount: parseFloat(form.amount),
+        date: form.date
+      })
+      onSave()
+      onClose()
+    } catch (error) {
+      console.error('Error guardando sueldo:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={kind === 'recurring' ? 'Nuevo costo recurrente' : 'Nuevo costo puntual'}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {kind === 'one_time' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+            <select
+              value={form.oneTimeType}
+              onChange={(e) => setForm({ ...form, oneTimeType: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              required
+            >
+              {SALARY_ONE_TIME_TYPES.map(t => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <Input
+          label="Concepto"
+          value={form.concept}
+          onChange={(e) => setForm({ ...form, concept: e.target.value })}
+          placeholder={kind === 'recurring' ? 'Ej: Sueldo coordinador' : 'Ej: Juan Pérez'}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label="Monto"
+            type="number"
+            value={form.amount}
+            onChange={(e) => setForm({ ...form, amount: e.target.value })}
+            placeholder="0"
+            required
+          />
+          {kind === 'one_time' && (
+            <Input
+              label="Fecha"
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+            />
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+          <textarea
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            rows={2}
+            placeholder="Detalles adicionales..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+        </div>
+
+        <div className="flex gap-3 justify-end pt-4">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" loading={loading}>Guardar</Button>
         </div>
       </form>
     </Modal>
