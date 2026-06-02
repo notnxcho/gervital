@@ -3,9 +3,9 @@ export const CLUB_LOCATION = { lat: -34.8969, lng: -56.1470 }
 
 export const SHIFTS = [
   { id: 'morning_arrive', label: 'Llegada mañana', time: '9:00', type: 'arrive', period: 'morning' },
-  { id: 'morning_leave', label: 'Salida mañana', time: '14:00', type: 'leave', period: 'morning' },
-  { id: 'afternoon_arrive', label: 'Llegada tarde', time: '15:00', type: 'arrive', period: 'afternoon' },
-  { id: 'afternoon_leave', label: 'Salida tarde', time: '19:00', type: 'leave', period: 'afternoon' }
+  { id: 'morning_leave', label: 'Salida mañana', time: '13:00', type: 'leave', period: 'morning' },
+  { id: 'afternoon_arrive', label: 'Llegada tarde', time: '14:00', type: 'arrive', period: 'afternoon' },
+  { id: 'afternoon_leave', label: 'Salida tarde', time: '18:00', type: 'leave', period: 'afternoon' }
 ]
 
 export const CAR_COLORS = [

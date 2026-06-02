@@ -9,21 +9,22 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
-import { Plus } from 'iconoir-react'
+import { Plus, MagicWand } from 'iconoir-react'
 import CarCard from './CarCard'
 import { SortableClientChip, DragOverlayChip } from './ClientChip'
 import { UNASSIGNED_COLOR } from '../../services/transport/transportConstants'
-import { getNextCarColor } from '../../services/transport/transportService'
+import { getNextCarColor, autoAssignByZone } from '../../services/transport/transportService'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
 
-function UnassignedPool({ clientIds, clients }) {
+function UnassignedPool({ clientIds, clients, onAutoAssign, autoAssigning }) {
   const { setNodeRef, isOver } = useDroppable({
     id: 'unassigned',
     data: { type: 'unassigned' }
   })
 
   const unassignedClients = clientIds.map(id => clients.get(id)).filter(Boolean)
+  const geocodedCount = unassignedClients.filter(c => c.latitude != null && c.longitude != null).length
 
   return (
     <div
@@ -32,9 +33,24 @@ function UnassignedPool({ clientIds, clients }) {
         isOver ? 'bg-gray-50' : ''
       }`}
     >
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-        Sin asignar ({clientIds.length})
-      </p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          Sin asignar ({clientIds.length})
+        </p>
+        <button
+          onClick={onAutoAssign}
+          disabled={geocodedCount === 0 || autoAssigning}
+          title="Asignar por zona los clientes sin asignar"
+          className="flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
+        >
+          {autoAssigning ? (
+            <span className="w-3.5 h-3.5 rounded-full border-2 border-indigo-200 border-t-indigo-600 animate-spin" />
+          ) : (
+            <MagicWand className="w-3.5 h-3.5" />
+          )}
+          {autoAssigning ? 'Asignando…' : 'Auto-asignar'}
+        </button>
+      </div>
       <SortableContext items={clientIds} strategy={rectSortingStrategy}>
         <div className="flex flex-wrap gap-1.5">
           {unassignedClients.map(client => (
@@ -61,6 +77,7 @@ export default function CarAssignmentPanel({
 }) {
   const [activeClient, setActiveClient] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [autoAssigning, setAutoAssigning] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -132,6 +149,16 @@ export default function CarAssignmentPanel({
     setActiveClient(null)
   }
 
+  function handleAutoAssign() {
+    if (autoAssigning) return
+    setAutoAssigning(true)
+    // Fake compute delay so the assignment feels like real work
+    setTimeout(() => {
+      onStateChange(prev => autoAssignByZone(prev, clientsById).state)
+      setAutoAssigning(false)
+    }, 600)
+  }
+
   function handleAddCar() {
     onStateChange(prev => ({
       ...prev,
@@ -197,6 +224,8 @@ export default function CarAssignmentPanel({
         <UnassignedPool
           clientIds={shiftState.unassigned}
           clients={clientsById}
+          onAutoAssign={handleAutoAssign}
+          autoAssigning={autoAssigning}
         />
 
         <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">

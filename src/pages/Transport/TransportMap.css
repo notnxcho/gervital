@@ -1,0 +1,118 @@
+/* Client avatar markers on the transport map */
+
+.tm-marker {
+  width: 40px; height: 40px;
+  border-radius: 9999px;
+  border: 3px solid var(--tm-ring, #94a3b8);
+  background: #fff;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
+  transition: transform .18s cubic-bezier(.2, .8, .2, 1), box-shadow .18s ease;
+  user-select: none;
+}
+.tm-marker:hover { transform: scale(1.08); }
+
+.tm-marker-photo {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tm-marker-initials {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 14px; color: rgba(255, 255, 255, .95);
+  background: linear-gradient(135deg, #8b7fd1, #b39ddb 60%, #d6c8f0);
+}
+
+/* Club / center marker — distinct from client avatars */
+.tm-club {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+}
+.tm-club-badge {
+  width: 44px; height: 44px;
+  border-radius: 9999px;
+  border: 3px solid #fff;
+  background: #4f46e5;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .4);
+}
+.tm-club-label {
+  margin-top: 4px;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  background: #4f46e5;
+  color: #fff;
+  font-size: 11px; font-weight: 600; line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+}
+
+/* Client context popup */
+.tm-popup {
+  position: relative;
+  width: 232px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .22);
+  padding: 12px 14px 13px;
+  font-size: 13px;
+  color: #334155;
+  cursor: default;
+}
+.tm-popup-close {
+  position: absolute; top: 6px; right: 6px;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 9999px;
+  color: #94a3b8;
+  transition: background .15s ease, color .15s ease;
+}
+.tm-popup-close:hover { background: #f1f5f9; color: #475569; }
+
+.tm-popup-head {
+  display: flex; align-items: center; gap: 9px;
+  padding-right: 18px; margin-bottom: 10px;
+}
+.tm-popup-name { font-weight: 600; font-size: 14px; color: #1e293b; line-height: 1.25; }
+
+.tm-popup-rows { display: flex; flex-direction: column; gap: 8px; }
+.tm-popup-row { display: flex; align-items: center; gap: 7px; }
+.tm-popup-col { display: flex; flex-direction: column; gap: 2px; }
+.tm-popup-key {
+  flex-shrink: 0; min-width: 62px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .03em; color: #94a3b8;
+}
+.tm-popup-tier {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 7px;
+  color: #fff; font-weight: 700; font-size: 14px;
+}
+
+/* Little pointer at the bottom of the popup */
+.tm-popup-tip {
+  position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%);
+  width: 14px; height: 14px;
+  background: #fff;
+  transform: translateX(-50%) rotate(45deg);
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, .08);
+}
+
+/* Highlighted (chip hovered) — scale up + pulsing ring */
+.tm-marker.is-highlighted {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tm-ring, #94a3b8) 45%, transparent),
+              0 2px 8px rgba(0, 0, 0, .4);
+  animation: tm-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes tm-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--tm-ring, #94a3b8) 45%, transparent), 0 2px 8px rgba(0, 0, 0, .4); }
+  50%      { box-shadow: 0 0 0 9px color-mix(in srgb, var(--tm-ring, #94a3b8) 0%, transparent), 0 2px 8px rgba(0, 0, 0, .4); }
+}

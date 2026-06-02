@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { format, addDays, subDays, isWeekend, nextMonday, previousFriday } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { NavArrowLeft, NavArrowRight, Refresh } from 'iconoir-react'
+import { NavArrowLeft, NavArrowRight, Refresh, Check, Calendar } from 'iconoir-react'
 import {
   getTransportClients,
   filterClientsForShift,
@@ -14,6 +14,7 @@ import {
 import { SHIFTS, DAY_NAMES, DAY_LABELS_ES } from '../../services/transport/transportConstants'
 import TransportMap from './TransportMap'
 import CarAssignmentPanel from './CarAssignmentPanel'
+import TransportWeekTable from './TransportWeekTable'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
 
@@ -53,7 +54,7 @@ export default function TransportScheduler() {
   const [showRepeatConfirm, setShowRepeatConfirm] = useState(false)
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(null)
   const [showSaveWarning, setShowSaveWarning] = useState(false)
-  const [highlightedClient, setHighlightedClient] = useState(null)
+  const [showWeek, setShowWeek] = useState(false)
   const [error, setError] = useState(null)
   const [toast, setToast] = useState(null)
 
@@ -93,6 +94,17 @@ export default function TransportScheduler() {
     })
     return counts
   }, [allClients, dayName])
+
+  // A shift is "complete" when it has attendees and none are left unassigned
+  const shiftComplete = useMemo(() => {
+    const complete = {}
+    SHIFTS.forEach(s => {
+      const count = shiftCounts[s.id] || 0
+      const unassigned = shifts[s.id]?.unassigned?.length ?? 0
+      complete[s.id] = count > 0 && unassigned === 0
+    })
+    return complete
+  }, [shiftCounts, shifts])
 
   // ── Load data ─────────────────────────────────────────────────────────────
 
@@ -262,13 +274,6 @@ export default function TransportScheduler() {
     }
   }
 
-  // ── Pin click → highlight ─────────────────────────────────────────────────
-
-  function handlePinClick(clientId) {
-    setHighlightedClient(clientId)
-    setTimeout(() => setHighlightedClient(null), 2000)
-  }
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -322,7 +327,7 @@ export default function TransportScheduler() {
             size="sm"
             onClick={handleSave}
             loading={saving}
-            disabled={loading}
+            disabled={loading || !isDirty}
           >
             Guardar día
           </Button>
@@ -330,27 +335,43 @@ export default function TransportScheduler() {
       </div>
 
       {/* Shift Tabs */}
-      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 flex">
-        {SHIFTS.map(shift => (
-          <button
-            key={shift.id}
-            onClick={() => setActiveShift(shift.id)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              activeShift === shift.id
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            {shift.label} · {shift.time}
-            <span className={`ml-2 inline-flex items-center justify-center px-1.5 py-0.5 text-xs rounded-full ${
-              activeShift === shift.id
-                ? 'bg-indigo-100 text-indigo-600'
-                : 'bg-gray-100 text-gray-500'
-            }`}>
-              {shiftCounts[shift.id] || 0}
-            </span>
-          </button>
-        ))}
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div className="flex">
+        {SHIFTS.map(shift => {
+          const complete = shiftComplete[shift.id]
+          return (
+            <button
+              key={shift.id}
+              onClick={() => setActiveShift(shift.id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeShift === shift.id
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {shift.label} · {shift.time}
+              <span className={`ml-2 inline-flex items-center gap-0.5 justify-center px-1.5 py-0.5 text-xs rounded-full ${
+                complete
+                  ? 'bg-green-100 text-green-700'
+                  : activeShift === shift.id
+                    ? 'bg-indigo-100 text-indigo-600'
+                    : 'bg-gray-100 text-gray-500'
+              }`}>
+                {shiftCounts[shift.id] || 0}
+                {complete && <Check className="w-3 h-3" strokeWidth={2.5} />}
+              </span>
+            </button>
+          )
+        })}
+        </div>
+
+        <button
+          onClick={() => setShowWeek(true)}
+          className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+        >
+          <Calendar className="w-4 h-4" />
+          Ver semana
+        </button>
       </div>
 
       {/* Main content */}
@@ -374,8 +395,6 @@ export default function TransportScheduler() {
           <TransportMap
             shiftClients={shiftClients}
             shiftState={shifts[activeShift]}
-            onPinClick={handlePinClick}
-            highlightedClient={highlightedClient}
           />
           <CarAssignmentPanel
             shiftState={shifts[activeShift]}
@@ -404,6 +423,13 @@ export default function TransportScheduler() {
           <Button onClick={confirmRepeat}>Confirmar</Button>
         </div>
       </Modal>
+
+      {/* Weekly overview */}
+      <TransportWeekTable
+        isOpen={showWeek}
+        onClose={() => setShowWeek(false)}
+        clients={allClients}
+      />
 
       {/* Save with unassigned warning */}
       <Modal isOpen={showSaveWarning} onClose={() => setShowSaveWarning(false)} title="Asistentes sin asignar" size="sm">

@@ -1,0 +1,125 @@
+/* Weekly transport overview — scrollable grid with sticky headers */
+
+.wk-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.wk-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); }
+
+.wk-panel {
+  position: relative;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 12px 44px rgba(0, 0, 0, .26);
+  width: 100%; max-width: 1200px;
+  max-height: 90vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+.wk-header {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.wk-title { font-size: 16px; font-weight: 700; margin: 0; color: #111827; }
+.wk-subtitle { font-size: 12px; color: #6b7280; margin: 2px 0 0; }
+.wk-close {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; color: #9ca3af;
+  transition: background .15s ease, color .15s ease;
+}
+.wk-close:hover { background: #f3f4f6; color: #4b5563; }
+
+/* ── Scroll container ─────────────────────────────────────────── */
+.wk-scroll { flex: 1; overflow: auto; }
+
+.wk-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 920px;
+}
+
+/* Top-left corner — highest stacking */
+.wk-table thead th.wk-corner {
+  position: sticky; top: 0; left: 0; z-index: 30;
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  min-width: 132px; width: 132px;
+}
+
+/* Day column headers — sticky top */
+.wk-table thead th.wk-day {
+  position: sticky; top: 0; z-index: 20;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid #f3f4f6;
+  padding: 12px 14px; text-align: left;
+  min-width: 260px;
+}
+.wk-day-name { font-size: 14px; font-weight: 700; }
+.wk-day-sub { font-size: 14px; color: #9ca3af; font-weight: 500; margin-top: 1px; }
+
+/* Shift label column — sticky left */
+.wk-table tbody th.wk-shift {
+  position: sticky; left: 0; z-index: 10;
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #f3f4f6;
+  text-align: left; padding: 12px 14px;
+  vertical-align: top;
+  min-width: 132px; width: 132px;
+}
+.wk-shift-label { font-size: 14px; font-weight: 700; line-height: 1.2; }
+.wk-shift-time { font-size: 14px; color: #9ca3af; font-weight: 600; margin-top: 2px; }
+.wk-tag {
+  display: inline-block; margin-top: 8px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  padding: 2px 7px; border-radius: 9999px;
+}
+.wk-tag-arrive { background: #ecfdf5; color: #047857; }
+.wk-tag-leave { background: #fff7ed; color: #c2410c; }
+
+/* Data cells */
+.wk-table td.wk-cell {
+  border-bottom: 1px solid #f3f4f6;
+  border-right: 1px solid #f3f4f6;
+  padding: 8px; vertical-align: top;
+  min-width: 260px;
+}
+.wk-table tr.wk-band td.wk-cell { background: #fcfcfd; }
+.wk-table tr.wk-band th.wk-shift { background: #fcfcfd; }
+
+.wk-cell-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 0 2px 6px;
+}
+.wk-count { font-size: 14px; color: #9ca3af; font-weight: 600; }
+.wk-cars {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 14px; font-weight: 700;
+  color: #4f46e5; background: #eef2ff;
+  padding: 2px 7px; border-radius: 9999px;
+}
+
+/* Person chip */
+.wk-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 9px; border-radius: 8px;
+  background: #fff; border: 1px solid #e5e7eb;
+  margin-bottom: 4px;
+}
+.wk-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 9999px; }
+.wk-name { font-size: 14px; font-weight: 500; color: #374151; line-height: 1.2; }
+
+/* Capacity separator — "necesitaría otro auto" */
+.wk-sep { margin: 8px 2px 10px; }
+.wk-line { height: 1px; background: repeating-linear-gradient(to right, #e5e7eb 0 5px, transparent 5px 9px); }
+
+.wk-empty { font-size: 11px; color: #cbd5e1; padding: 6px 2px; }

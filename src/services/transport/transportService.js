@@ -1,5 +1,5 @@
 import { supabase } from '../supabase/client'
-import { CAR_COLORS, DEFAULT_FLEET } from './transportConstants'
+import { CAR_COLORS, DEFAULT_FLEET, CLUB_LOCATION } from './transportConstants'
 
 export async function getTransportClients() {
   const { data, error } = await supabase
@@ -118,4 +118,119 @@ export function buildDefaultFleet() {
 export function getNextCarColor(existingCars) {
   const usedColors = new Set(existingCars.map(c => c.color))
   return CAR_COLORS.find(c => !usedColors.has(c)) || CAR_COLORS[existingCars.length % CAR_COLORS.length]
+}
+
+// A car is the "combi" (low-priority, big vehicle) when it seats more than a regular car
+const REGULAR_SEAT_COUNT = 4
+const isCombi = car => car.seatCount > REGULAR_SEAT_COUNT
+
+// Auto-assign the unassigned clients of a shift into cars, grouped by geographic zone.
+// Preferences: fill regular 4-seat cars first, use the combi only when they overflow,
+// and add new 4-seat cars only when even the combi is full. Manual assignments are kept;
+// clients without coordinates stay unassigned.
+export function autoAssignByZone(shiftState, clientsById) {
+  const next = {
+    cars: shiftState.cars.map(c => ({ ...c, memberIds: [...(c.memberIds || [])] })),
+    unassigned: [...shiftState.unassigned]
+  }
+
+  const pool = []
+  const noGeo = []
+  for (const id of next.unassigned) {
+    const c = clientsById.get(id)
+    if (c && c.latitude != null && c.longitude != null) pool.push({ id, lat: c.latitude, lng: c.longitude })
+    else noGeo.push(id)
+  }
+
+  if (pool.length === 0) {
+    next.unassigned = noGeo
+    return { state: next, placed: 0, skipped: noGeo.length }
+  }
+
+  // Local planar projection (good enough at city scale): correct lng by cos(lat)
+  const kx = Math.cos(CLUB_LOCATION.lat * Math.PI / 180)
+  const dist2 = (a, b) => {
+    const dx = (a.lng - b.lng) * kx
+    const dy = a.lat - b.lat
+    return dx * dx + dy * dy
+  }
+
+  const ptById = new Map(pool.map(p => [p.id, p]))
+  const remaining = new Set(pool.map(p => p.id))
+
+  function centroidOf(car) {
+    const pts = car.memberIds
+      .map(id => clientsById.get(id))
+      .filter(c => c && c.latitude != null && c.longitude != null)
+    if (pts.length === 0) return null
+    const lat = pts.reduce((s, c) => s + c.latitude, 0) / pts.length
+    const lng = pts.reduce((s, c) => s + c.longitude, 0) / pts.length
+    return { lat, lng }
+  }
+
+  function activeCentroids() {
+    return next.cars.map(centroidOf).filter(Boolean)
+  }
+
+  function nearestRemainingTo(target) {
+    let best = null, bestD = Infinity
+    for (const id of remaining) {
+      const d = dist2(ptById.get(id), target)
+      if (d < bestD) { bestD = d; best = id }
+    }
+    return best
+  }
+
+  // Seed an empty car with the remaining client farthest from every open zone
+  // (k-means++ style spread), or farthest from the club when no zones exist yet.
+  function pickSeed() {
+    const cents = activeCentroids()
+    let best = null, bestScore = -Infinity
+    for (const id of remaining) {
+      const p = ptById.get(id)
+      const score = cents.length === 0
+        ? dist2(p, CLUB_LOCATION)
+        : Math.min(...cents.map(c => dist2(p, c)))
+      if (score > bestScore) { bestScore = score; best = id }
+    }
+    return best
+  }
+
+  function fillCar(car) {
+    while (car.memberIds.length < car.seatCount && remaining.size > 0) {
+      const centroid = centroidOf(car)
+      const pickId = centroid ? nearestRemainingTo(centroid) : pickSeed()
+      if (pickId == null) break
+      car.memberIds.push(pickId)
+      remaining.delete(pickId)
+    }
+  }
+
+  // Fill priority: regular cars with members → empty regular cars → combi(s)
+  const regWith = next.cars.filter(c => !isCombi(c) && c.memberIds.length > 0)
+  const regEmpty = next.cars.filter(c => !isCombi(c) && c.memberIds.length === 0)
+  const combis = next.cars.filter(isCombi)
+
+  for (const car of [...regWith, ...regEmpty, ...combis]) {
+    if (remaining.size === 0) break
+    if (car.memberIds.length >= car.seatCount) continue
+    fillCar(car)
+  }
+
+  // Still clients left → add new 4-seat cars as needed
+  while (remaining.size > 0) {
+    const newCar = {
+      id: `temp-${Date.now()}-${next.cars.length}`,
+      name: `Auto ${next.cars.length + 1}`,
+      seatCount: REGULAR_SEAT_COUNT,
+      color: getNextCarColor(next.cars),
+      position: next.cars.length,
+      memberIds: []
+    }
+    next.cars.push(newCar)
+    fillCar(newCar)
+  }
+
+  next.unassigned = [...noGeo, ...remaining]
+  return { state: next, placed: pool.length - remaining.size, skipped: next.unassigned.length }
 }
