@@ -6,6 +6,7 @@ import { NavArrowLeft, NavArrowRight, WarningTriangle, Clock } from 'iconoir-rea
 import Card, { CardHeader, CardContent } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import { getDashboardMetrics } from '../../services/dashboard/dashboardService'
+import { useAuth } from '../../context/AuthContext'
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('es-AR', {
@@ -48,6 +49,7 @@ const TIER_COLORS = {
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { hasAccess } = useAuth()
   // Start with current month (0-indexed)
   const [currentDate, setCurrentDate] = useState(() => startOfMonth(new Date()))
   const [metrics, setMetrics] = useState(null)
@@ -110,6 +112,8 @@ export default function Dashboard() {
       ) : metrics && (
         <div className="space-y-6">
 
+          {hasAccess('dashboard_financials') && (
+            <>
           {/* KPI row: 5 stat cards */}
           <div className="flex gap-4 flex-wrap">
             <StatCard
@@ -344,6 +348,8 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
+          )}
+            </>
           )}
 
           {/* Operational performance section */}
