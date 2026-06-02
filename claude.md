@@ -59,7 +59,7 @@ src/services/
   id: string,
   name: string,
   email: string,
-  role: 'admin' | 'superadmin',
+  role: 'operador' | 'admin' | 'superadmin',
   createdAt: string // YYYY-MM-DD
 }
 ```
@@ -329,22 +329,24 @@ const chargeableAmount = (chargeableDays.length / plannedDays.length) * monthlyP
 2. **Plan y asistencia**: frecuencia, horario, días asignados, transporte, precio estimado
 3. **Información médica**: restricciones alimentarias/médicas/movilidad, medicación, notas
 
-### 5. Accesos (Usuarios del sistema)
+### 5. Accesos (Usuarios del sistema) — Solo Superadmin
 - Lista de usuarios con rol
-- Crear/editar/eliminar usuarios
-- Roles: Admin y Superadmin
+- Crear/editar/eliminar usuarios y resetear contraseña (vía Edge Function `admin-users`)
+- Roles: Operador, Admin y Superadmin
 - Indicador visual del usuario actual
 
-### 6. Proveedores (Solo Superadmin)
+### 6. Proveedores (Operador, Admin, Superadmin)
 - Lista de proveedores por categoría
 - CRUD de proveedores
 - Categorías: Alimentación, Limpieza, Transporte, Salud, Insumos, etc.
 
-### 7. Gastos (Solo Superadmin)
+### 7. Gastos (Operador, Admin, Superadmin)
 - Gastos recurrentes vs extraordinarios
 - Asociados a proveedores
 - Estados: pendiente/pagado
 - Resumen mensual
+- Sección **Sueldos** (Solo Superadmin): costos recurrentes mensuales (alta/baja) y costos
+  puntuales con tipo discreto (aguinaldo, despido, licencia vacacional, liquidación, otro)
 
 ### 8. Transporte (`/transporte`)
 - Programación diaria de vehículos para clientes con transporte
@@ -361,18 +363,40 @@ const chargeableAmount = (chargeableDays.length / plannedDays.length) * monthlyP
 
 ## Roles y Permisos
 
-### Superadmin
-- ✅ Acceso completo a todo el sistema
-- ✅ Gestión de usuarios
+Tres roles: `operador` < `admin` < `superadmin`. Fuente de verdad en frontend:
+`FEATURE_ROLES` en `src/context/AuthContext.jsx` (feature → roles), expuesta vía
+`hasAccess(feature)` y el helper puro `roleHasAccess(role, feature)`. Reforzado en
+backend con RLS (helper `is_admin_or_superadmin()`, migración 020).
+
+Features: `clients`, `suppliers`, `billing`, `salaries`, `dashboard_financials`, `users`.
+
+### Operador
+- ✅ Clientes, grupos, transporte (operación y coordinación)
 - ✅ Proveedores y gastos
-- ✅ Estadísticas (futuro)
+- ✅ Calendario de asistencia (ver y editar)
+- ❌ Precios, montos, facturación y cobranza (header del detalle de cliente)
+- ❌ Dashboard financiero, Sueldos, Accesos
 
 ### Admin
-- ✅ Gestión de clientes
-- ✅ Gestión de asistencias
-- ✅ Facturación
-- ❌ Proveedores y gastos
-- ❌ Estadísticas
+- ✅ Todo lo del operador
+- ✅ Facturación y cobranza (feature `billing`): precios/montos/estado en el detalle de cliente
+- ❌ Dashboard financiero, Sueldos, gestión de usuarios (Accesos)
+
+### Superadmin
+- ✅ Acceso irrestricto
+- ✅ Gestión de usuarios (Accesos) — crear/editar/eliminar y resetear contraseña
+- ✅ Parte financiera del Dashboard
+- ✅ Sueldos (sección dentro de Proveedores/Gastos)
+
+### Gestión de usuarios y contraseñas
+- No hay sistema de mailing. Contraseña inicial al crear y al resetear: `Password1234!`.
+- Las operaciones privilegiadas (crear/eliminar usuario, resetear password) pasan por la
+  Edge Function `admin-users` (`supabase/functions/admin-users/index.ts`), que verifica que
+  el llamador sea superadmin y usa la `service_role`. El frontend la invoca vía
+  `supabase.functions.invoke('admin-users', ...)` desde `userService.js`.
+- Restricción financiera real: RLS limita `monthly_invoices` (SELECT) y `plan_pricing`
+  (SELECT) a admin/superadmin. `invoices_view` quedó en `security_invoker` para que la RLS
+  de la tabla base aplique al leer la vista (el operador recibe 0 filas, sin error).
 
 ---
 
