@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup — Vista semanal de transporte</title>
+<style>
+  :root {
+    --indigo: #4f46e5;
+    --indigo-50: #eef2ff;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-700: #374151;
+    --gray-900: #111827;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--gray-50);
+    color: var(--gray-900);
+    padding: 24px;
+  }
+
+  .page-head { margin-bottom: 16px; }
+  .page-head h1 { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
+  .page-head p { font-size: 13px; color: var(--gray-500); margin: 0; }
+
+  /* ── Scroll container ─────────────────────────────────────────── */
+  .table-wrap {
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    overflow: auto;
+    max-height: calc(100vh - 140px);
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+    min-width: 920px;
+  }
+
+  /* Top-left corner — highest stacking */
+  thead th.corner {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 30;
+    background: #fff;
+    border-right: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--gray-200);
+    min-width: 132px;
+    width: 132px;
+  }
+
+  /* Day column headers — sticky top */
+  thead th.day {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #fff;
+    border-bottom: 1px solid var(--gray-200);
+    border-right: 1px solid var(--gray-100);
+    padding: 12px 14px;
+    text-align: left;
+    min-width: 158px;
+  }
+  thead th.day .day-name { font-size: 13px; font-weight: 700; text-transform: capitalize; }
+  thead th.day .day-sub  { font-size: 11px; color: var(--gray-400); font-weight: 500; margin-top: 1px; }
+
+  /* Shift label column — sticky left */
+  tbody th.shift {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: #fff;
+    border-right: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--gray-100);
+    text-align: left;
+    padding: 12px 14px;
+    vertical-align: top;
+    min-width: 132px;
+    width: 132px;
+  }
+  .shift-label { font-size: 13px; font-weight: 700; line-height: 1.2; }
+  .shift-time  { font-size: 11px; color: var(--gray-400); font-weight: 600; margin-top: 2px; }
+  .shift-tag {
+    display: inline-block; margin-top: 8px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    padding: 2px 7px; border-radius: 9999px;
+  }
+  .tag-arrive { background: #ecfdf5; color: #047857; }
+  .tag-leave  { background: #fff7ed; color: #c2410c; }
+
+  /* Data cells */
+  td.cell {
+    border-bottom: 1px solid var(--gray-100);
+    border-right: 1px solid var(--gray-100);
+    padding: 8px;
+    vertical-align: top;
+    min-width: 158px;
+  }
+  /* Alternate shift bands for readability */
+  tr.band td.cell { background: #fcfcfd; }
+
+  .cell-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 0 2px 6px;
+  }
+  .cell-count { font-size: 11px; color: var(--gray-400); font-weight: 600; }
+  .cars-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 700;
+    color: var(--indigo); background: var(--indigo-50);
+    padding: 2px 7px; border-radius: 9999px;
+  }
+
+  /* Person chip */
+  .chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 9px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    margin-bottom: 4px;
+  }
+  .tier-dot {
+    flex-shrink: 0;
+    width: 8px; height: 8px; border-radius: 9999px;
+    background: var(--tier, #cbd5e1);
+  }
+  .chip-name { font-size: 12px; font-weight: 500; color: var(--gray-700); line-height: 1.15; }
+
+  /* Capacity separator — "necesitaría otro auto" */
+  .sep { margin: 8px 2px 10px; }
+  .sep .line { height: 1px; background: repeating-linear-gradient(to right, var(--gray-200) 0 5px, transparent 5px 9px); }
+
+  .cell-empty { font-size: 11px; color: #cbd5e1; padding: 6px 2px; }
+
+  .legend { margin-top: 14px; display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--gray-500); }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 9999px; }
+</style>
+</head>
+<body>
+  <div class="page-head">
+    <h1>Vista semanal de transporte</h1>
+    <p>Asistentes con transporte por día y horario. Cada persona aparece dos veces al día (llegada + salida). El separador marca que se necesitaría otro auto (4 asientos c/u).</p>
+  </div>
+
+  <div class="table-wrap">
+    <table id="grid"></table>
+  </div>
+
+  <div class="legend">
+    <div class="item"><span class="dot" style="background:#34d399"></span>Tier A</div>
+    <div class="item"><span class="dot" style="background:#38bdf8"></span>Tier B</div>
+    <div class="item"><span class="dot" style="background:#fbbf24"></span>Tier C</div>
+    <div class="item"><span class="dot" style="background:#fb7185"></span>Tier D</div>
+    <div class="item">⌐ Separador cada 4 personas = +1 auto necesario</div>
+  </div>
+
+<script>
+// MOCKED RES — datos de ejemplo para el mockup
+const TIER_HEX = { A:'#34d399', B:'#38bdf8', C:'#fbbf24', D:'#fb7185' }
+const SEAT_CAP = 4
+
+const DAYS = [
+  { key:'monday',    label:'Lunes' },
+  { key:'tuesday',   label:'Martes' },
+  { key:'wednesday', label:'Miércoles' },
+  { key:'thursday',  label:'Jueves' },
+  { key:'friday',    label:'Viernes' }
+]
+
+const SHIFTS = [
+  { id:'morning_arrive',   label:'Llegada mañana', time:'9:00',  kind:'arrive' },
+  { id:'morning_leave',    label:'Salida mañana',  time:'13:00', kind:'leave' },
+  { id:'afternoon_arrive', label:'Llegada tarde',  time:'14:00', kind:'arrive' },
+  { id:'afternoon_leave',  label:'Salida tarde',   time:'18:00', kind:'leave' }
+]
+
+// Quién aparece en cada turno según su horario de plan
+function eligible(schedule, shiftId) {
+  switch (shiftId) {
+    case 'morning_arrive':   return schedule === 'morning'   || schedule === 'full_day'
+    case 'morning_leave':    return schedule === 'morning'
+    case 'afternoon_arrive': return schedule === 'afternoon'
+    case 'afternoon_leave':  return schedule === 'afternoon' || schedule === 'full_day'
+    default: return false
+  }
+}
+
+// MOCKED RES — 14 clientes con transporte
+const ALL = ['monday','tuesday','wednesday','thursday','friday']
+const MWF = ['monday','wednesday','friday']
+const TT  = ['tuesday','thursday']
+const CLIENTS = [
+  { name:'María González',     tier:'B', schedule:'morning',   days:ALL },
+  { name:'José Pérez',         tier:'A', schedule:'morning',   days:ALL },
+  { name:'Carmen Rodríguez',   tier:'C', schedule:'morning',   days:MWF },
+  { name:'Antonio Fernández',  tier:'A', schedule:'morning',   days:ALL },
+  { name:'Dolores Martín',     tier:'D', schedule:'morning',   days:TT },
+  { name:'Francisco López',    tier:'B', schedule:'full_day',  days:ALL },
+  { name:'Isabel Sánchez',     tier:'C', schedule:'full_day',  days:MWF },
+  { name:'Manuel Gómez',       tier:'A', schedule:'full_day',  days:ALL },
+  { name:'Pilar Jiménez',      tier:'B', schedule:'morning',   days:MWF },
+  { name:'Rafael Ruiz',        tier:'D', schedule:'afternoon', days:ALL },
+  { name:'Teresa Díaz',        tier:'C', schedule:'afternoon', days:TT },
+  { name:'Andrés Moreno',      tier:'A', schedule:'afternoon', days:MWF },
+  { name:'Lucía Álvarez',      tier:'B', schedule:'afternoon', days:ALL },
+  { name:'Ramón Muñoz',        tier:'B', schedule:'full_day',  days:TT }
+]
+
+function initials(name) {
+  const p = name.split(' ')
+  return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase()
+}
+
+function peopleFor(shiftId, dayKey) {
+  return CLIENTS.filter(c => c.days.includes(dayKey) && eligible(c.schedule, shiftId))
+}
+
+function chipHtml(c) {
+  return `<div class="chip">
+    <span class="tier-dot" style="--tier:${TIER_HEX[c.tier]}"></span>
+    <div class="chip-name">${c.name}</div>
+  </div>`
+}
+
+function cellHtml(shiftId, dayKey) {
+  const people = peopleFor(shiftId, dayKey)
+  if (people.length === 0) return `<div class="cell-empty">—</div>`
+
+  const cars = Math.ceil(people.length / SEAT_CAP)
+  let body = `<div class="cell-head">
+    <span class="cell-count">${people.length} pers.</span>
+    <span class="cars-pill">🚐 ${cars}</span>
+  </div>`
+
+  people.forEach((c, i) => {
+    if (i > 0 && i % SEAT_CAP === 0) {
+      body += `<div class="sep"><div class="line"></div></div>`
+    }
+    body += chipHtml(c)
+  })
+  return body
+}
+
+function render() {
+  let html = ''
+  // Header
+  html += '<thead><tr><th class="corner"></th>'
+  DAYS.forEach(d => {
+    const count = new Set(SHIFTS.flatMap(s => peopleFor(s.id, d.key).map(c => c.name))).size
+    html += `<th class="day"><div class="day-name">${d.label}</div><div class="day-sub">${count} asistentes</div></th>`
+  })
+  html += '</tr></thead><tbody>'
+
+  // Rows
+  SHIFTS.forEach((s, idx) => {
+    const band = idx % 2 === 1 ? ' band' : ''
+    html += `<tr class="${band.trim()}">`
+    html += `<th class="shift">
+      <div class="shift-label">${s.label}</div>
+      <div class="shift-time">${s.time}</div>
+      <span class="shift-tag ${s.kind === 'arrive' ? 'tag-arrive' : 'tag-leave'}">${s.kind === 'arrive' ? 'Llegada' : 'Salida'}</span>
+    </th>`
+    DAYS.forEach(d => {
+      html += `<td class="cell">${cellHtml(s.id, d.key)}</td>`
+    })
+    html += '</tr>'
+  })
+  html += '</tbody>'
+  document.getElementById('grid').innerHTML = html
+}
+
+render()
+</script>
+</body>
+</html>
