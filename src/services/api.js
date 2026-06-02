@@ -116,6 +116,19 @@ export {
 } from './expenses/expenseService'
 
 // ============================================
+// SALARIES API (Sueldos)
+// ============================================
+export {
+  getSalaries,
+  createSalary,
+  updateSalary,
+  deactivateSalary,
+  deleteSalary,
+  SALARY_ONE_TIME_TYPES,
+  salaryOneTimeLabel
+} from './salaries/salaryService'
+
+// ============================================
 // TRANSPORT API
 // ============================================
 export {
