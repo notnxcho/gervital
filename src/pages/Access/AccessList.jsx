@@ -44,6 +44,7 @@ export default function AccessList() {
   const [formData, setFormData] = useState({ name: '', email: '', role: 'operador' })
   const [formLoading, setFormLoading] = useState(false)
   const [errors, setErrors] = useState({})
+  const [actionError, setActionError] = useState('')
   
   const { user: currentUser } = useAuth()
 
@@ -67,6 +68,7 @@ export default function AccessList() {
     setEditingUser(null)
     setFormData({ name: '', email: '', role: 'operador' })
     setErrors({})
+    setActionError('')
     setModalOpen(true)
   }
 
@@ -74,6 +76,7 @@ export default function AccessList() {
     setEditingUser(user)
     setFormData({ name: user.name, email: user.email, role: user.role })
     setErrors({})
+    setActionError('')
     setModalOpen(true)
   }
 
@@ -91,6 +94,7 @@ export default function AccessList() {
     if (!validateForm()) return
     
     setFormLoading(true)
+    setActionError('')
     try {
       if (editingUser) {
         await updateUser(editingUser.id, formData)
@@ -101,6 +105,7 @@ export default function AccessList() {
       setModalOpen(false)
     } catch (error) {
       console.error('Error guardando usuario:', error)
+      setActionError(error.message || 'No se pudo guardar el usuario')
     } finally {
       setFormLoading(false)
     }
@@ -110,12 +115,14 @@ export default function AccessList() {
     if (!deleteModal.user) return
 
     setFormLoading(true)
+    setActionError('')
     try {
       await deleteUser(deleteModal.user.id)
       await loadUsers()
       setDeleteModal({ open: false, user: null })
     } catch (error) {
       console.error('Error eliminando usuario:', error)
+      setActionError(error.message || 'No se pudo eliminar el usuario')
     } finally {
       setFormLoading(false)
     }
@@ -124,11 +131,13 @@ export default function AccessList() {
   const handleResetPassword = async () => {
     if (!resetModal.user) return
     setFormLoading(true)
+    setActionError('')
     try {
       await resetPassword(resetModal.user.authId)
       setResetDone(true)
     } catch (error) {
       console.error('Error reseteando contraseña:', error)
+      setActionError(error.message || 'No se pudo resetear la contraseña')
     } finally {
       setFormLoading(false)
     }
@@ -238,7 +247,7 @@ export default function AccessList() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => { setResetDone(false); setResetModal({ open: true, user }) }}
+                        onClick={() => { setResetDone(false); setActionError(''); setResetModal({ open: true, user }) }}
                         title="Resetear contraseña"
                       >
                         <Lock className="w-4 h-4" />
@@ -247,7 +256,7 @@ export default function AccessList() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setDeleteModal({ open: true, user })}
+                          onClick={() => { setActionError(''); setDeleteModal({ open: true, user }) }}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash className="w-4 h-4" />
@@ -300,6 +309,12 @@ export default function AccessList() {
             </div>
           )}
 
+          {actionError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+              {actionError}
+            </div>
+          )}
+
           <div className="flex gap-3 justify-end pt-4">
             <Button
               type="button"
@@ -326,6 +341,11 @@ export default function AccessList() {
           <span className="font-semibold">{deleteModal.user?.name}</span>
           ? Esta acción no se puede deshacer.
         </p>
+        {actionError && (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+            {actionError}
+          </div>
+        )}
         <div className="flex gap-3 justify-end">
           <Button
             variant="secondary"
@@ -366,6 +386,11 @@ export default function AccessList() {
               ¿Resetear la contraseña de <span className="font-semibold">{resetModal.user?.name}</span> a
               la contraseña inicial <span className="font-mono font-semibold">Password1234!</span>?
             </p>
+            {actionError && (
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                {actionError}
+              </div>
+            )}
             <div className="flex gap-3 justify-end">
               <Button variant="secondary" onClick={() => setResetModal({ open: false, user: null })}>
                 Cancelar
