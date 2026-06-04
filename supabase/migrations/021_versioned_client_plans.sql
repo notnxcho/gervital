@@ -277,3 +277,32 @@ WITH (security_invoker = true) AS
      LEFT JOIN emergency_contacts ec ON c.id = ec.client_id
      LEFT JOIN client_addresses ca ON c.id = ca.client_id
      LEFT JOIN medical_info mi ON c.id = mi.client_id;
+
+-- ── create_client_full (crea versión 1 del plan) ─────────────────────────────
+CREATE OR REPLACE FUNCTION public.create_client_full(p_first_name text, p_last_name text, p_email text DEFAULT NULL::text, p_phone text DEFAULT NULL::text, p_birth_date date DEFAULT NULL::date, p_cognitive_level text DEFAULT NULL::text, p_start_date date DEFAULT CURRENT_DATE, p_plan_frequency integer DEFAULT NULL::integer, p_plan_schedule text DEFAULT NULL::text, p_plan_has_transport boolean DEFAULT false, p_plan_assigned_days text[] DEFAULT '{}'::text[], p_ec_name text DEFAULT NULL::text, p_ec_relationship text DEFAULT NULL::text, p_ec_phone text DEFAULT NULL::text, p_addr_street text DEFAULT NULL::text, p_addr_access_notes text DEFAULT NULL::text, p_addr_doorbell text DEFAULT NULL::text, p_addr_concierge text DEFAULT NULL::text, p_addr_distance_range text DEFAULT NULL::text, p_med_dietary text DEFAULT NULL::text, p_med_medical text DEFAULT NULL::text, p_med_mobility text DEFAULT NULL::text, p_med_medication text DEFAULT NULL::text, p_med_medication_schedule text DEFAULT NULL::text, p_med_notes text DEFAULT NULL::text, p_med_is_diabetic boolean DEFAULT false, p_med_is_celiac boolean DEFAULT false, p_med_is_hypertensive boolean DEFAULT false)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE v_client_id UUID;
+BEGIN
+  INSERT INTO clients (first_name, last_name, email, phone, birth_date, cognitive_level, start_date)
+  VALUES (p_first_name, p_last_name, p_email, p_phone, p_birth_date, p_cognitive_level, p_start_date)
+  RETURNING id INTO v_client_id;
+  IF p_plan_frequency IS NOT NULL THEN
+    INSERT INTO client_plans (client_id, effective_from, frequency, schedule, has_transport, assigned_days, distance_range)
+    VALUES (v_client_id, date_trunc('month', p_start_date)::date, p_plan_frequency, p_plan_schedule, p_plan_has_transport, p_plan_assigned_days, p_addr_distance_range);
+  END IF;
+  IF p_ec_name IS NOT NULL THEN
+    INSERT INTO emergency_contacts (client_id, name, relationship, phone)
+    VALUES (v_client_id, p_ec_name, p_ec_relationship, p_ec_phone);
+  END IF;
+  IF p_addr_street IS NOT NULL THEN
+    INSERT INTO client_addresses (client_id, street, access_notes, doorbell, concierge, distance_range)
+    VALUES (v_client_id, p_addr_street, p_addr_access_notes, p_addr_doorbell, p_addr_concierge, p_addr_distance_range);
+  END IF;
+  INSERT INTO medical_info (client_id, dietary_restrictions, medical_restrictions, mobility_restrictions, medication, medication_schedule, notes, is_diabetic, is_celiac, is_hypertensive)
+  VALUES (v_client_id, p_med_dietary, p_med_medical, p_med_mobility, p_med_medication, p_med_medication_schedule, p_med_notes, p_med_is_diabetic, p_med_is_celiac, p_med_is_hypertensive);
+  RETURN v_client_id;
+END;
+$function$;
