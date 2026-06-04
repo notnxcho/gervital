@@ -229,3 +229,51 @@ BEGIN
   );
 END;
 $function$;
+
+-- ── clients_full (current plan version) ──────────────────────────────────────
+CREATE OR REPLACE VIEW public.clients_full
+WITH (security_invoker = true) AS
+ SELECT c.id,
+    c.first_name AS "firstName",
+    c.last_name AS "lastName",
+    c.email,
+    c.phone,
+    c.birth_date AS "birthDate",
+    c.cognitive_level AS "cognitiveLevel",
+    c.start_date AS "startDate",
+    ( SELECT count(*)::integer AS count
+           FROM recovery_credits rc
+          WHERE rc.client_id = c.id AND rc.status = 'available'::text AND rc.expires_at >= CURRENT_DATE) AS "recoveryDaysAvailable",
+    c.avatar_url AS "avatarUrl",
+    c.deleted_at AS "deletedAt",
+    c.deactivation_reason AS "deactivationReason",
+    c.deactivation_notes AS "deactivationNotes",
+    c.created_at AS "createdAt",
+        CASE
+            WHEN cp.id IS NOT NULL THEN jsonb_build_object('frequency', cp.frequency, 'schedule', cp.schedule, 'hasTransport', cp.has_transport, 'assignedDays', cp.assigned_days)
+            ELSE NULL::jsonb
+        END AS plan,
+        CASE
+            WHEN ec.id IS NOT NULL THEN jsonb_build_object('name', ec.name, 'relationship', ec.relationship, 'phone', ec.phone)
+            ELSE NULL::jsonb
+        END AS "emergencyContact",
+        CASE
+            WHEN ca.id IS NOT NULL THEN jsonb_build_object('street', ca.street, 'accessNotes', ca.access_notes, 'doorbell', ca.doorbell, 'concierge', ca.concierge, 'latitude', ca.latitude, 'longitude', ca.longitude, 'distanceRange', ca.distance_range)
+            ELSE NULL::jsonb
+        END AS address,
+        CASE
+            WHEN mi.id IS NOT NULL THEN jsonb_build_object('dietaryRestrictions', mi.dietary_restrictions, 'medicalRestrictions', mi.medical_restrictions, 'mobilityRestrictions', mi.mobility_restrictions, 'medication', mi.medication, 'medicationSchedule', mi.medication_schedule, 'notes', mi.notes, 'isDiabetic', mi.is_diabetic, 'isCeliac', mi.is_celiac, 'isHypertensive', mi.is_hypertensive)
+            ELSE NULL::jsonb
+        END AS "medicalInfo"
+   FROM clients c
+     LEFT JOIN LATERAL (
+       SELECT cp2.id, cp2.frequency, cp2.schedule, cp2.has_transport, cp2.assigned_days
+       FROM client_plans cp2
+       WHERE cp2.client_id = c.id
+         AND cp2.effective_from <= date_trunc('month', CURRENT_DATE)::date
+       ORDER BY cp2.effective_from DESC
+       LIMIT 1
+     ) cp ON true
+     LEFT JOIN emergency_contacts ec ON c.id = ec.client_id
+     LEFT JOIN client_addresses ca ON c.id = ca.client_id
+     LEFT JOIN medical_info mi ON c.id = mi.client_id;
