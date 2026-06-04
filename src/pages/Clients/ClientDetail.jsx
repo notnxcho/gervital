@@ -47,6 +47,8 @@ const SCHEDULE_LABELS = {
 
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
 
+const DISTANCE_LABELS = { '0_to_2km': '0-2km', '2_to_5km': '2-5km', '5_to_10km': '5-10km' }
+
 const DAY_LABELS = {
   monday: 'Lun',
   tuesday: 'Mar',
@@ -445,25 +447,27 @@ export default function ClientDetail() {
 
       {/* Plan history */}
       {client.planVersions && client.planVersions.length > 1 && (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 mb-6">
-          <h3 className="mb-3 text-sm font-semibold text-gray-900">Historial de plan</h3>
-          <ul className="space-y-2">
-            {[...client.planVersions].reverse().map(v => (
-              <li key={v.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                <span className="font-medium text-gray-700">
-                  {MONTH_NAMES_ES[Number(v.effectiveFrom.split('-')[1]) - 1]} {v.effectiveFrom.split('-')[0]}
-                </span>
-                <span className="text-gray-500">
-                  {v.frequency}×/sem · {SCHEDULE_LABELS[v.schedule]}
-                  {v.hasTransport ? ` · transporte (${v.distanceRange || 's/d'})` : ''}
-                </span>
-                <span className="text-gray-400">
-                  {v.assignedDays.map(d => DAY_LABELS[d]).join(', ')}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <h3 className="mb-3 text-sm font-semibold text-gray-900">Historial de plan</h3>
+            <ul className="space-y-2">
+              {[...client.planVersions].reverse().map(v => (
+                <li key={v.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                  <span className="font-medium text-gray-700">
+                    {MONTH_NAMES_ES[Number(v.effectiveFrom.split('-')[1]) - 1]} {v.effectiveFrom.split('-')[0]}
+                  </span>
+                  <span className="text-gray-500">
+                    {v.frequency}×/sem · {SCHEDULE_LABELS[v.schedule]}
+                    {v.hasTransport ? ` · transporte (${DISTANCE_LABELS[v.distanceRange] || 's/d'})` : ''}
+                  </span>
+                  <span className="text-gray-400">
+                    {v.assignedDays.map(d => DAY_LABELS[d]).join(', ')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       )}
 
       {/* Info tabs */}
