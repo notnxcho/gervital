@@ -332,7 +332,7 @@ export default function AddClient() {
         navigate('/clientes')
       }
     } catch (error) {
-      console.error('Error creando cliente:', error)
+      console.error(isEditMode ? 'Error guardando cliente:' : 'Error creando cliente:', error)
     } finally {
       setLoading(false)
     }
@@ -596,7 +596,7 @@ export default function AddClient() {
           {/* Step 2: Plan y asistencia */}
           {currentStep === 2 && (
             <div className="space-y-6">
-              {isEditMode && (
+              {isEditMode && planFloorMonth && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Vigente desde
