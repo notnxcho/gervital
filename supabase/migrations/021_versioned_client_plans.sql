@@ -21,19 +21,29 @@ WHERE cp.client_id = a.client_id AND cp.distance_range IS NULL;
 ALTER TABLE client_plans ALTER COLUMN effective_from SET NOT NULL;
 
 -- Reemplazar UNIQUE(client_id) por UNIQUE(client_id, effective_from).
+-- Acotado a la constraint que sea exactamente UNIQUE (client_id) (cualquier nombre),
+-- para no barrer otras constraints en re-aplicaciones del archivo.
 DO $$
 DECLARE v_con text;
 BEGIN
   FOR v_con IN
     SELECT conname FROM pg_constraint
-    WHERE conrelid = 'client_plans'::regclass AND contype = 'u'
+    WHERE conrelid = 'client_plans'::regclass
+      AND contype = 'u'
+      AND pg_get_constraintdef(oid) = 'UNIQUE (client_id)'
   LOOP
     EXECUTE format('ALTER TABLE client_plans DROP CONSTRAINT %I', v_con);
   END LOOP;
-END $$;
 
-ALTER TABLE client_plans
-  ADD CONSTRAINT client_plans_client_effective_uniq UNIQUE (client_id, effective_from);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'client_plans'::regclass
+      AND conname = 'client_plans_client_effective_uniq'
+  ) THEN
+    ALTER TABLE client_plans
+      ADD CONSTRAINT client_plans_client_effective_uniq UNIQUE (client_id, effective_from);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_client_plans_client_effective
   ON client_plans (client_id, effective_from DESC);
