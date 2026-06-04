@@ -278,6 +278,77 @@ WITH (security_invoker = true) AS
      LEFT JOIN client_addresses ca ON c.id = ca.client_id
      LEFT JOIN medical_info mi ON c.id = mi.client_id;
 
+-- ── update_client_full (sin tocar el plan) ───────────────────────────────────
+CREATE OR REPLACE FUNCTION public.update_client_full(p_client_id uuid, p_first_name text DEFAULT NULL::text, p_last_name text DEFAULT NULL::text, p_email text DEFAULT NULL::text, p_phone text DEFAULT NULL::text, p_birth_date date DEFAULT NULL::date, p_cognitive_level text DEFAULT NULL::text, p_start_date date DEFAULT NULL::date, p_plan_frequency integer DEFAULT NULL::integer, p_plan_schedule text DEFAULT NULL::text, p_plan_has_transport boolean DEFAULT NULL::boolean, p_plan_assigned_days text[] DEFAULT NULL::text[], p_ec_name text DEFAULT NULL::text, p_ec_relationship text DEFAULT NULL::text, p_ec_phone text DEFAULT NULL::text, p_addr_street text DEFAULT NULL::text, p_addr_access_notes text DEFAULT NULL::text, p_addr_doorbell text DEFAULT NULL::text, p_addr_concierge text DEFAULT NULL::text, p_addr_distance_range text DEFAULT NULL::text, p_med_dietary text DEFAULT NULL::text, p_med_medical text DEFAULT NULL::text, p_med_mobility text DEFAULT NULL::text, p_med_medication text DEFAULT NULL::text, p_med_medication_schedule text DEFAULT NULL::text, p_med_notes text DEFAULT NULL::text, p_med_is_diabetic boolean DEFAULT NULL::boolean, p_med_is_celiac boolean DEFAULT NULL::boolean, p_med_is_hypertensive boolean DEFAULT NULL::boolean)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  UPDATE clients SET
+    first_name = COALESCE(p_first_name, first_name),
+    last_name = COALESCE(p_last_name, last_name),
+    email = COALESCE(p_email, email),
+    phone = COALESCE(p_phone, phone),
+    birth_date = COALESCE(p_birth_date, birth_date),
+    cognitive_level = COALESCE(p_cognitive_level, cognitive_level),
+    start_date = COALESCE(p_start_date, start_date),
+    updated_at = NOW()
+  WHERE id = p_client_id;
+
+  -- El plan NO se modifica acá. Se gestiona vía set_client_plan_version (no retroactivo).
+
+  IF p_ec_name IS NOT NULL THEN
+    INSERT INTO emergency_contacts (client_id, name, relationship, phone)
+    VALUES (p_client_id, p_ec_name, p_ec_relationship, p_ec_phone)
+    ON CONFLICT (client_id) DO UPDATE SET
+      name = EXCLUDED.name,
+      relationship = EXCLUDED.relationship,
+      phone = EXCLUDED.phone,
+      updated_at = NOW();
+  END IF;
+
+  IF p_addr_street IS NOT NULL THEN
+    INSERT INTO client_addresses (client_id, street, access_notes, doorbell, concierge, distance_range)
+    VALUES (p_client_id, p_addr_street, p_addr_access_notes, p_addr_doorbell, p_addr_concierge, p_addr_distance_range)
+    ON CONFLICT (client_id) DO UPDATE SET
+      street = EXCLUDED.street,
+      access_notes = EXCLUDED.access_notes,
+      doorbell = EXCLUDED.doorbell,
+      concierge = EXCLUDED.concierge,
+      distance_range = COALESCE(EXCLUDED.distance_range, client_addresses.distance_range),
+      updated_at = NOW();
+  END IF;
+
+  IF p_med_dietary IS NOT NULL OR p_med_medical IS NOT NULL OR p_med_mobility IS NOT NULL
+     OR p_med_medication IS NOT NULL OR p_med_medication_schedule IS NOT NULL OR p_med_notes IS NOT NULL
+     OR p_med_is_diabetic IS NOT NULL OR p_med_is_celiac IS NOT NULL OR p_med_is_hypertensive IS NOT NULL THEN
+    INSERT INTO medical_info (
+      client_id, dietary_restrictions, medical_restrictions,
+      mobility_restrictions, medication, medication_schedule, notes,
+      is_diabetic, is_celiac, is_hypertensive
+    ) VALUES (
+      p_client_id, p_med_dietary, p_med_medical,
+      p_med_mobility, p_med_medication, p_med_medication_schedule, p_med_notes,
+      COALESCE(p_med_is_diabetic, FALSE), COALESCE(p_med_is_celiac, FALSE), COALESCE(p_med_is_hypertensive, FALSE)
+    )
+    ON CONFLICT (client_id) DO UPDATE SET
+      dietary_restrictions = COALESCE(EXCLUDED.dietary_restrictions, medical_info.dietary_restrictions),
+      medical_restrictions = COALESCE(EXCLUDED.medical_restrictions, medical_info.medical_restrictions),
+      mobility_restrictions = COALESCE(EXCLUDED.mobility_restrictions, medical_info.mobility_restrictions),
+      medication = COALESCE(EXCLUDED.medication, medical_info.medication),
+      medication_schedule = COALESCE(EXCLUDED.medication_schedule, medical_info.medication_schedule),
+      notes = COALESCE(EXCLUDED.notes, medical_info.notes),
+      is_diabetic = COALESCE(p_med_is_diabetic, medical_info.is_diabetic),
+      is_celiac = COALESCE(p_med_is_celiac, medical_info.is_celiac),
+      is_hypertensive = COALESCE(p_med_is_hypertensive, medical_info.is_hypertensive),
+      updated_at = NOW();
+  END IF;
+
+  RETURN TRUE;
+END;
+$function$;
+
 -- ── create_client_full (crea versión 1 del plan) ─────────────────────────────
 CREATE OR REPLACE FUNCTION public.create_client_full(p_first_name text, p_last_name text, p_email text DEFAULT NULL::text, p_phone text DEFAULT NULL::text, p_birth_date date DEFAULT NULL::date, p_cognitive_level text DEFAULT NULL::text, p_start_date date DEFAULT CURRENT_DATE, p_plan_frequency integer DEFAULT NULL::integer, p_plan_schedule text DEFAULT NULL::text, p_plan_has_transport boolean DEFAULT false, p_plan_assigned_days text[] DEFAULT '{}'::text[], p_ec_name text DEFAULT NULL::text, p_ec_relationship text DEFAULT NULL::text, p_ec_phone text DEFAULT NULL::text, p_addr_street text DEFAULT NULL::text, p_addr_access_notes text DEFAULT NULL::text, p_addr_doorbell text DEFAULT NULL::text, p_addr_concierge text DEFAULT NULL::text, p_addr_distance_range text DEFAULT NULL::text, p_med_dietary text DEFAULT NULL::text, p_med_medical text DEFAULT NULL::text, p_med_mobility text DEFAULT NULL::text, p_med_medication text DEFAULT NULL::text, p_med_medication_schedule text DEFAULT NULL::text, p_med_notes text DEFAULT NULL::text, p_med_is_diabetic boolean DEFAULT false, p_med_is_celiac boolean DEFAULT false, p_med_is_hypertensive boolean DEFAULT false)
  RETURNS uuid
