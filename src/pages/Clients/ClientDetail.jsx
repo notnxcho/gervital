@@ -28,7 +28,8 @@ import {
   deactivateClient,
   reactivateClient,
   uploadClientAvatar,
-  deleteClientAvatar
+  deleteClientAvatar,
+  getClientPlanVersions
 } from '../../services/api'
 import { useAuth, roleHasAccess } from '../../context/AuthContext'
 import Button from '../../components/ui/Button'
@@ -58,6 +59,22 @@ const DAY_INDEX_TO_NAME = {
   3: 'wednesday',
   4: 'thursday',
   5: 'friday'
+}
+
+// Resolve the plan version effective for a given (year, month) — month is 0-indexed.
+// Falls back to the current `fallbackPlan` if no versions are loaded.
+function getPlanForMonth(planVersions, fallbackPlan, year, month) {
+  if (!planVersions || planVersions.length === 0) return fallbackPlan
+  const monthStartTs = new Date(year, month, 1).getTime()
+  let chosen = null
+  for (const v of planVersions) {
+    const [vy, vm] = v.effectiveFrom.split('-').map(Number)
+    const vTs = new Date(vy, vm - 1, 1).getTime()
+    if (vTs <= monthStartTs && (!chosen || vTs >= chosen.ts)) {
+      chosen = { ts: vTs, plan: v }
+    }
+  }
+  return chosen ? chosen.plan : (planVersions[0] || fallbackPlan)
 }
 
 const COGNITIVE_LEVEL_CONFIG = {
@@ -132,13 +149,14 @@ export default function ClientDetail() {
     setLoading(true)
     try {
       // Advance past scheduled days and ensure future months exist (parallel with data fetching)
-      const [clientData, attendanceData, invoicesData, pricing, transportPricing, recoveryData] = await Promise.all([
+      const [clientData, attendanceData, invoicesData, pricing, transportPricing, recoveryData, planVersions] = await Promise.all([
         getClientById(id),
         getClientAttendance(id),
         getClientInvoices(id),
         getPlanPricing(),
         getTransportPricing(),
-        getRecoveryCredits(id)
+        getRecoveryCredits(id),
+        getClientPlanVersions(id)
       ])
       // Run setup functions (non-blocking, best-effort)
       Promise.all([
@@ -149,7 +167,7 @@ export default function ClientDetail() {
         getClientInvoices(id).then(updated => setInvoices(updated)).catch(() => {})
       })
 
-      setClient(clientData)
+      setClient({ ...clientData, planVersions })
       setRecoveryCredits(recoveryData)
       setAttendance(attendanceData)
       setInvoices(invoicesData)
@@ -168,7 +186,7 @@ export default function ClientDetail() {
         getClientById(id),
         getRecoveryCredits(id)
       ])
-      setClient(clientData)
+      setClient(prev => ({ ...clientData, planVersions: prev?.planVersions }))
       setRecoveryCredits(recoveryData)
     } catch (error) {
       console.error('Error actualizando días de recupero:', error)
@@ -180,7 +198,7 @@ export default function ClientDetail() {
     setDeactivating(true)
     try {
       const updated = await deactivateClient(id, { reason, notes, userId: user.id })
-      setClient(updated)
+      setClient(prev => ({ ...updated, planVersions: prev?.planVersions }))
       setDeactivateModal(false)
     } catch (error) {
       console.error('Error dando de baja al cliente:', error)
@@ -193,7 +211,7 @@ export default function ClientDetail() {
     setReactivating(true)
     try {
       const updated = await reactivateClient(id)
-      setClient(updated)
+      setClient(prev => ({ ...updated, planVersions: prev?.planVersions }))
     } catch (error) {
       console.error('Error reactivando cliente:', error)
     } finally {
@@ -636,6 +654,8 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const monthEnd = endOfMonth(monthStart)
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
 
+  const plan = getPlanForMonth(client.planVersions, client.plan, year, month)
+
   const startDay = getDay(monthStart)
   const paddingDays = startDay === 0 ? 6 : startDay - 1
 
@@ -653,19 +673,19 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
 
   const fullMonthDays = days.filter(d => {
     const name = DAY_INDEX_TO_NAME[getDay(d)]
-    return name && client.plan.assignedDays.includes(name)
+    return name && plan.assignedDays.includes(name)
   }).length
 
   const vacationDays = days.filter(d => {
     const dateStr = format(d, 'yyyy-MM-dd')
     const rec = attendance.find(a => a.date === dateStr)
     const name = DAY_INDEX_TO_NAME[getDay(d)]
-    return name && client.plan.assignedDays.includes(name) && d >= effectiveStart && rec?.status === 'vacation'
+    return name && plan.assignedDays.includes(name) && d >= effectiveStart && rec?.status === 'vacation'
   }).length
 
   const plannedDays = days.filter(d => {
     const name = DAY_INDEX_TO_NAME[getDay(d)]
-    if (!name || !client.plan.assignedDays.includes(name)) return false
+    if (!name || !plan.assignedDays.includes(name)) return false
     if (d < effectiveStart) return false
     return true
   }).length
@@ -676,9 +696,9 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     return attendance.find(a => a.date === dateStr)?.status === 'recovery'
   }).length
 
-  const planPrice = getPlanPriceSync(pricingData, client.plan.frequency, client.plan.schedule)
-  const transportPrice = client.plan.hasTransport && client.address?.distanceRange
-    ? getTransportPriceSync(transportPricingData, client.plan.frequency, client.address.distanceRange)
+  const planPrice = getPlanPriceSync(pricingData, plan.frequency, plan.schedule)
+  const transportPrice = plan.hasTransport && plan.distanceRange
+    ? getTransportPriceSync(transportPricingData, plan.frequency, plan.distanceRange)
     : { priceNet: 0, priceGross: 0 }
   const monthlyTotalGross = planPrice.priceGross + transportPrice.priceGross
   const liveChargeableAmount = fullMonthDays > 0
@@ -698,7 +718,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     const dateStr = format(day, 'yyyy-MM-dd')
     const rec = attendance.find(a => a.date === dateStr)
     const name = DAY_INDEX_TO_NAME[getDay(day)]
-    const isAssigned = name && client.plan.assignedDays.includes(name)
+    const isAssigned = name && plan.assignedDays.includes(name)
 
     if (rec?.status === 'recovery') return { status: 'recovery', isJustified: false, isAssigned: false }
     if (!isAssigned) return { status: 'not_scheduled', isJustified: false, isAssigned: false }
