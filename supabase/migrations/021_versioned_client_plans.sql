@@ -103,8 +103,8 @@ DECLARE
   v_chargeable_days INTEGER;
   v_att_rate_net NUMERIC(12,2);
   v_att_rate_gross NUMERIC(12,2);
-  v_att_charge_net NUMERIC(12,2);
-  v_att_charge_gross NUMERIC(12,2);
+  v_att_charge_net NUMERIC(12,2) := 0;
+  v_att_charge_gross NUMERIC(12,2) := 0;
   v_trans_rate_net NUMERIC(12,2) := 0;
   v_trans_rate_gross NUMERIC(12,2) := 0;
   v_trans_charge_net NUMERIC(12,2) := 0;
