@@ -47,3 +47,37 @@ END $$;
 
 CREATE INDEX IF NOT EXISTS idx_client_plans_client_effective
   ON client_plans (client_id, effective_from DESC);
+
+-- ── set_client_plan_version ───────────────────────────────────────────────────
+-- Crea o actualiza la versión de plan vigente desde el mes de p_effective_from.
+CREATE OR REPLACE FUNCTION public.set_client_plan_version(
+  p_client_id uuid,
+  p_effective_from date,
+  p_frequency integer,
+  p_schedule text,
+  p_has_transport boolean,
+  p_assigned_days text[],
+  p_distance_range text DEFAULT NULL,
+  p_created_by text DEFAULT NULL
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER AS $function$
+DECLARE v_id uuid;
+BEGIN
+  INSERT INTO client_plans (
+    client_id, effective_from, frequency, schedule,
+    has_transport, assigned_days, distance_range, created_by
+  ) VALUES (
+    p_client_id, date_trunc('month', p_effective_from)::date, p_frequency, p_schedule,
+    COALESCE(p_has_transport, FALSE), COALESCE(p_assigned_days, '{}'), p_distance_range, p_created_by
+  )
+  ON CONFLICT (client_id, effective_from) DO UPDATE SET
+    frequency     = EXCLUDED.frequency,
+    schedule      = EXCLUDED.schedule,
+    has_transport = EXCLUDED.has_transport,
+    assigned_days = EXCLUDED.assigned_days,
+    distance_range = EXCLUDED.distance_range,
+    updated_at    = NOW()
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$function$;
