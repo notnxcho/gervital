@@ -377,3 +377,39 @@ BEGIN
   RETURN v_client_id;
 END;
 $function$;
+
+-- ── mark_vacation_range (version-aware assigned_days) ─────────────────────────
+-- Resuelve assigned_days por la versión de plan vigente de CADA día (no retroactivo;
+-- soporta rangos que cruzan un cambio de plan). Antes leía una fila no determinística.
+CREATE OR REPLACE FUNCTION public.mark_vacation_range(p_client_id uuid, p_from_date date, p_to_date date, p_created_by text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_day DATE; v_day_of_week INTEGER; v_day_name TEXT;
+  v_assigned_days TEXT[]; v_count INTEGER := 0;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM client_plans WHERE client_id = p_client_id) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Plan no encontrado');
+  END IF;
+  v_day := p_from_date;
+  WHILE v_day <= p_to_date LOOP
+    SELECT assigned_days INTO v_assigned_days
+    FROM client_plans
+    WHERE client_id = p_client_id AND effective_from <= date_trunc('month', v_day)::date
+    ORDER BY effective_from DESC LIMIT 1;
+
+    v_day_of_week := EXTRACT(DOW FROM v_day)::INTEGER;
+    v_day_name := CASE v_day_of_week
+      WHEN 1 THEN 'monday' WHEN 2 THEN 'tuesday' WHEN 3 THEN 'wednesday'
+      WHEN 4 THEN 'thursday' WHEN 5 THEN 'friday' ELSE NULL END;
+    IF v_day_name IS NOT NULL AND v_assigned_days IS NOT NULL AND v_day_name = ANY(v_assigned_days) THEN
+      PERFORM mark_day_vacation(p_client_id, v_day, p_created_by);
+      v_count := v_count + 1;
+    END IF;
+    v_day := v_day + INTERVAL '1 day';
+  END LOOP;
+  RETURN jsonb_build_object('success', true, 'daysMarked', v_count);
+END;
+$function$;
