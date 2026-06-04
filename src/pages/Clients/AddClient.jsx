@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check } from 'iconoir-react'
-import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords } from '../../services/api'
+import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion } from '../../services/api'
 import { geocodeAndCalculateDistance } from '../../services/clients/geocodingService'
 import { getPlanPricing, getPlanPriceSync } from '../../services/pricing/pricingService'
 import { getTransportPricing, getTransportPriceSync } from '../../services/pricing/transportPricingService'
@@ -9,6 +9,22 @@ import Button from '../../components/ui/Button'
 import Input, { Select, Textarea, Checkbox } from '../../components/ui/Input'
 import Card, { CardContent } from '../../components/ui/Card'
 import { useAuth } from '../../context/AuthContext'
+
+const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
+
+// Build month options from floorKey ('YYYY-MM') through floor + 6 months.
+function buildEffectiveMonthOptions(floorKey) {
+  if (!floorKey) return []
+  const [fy, fm] = floorKey.split('-').map(Number)
+  const options = []
+  for (let i = 0; i <= 6; i++) {
+    const d = new Date(fy, fm - 1 + i, 1)
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = `${MONTH_NAMES_ES[d.getMonth()]} ${d.getFullYear()}`
+    options.push({ value, label })
+  }
+  return options
+}
 
 // MOCKED RES - Opciones de planes
 const FREQUENCY_OPTIONS = [
@@ -100,6 +116,8 @@ export default function AddClient() {
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [geocoding, setGeocoding] = useState(false)
+  const [planEffectiveFrom, setPlanEffectiveFrom] = useState('')
+  const [planFloorMonth, setPlanFloorMonth] = useState('')
 
   useEffect(() => {
     getPlanPricing()
@@ -114,7 +132,7 @@ export default function AddClient() {
     if (!isEditMode) return
     setLoadingClient(true)
     getClientById(id)
-      .then(client => {
+      .then(async client => {
         if (!client) return
         if (client.avatarUrl) {
           setAvatarPreview(client.avatarUrl)
@@ -149,6 +167,18 @@ export default function AddClient() {
           isCeliac: client.medicalInfo?.isCeliac || false,
           isHypertensive: client.medicalInfo?.isHypertensive || false
         })
+
+        const invoices = await getClientInvoices(id).catch(() => [])
+        const unpaid = invoices
+          .filter(inv => inv.paymentStatus !== 'paid')
+          .sort((a, b) => (a.year - b.year) || (a.month - b.month))
+        const now = new Date()
+        const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        const floorKey = unpaid.length
+          ? `${unpaid[0].year}-${String(unpaid[0].month + 1).padStart(2, '0')}`
+          : currentKey
+        setPlanFloorMonth(floorKey)
+        setPlanEffectiveFrom(currentKey < floorKey ? floorKey : currentKey)
       })
       .catch(err => console.error('Error cargando cliente:', err))
       .finally(() => setLoadingClient(false))
@@ -276,6 +306,14 @@ export default function AddClient() {
       
       if (isEditMode) {
         await updateClient(id, clientData)
+        const effFrom = `${planEffectiveFrom}-01`
+        await setClientPlanVersion(id, effFrom, {
+          frequency: parseInt(formData.frequency),
+          schedule: formData.schedule,
+          hasTransport: formData.hasTransport,
+          assignedDays: formData.assignedDays,
+          distanceRange: clientData.address.distanceRange
+        })
         if (geoData.lat && geoData.lng) {
           await updateClientAddressCoords(id, geoData.lat, geoData.lng).catch(console.error)
         }
@@ -558,6 +596,25 @@ export default function AddClient() {
           {/* Step 2: Plan y asistencia */}
           {currentStep === 2 && (
             <div className="space-y-6">
+              {isEditMode && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vigente desde
+                  </label>
+                  <select
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    value={planEffectiveFrom}
+                    onChange={e => setPlanEffectiveFrom(e.target.value)}
+                  >
+                    {buildEffectiveMonthOptions(planFloorMonth).map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Los cambios de plan aplican desde este mes en adelante. Los meses anteriores no se modifican.
+                  </p>
+                </div>
+              )}
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Plan de asistencia</h3>
                 <div className="grid grid-cols-2 gap-4">
