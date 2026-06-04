@@ -654,7 +654,9 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const monthEnd = endOfMonth(monthStart)
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
 
-  const plan = getPlanForMonth(client.planVersions, client.plan, year, month)
+  // Fallback (no versions loaded) keeps the current plan but sources distance from the address,
+  // since client.plan from clients_full carries no distanceRange.
+  const plan = getPlanForMonth(client.planVersions, { ...client.plan, distanceRange: client.address?.distanceRange }, year, month)
 
   const startDay = getDay(monthStart)
   const paddingDays = startDay === 0 ? 6 : startDay - 1
