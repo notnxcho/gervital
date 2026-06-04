@@ -147,3 +147,50 @@ export async function reactivateClient(id) {
 
   return getClientById(id)
 }
+
+/**
+ * Get all plan versions for a client, ascending by effectiveFrom
+ * @param {string} clientId
+ * @returns {Promise<Array>}
+ */
+export async function getClientPlanVersions(clientId) {
+  const { data, error } = await supabase
+    .from('client_plans')
+    .select('id, effective_from, frequency, schedule, has_transport, assigned_days, distance_range')
+    .eq('client_id', clientId)
+    .order('effective_from', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  return (data || []).map(v => ({
+    id: v.id,
+    effectiveFrom: v.effective_from,
+    frequency: v.frequency,
+    schedule: v.schedule,
+    hasTransport: v.has_transport,
+    assignedDays: v.assigned_days || [],
+    distanceRange: v.distance_range
+  }))
+}
+
+/**
+ * Create or update the plan version effective from a given month
+ * @param {string} clientId
+ * @param {string} effectiveFrom - YYYY-MM-DD (truncated to month start server-side)
+ * @param {object} plan - { frequency, schedule, hasTransport, assignedDays, distanceRange }
+ * @param {string} createdBy - optional user name
+ */
+export async function setClientPlanVersion(clientId, effectiveFrom, plan, createdBy = null) {
+  const { data, error } = await supabase.rpc('set_client_plan_version', {
+    p_client_id: clientId,
+    p_effective_from: effectiveFrom,
+    p_frequency: plan.frequency,
+    p_schedule: plan.schedule,
+    p_has_transport: plan.hasTransport,
+    p_assigned_days: plan.assignedDays,
+    p_distance_range: plan.distanceRange ?? null,
+    p_created_by: createdBy
+  })
+  if (error) throw new Error(error.message)
+  return data
+}

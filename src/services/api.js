@@ -29,7 +29,9 @@ export {
   updateClient,
   deactivateClient,
   reactivateClient,
-  updateClientAddressCoords
+  updateClientAddressCoords,
+  getClientPlanVersions,
+  setClientPlanVersion
 } from './clients/clientService'
 
 // ============================================

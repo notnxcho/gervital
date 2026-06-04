@@ -112,14 +112,6 @@ export function transformUpdateToDb(clientId, updateData) {
   if (updateData.cognitiveLevel !== undefined) params.p_cognitive_level = updateData.cognitiveLevel
   if (updateData.startDate !== undefined) params.p_start_date = updateData.startDate
 
-  // Plan
-  if (updateData.plan) {
-    if (updateData.plan.frequency !== undefined) params.p_plan_frequency = updateData.plan.frequency
-    if (updateData.plan.schedule !== undefined) params.p_plan_schedule = updateData.plan.schedule
-    if (updateData.plan.hasTransport !== undefined) params.p_plan_has_transport = updateData.plan.hasTransport
-    if (updateData.plan.assignedDays !== undefined) params.p_plan_assigned_days = updateData.plan.assignedDays
-  }
-
   // Emergency contact
   if (updateData.emergencyContact) {
     if (updateData.emergencyContact.name !== undefined) params.p_ec_name = updateData.emergencyContact.name
