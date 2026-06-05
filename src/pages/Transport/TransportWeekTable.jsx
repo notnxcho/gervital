@@ -1,5 +1,5 @@
-import { Fragment, useEffect } from 'react'
-import { Xmark } from 'iconoir-react'
+import { Fragment, useEffect, useState } from 'react'
+import { Search, Xmark } from 'iconoir-react'
 import { SHIFTS } from '../../services/transport/transportConstants'
 import { filterClientsForShift } from '../../services/transport/transportService'
 import './TransportWeekTable.css'
@@ -38,9 +38,15 @@ function Cell({ people }) {
   )
 }
 
+const normalize = (str) =>
+  (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
 export default function TransportWeekTable({ isOpen, onClose, clients }) {
+  const [search, setSearch] = useState('')
+
   useEffect(() => {
     if (!isOpen) return
+    setSearch('')
     document.body.style.overflow = 'hidden'
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
@@ -52,11 +58,16 @@ export default function TransportWeekTable({ isOpen, onClose, clients }) {
 
   if (!isOpen) return null
 
+  const query = normalize(search.trim())
+  const visibleClients = query
+    ? clients.filter(c => normalize(`${c.firstName} ${c.lastName}`).includes(query))
+    : clients
+
   // Unique attendees per day (a person shows up in two shifts, count once)
   const dayUnique = {}
   WEEK_DAYS.forEach(d => {
     const ids = new Set()
-    SHIFTS.forEach(s => filterClientsForShift(clients, s.id, d.key).forEach(c => ids.add(c.id)))
+    SHIFTS.forEach(s => filterClientsForShift(visibleClients, s.id, d.key).forEach(c => ids.add(c.id)))
     dayUnique[d.key] = ids.size
   })
 
@@ -71,9 +82,32 @@ export default function TransportWeekTable({ isOpen, onClose, clients }) {
               Asistentes por día y horario · cada persona aparece 2 veces (llegada + salida) · separador cada {SEAT_CAP} = otro auto
             </p>
           </div>
-          <button className="wk-close" onClick={onClose} aria-label="Cerrar">
-            <Xmark className="w-5 h-5" />
-          </button>
+          <div className="wk-header-actions">
+            <div className="wk-search">
+              <Search className="wk-search-icon" />
+              <input
+                type="text"
+                className="wk-search-input"
+                placeholder="Buscar persona..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && search) {
+                    e.stopPropagation()
+                    setSearch('')
+                  }
+                }}
+              />
+              {search && (
+                <button className="wk-search-clear" onClick={() => setSearch('')} aria-label="Limpiar búsqueda">
+                  <Xmark className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <button className="wk-close" onClick={onClose} aria-label="Cerrar">
+              <Xmark className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="wk-scroll">
@@ -101,7 +135,7 @@ export default function TransportWeekTable({ isOpen, onClose, clients }) {
                   </th>
                   {WEEK_DAYS.map(d => (
                     <td key={d.key} className="wk-cell">
-                      <Cell people={filterClientsForShift(clients, s.id, d.key)} />
+                      <Cell people={filterClientsForShift(visibleClients, s.id, d.key)} />
                     </td>
                   ))}
                 </tr>

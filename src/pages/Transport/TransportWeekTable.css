@@ -3,7 +3,7 @@
 .wk-overlay {
   position: fixed; inset: 0; z-index: 50;
   display: flex; align-items: center; justify-content: center;
-  padding: 24px;
+  padding: 16px;
 }
 .wk-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); }
 
@@ -12,8 +12,7 @@
   background: #fff;
   border-radius: 14px;
   box-shadow: 0 12px 44px rgba(0, 0, 0, .26);
-  width: 100%; max-width: 1200px;
-  max-height: 90vh;
+  width: 100%; height: max-content; max-height: 100%;
   display: flex; flex-direction: column;
   overflow: hidden;
 }
@@ -26,6 +25,47 @@
 }
 .wk-title { font-size: 16px; font-weight: 700; margin: 0; color: #111827; }
 .wk-subtitle { font-size: 12px; color: #6b7280; margin: 2px 0 0; }
+.wk-header-actions {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* Search input */
+.wk-search {
+  position: relative;
+  display: flex; align-items: center;
+}
+.wk-search-icon {
+  position: absolute; left: 10px;
+  width: 15px; height: 15px;
+  color: #9ca3af; pointer-events: none;
+}
+.wk-search-input {
+  width: 220px;
+  height: 34px;
+  padding: 0 30px 0 32px;
+  font-size: 13px; color: #111827;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.wk-search-input::placeholder { color: #9ca3af; }
+.wk-search-input:focus {
+  background: #fff;
+  border-color: #c7d2fe;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, .12);
+}
+.wk-search-clear {
+  position: absolute; right: 6px;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; color: #9ca3af;
+  transition: background .15s ease, color .15s ease;
+}
+.wk-search-clear:hover { background: #f3f4f6; color: #4b5563; }
+
 .wk-close {
   flex-shrink: 0;
   width: 32px; height: 32px;
