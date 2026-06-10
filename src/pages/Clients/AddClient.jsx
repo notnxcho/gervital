@@ -57,6 +57,14 @@ const COGNITIVE_LEVEL_OPTIONS = [
   { value: 'D', label: 'D - Asistencia alta' }
 ]
 
+const DOCUMENT_TYPE_OPTIONS = [
+  { value: 'ci', label: 'Cédula (CI)' },
+  { value: 'rut', label: 'RUT' },
+  { value: 'dni', label: 'DNI' },
+  { value: 'pasaporte', label: 'Pasaporte' },
+  { value: 'otro', label: 'Otro' }
+]
+
 const STEPS = [
   { id: 1, title: 'Datos personales y contacto' },
   { id: 2, title: 'Plan y asistencia' },
@@ -73,6 +81,8 @@ const INITIAL_FORM_DATA = {
   birthDate: '',
   cognitiveLevel: 'A',
   startDate: new Date().toISOString().split('T')[0],
+  documentType: 'ci',
+  documentNumber: '',
   // Contacto emergencia
   emergencyContactName: '',
   emergencyContactRelationship: '',
@@ -145,6 +155,8 @@ export default function AddClient() {
           birthDate: client.birthDate || '',
           cognitiveLevel: client.cognitiveLevel || 'A',
           startDate: client.startDate || '',
+          documentType: client.documentType || 'ci',
+          documentNumber: client.documentNumber || '',
           emergencyContactName: client.emergencyContact?.name || '',
           emergencyContactRelationship: client.emergencyContact?.relationship || '',
           emergencyContactPhone: client.emergencyContact?.phone || '',
@@ -271,6 +283,8 @@ export default function AddClient() {
         birthDate: formData.birthDate,
         cognitiveLevel: formData.cognitiveLevel,
         startDate: formData.startDate,
+        documentType: formData.documentType,
+        documentNumber: formData.documentNumber,
         plan: {
           frequency: parseInt(formData.frequency),
           schedule: formData.schedule,
@@ -514,6 +528,19 @@ export default function AddClient() {
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => updateField('startDate', e.target.value)}
+                  />
+                  <Select
+                    label="Tipo de documento"
+                    value={formData.documentType}
+                    onChange={(e) => updateField('documentType', e.target.value)}
+                    options={DOCUMENT_TYPE_OPTIONS}
+                  />
+                  <Input
+                    label="Número de documento"
+                    value={formData.documentNumber}
+                    onChange={(e) => updateField('documentNumber', e.target.value)}
+                    error={errors.documentNumber}
+                    placeholder="1.234.567-8"
                   />
                 </div>
               </div>

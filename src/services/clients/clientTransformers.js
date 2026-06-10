@@ -12,6 +12,8 @@ export function transformClientToDb(clientData) {
     p_birth_date: clientData.birthDate || null,
     p_cognitive_level: clientData.cognitiveLevel || null,
     p_start_date: clientData.startDate || null,
+    p_document_type: clientData.documentType || 'ci',
+    p_document_number: clientData.documentNumber || null,
     // Plan
     p_plan_frequency: clientData.plan?.frequency || null,
     p_plan_schedule: clientData.plan?.schedule || null,
@@ -111,6 +113,8 @@ export function transformUpdateToDb(clientId, updateData) {
   if (updateData.birthDate !== undefined) params.p_birth_date = updateData.birthDate
   if (updateData.cognitiveLevel !== undefined) params.p_cognitive_level = updateData.cognitiveLevel
   if (updateData.startDate !== undefined) params.p_start_date = updateData.startDate
+  if (updateData.documentType !== undefined) params.p_document_type = updateData.documentType
+  if (updateData.documentNumber !== undefined) params.p_document_number = updateData.documentNumber
 
   // Emergency contact
   if (updateData.emergencyContact) {
