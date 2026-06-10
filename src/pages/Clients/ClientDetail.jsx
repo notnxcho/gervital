@@ -16,10 +16,7 @@ import {
   calculateMonthBilling,
   markMonthPaid,
   markMonthInvoiced,
-  emitInvoice,
   syncClientToBiller,
-  checkDgiStatus,
-  voidInvoice,
   unmarkMonthPaid,
   markDayAbsent,
   unmarkDayAbsent,
@@ -36,6 +33,7 @@ import {
   getClientPlanVersions
 } from '../../services/api'
 import { useAuth, roleHasAccess } from '../../context/AuthContext'
+import EmitInvoiceModal from './EmitInvoiceModal'
 import Button from '../../components/ui/Button'
 import Card, { CardContent, CardHeader } from '../../components/ui/Card'
 import Tabs from '../../components/ui/Tabs'
@@ -669,18 +667,14 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const [selectedDate, setSelectedDate] = useState(null)
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [paymentDropOpen, setPaymentDropOpen] = useState(false)
-  const [invoiceDropOpen, setInvoiceDropOpen] = useState(false)
-  const [emitting, setEmitting] = useState(false)
-  const [emitErr, setEmitErr] = useState(null)
+  const [emitModalOpen, setEmitModalOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const paymentDropRef = useRef(null)
-  const invoiceDropRef = useRef(null)
   const isDeactivated = !!client.deletedAt
 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (paymentDropRef.current && !paymentDropRef.current.contains(e.target)) setPaymentDropOpen(false)
-      if (invoiceDropRef.current && !invoiceDropRef.current.contains(e.target)) setInvoiceDropOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -693,6 +687,12 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   // Fallback (no versions loaded) keeps the current plan but sources distance from the address,
   // since client.plan from clients_full carries no distanceRange.
   const plan = getPlanForMonth(client.planVersions, { ...client.plan, distanceRange: client.address?.distanceRange }, year, month)
+
+  // Días descontados del mes (vacaciones / no cobrados) → adenda por defecto del modal.
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`
+  const discountedDays = attendance
+    .filter(a => a.status === 'vacation' && String(a.date).startsWith(monthPrefix))
+    .map(a => new Date(String(a.date) + 'T12:00:00'))
 
   const startDay = getDay(monthStart)
   const paddingDays = startDay === 0 ? 6 : startDay - 1
@@ -814,23 +814,6 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     await withProcessing(() => unmarkMonthPaid(client.id, year, month))
   }
 
-  const handleEmitInvoice = async () => {
-    // Keep the dropdown open while emitting so the "Emitiendo…" state and any
-    // inline error are visible (closing it first hid all feedback until the alert).
-    setEmitErr(null)
-    setEmitting(true)
-    try {
-      const res = await emitInvoice(client.id, year, month)
-      setInvoiceDropOpen(false)
-      await onRefresh()
-      window.alert(`e-Ticket emitido: ${res.serie}-${res.numero}`)
-    } catch (err) {
-      setEmitErr(err.message)
-    } finally {
-      setEmitting(false)
-    }
-  }
-
   return (
     <>
       <Card className="flex-shrink-0 w-80 snap-center">
@@ -871,7 +854,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
             {/* Payment badge */}
             <div className="relative flex-1" ref={paymentDropRef}>
               <button
-                onClick={isDeactivated ? undefined : () => { setPaymentDropOpen(!paymentDropOpen); setInvoiceDropOpen(false) }}
+                onClick={isDeactivated ? undefined : () => setPaymentDropOpen(!paymentDropOpen)}
                 disabled={isDeactivated}
                 className={`w-full flex items-center justify-between gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
                   isPaid
@@ -915,89 +898,23 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
               )}
             </div>
 
-            {/* Invoice badge */}
-            <div className="relative flex-1" ref={invoiceDropRef}>
+            {/* Invoice badge → abre el modal de emisión/info */}
+            <div className="flex-1">
               <button
-                onClick={isDeactivated ? undefined : () => { setInvoiceDropOpen(!invoiceDropOpen); setPaymentDropOpen(false) }}
+                onClick={isDeactivated ? undefined : () => setEmitModalOpen(true)}
                 disabled={isDeactivated}
-                className={`w-full flex items-center justify-between gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
                   isInvoiced
                     ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                    : 'bg-gray-50 text-gray-500 border-gray-200'
-                } ${isDeactivated ? 'cursor-default' : isInvoiced ? 'hover:bg-indigo-100' : 'hover:bg-gray-100'}`}
+                    : invoice?.emitError
+                      ? 'bg-red-50 text-red-700 border-red-200'
+                      : 'bg-gray-50 text-gray-500 border-gray-200'
+                } ${isDeactivated ? 'cursor-default' : isInvoiced ? 'hover:bg-indigo-100' : invoice?.emitError ? 'hover:bg-red-100' : 'hover:bg-gray-100'}`}
               >
-                <span>{isInvoiced ? 'Facturado' : 'Sin factura'}</span>
-                {!isDeactivated && <NavArrowDown className="w-3 h-3" />}
+                {isInvoiced
+                  ? `Facturado${invoice.invoiceNumber ? ` · ${invoice.invoiceNumber}` : ''}`
+                  : invoice?.emitError ? 'Error al emitir' : 'Sin factura'}
               </button>
-              {invoiceDropOpen && (
-                <div className="absolute top-full right-0 mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1">
-                  {isInvoiced ? (
-                    <>
-                      <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100">
-                        {invoice.invoiceNumber && <div className="font-semibold text-gray-900">Nro: {invoice.invoiceNumber}</div>}
-                        <div>Facturado el {format(new Date(invoice.invoicedAt), "d/M/yyyy")}</div>
-                      </div>
-                      <div className="px-3 py-2 text-xs border-b border-gray-100 flex items-center justify-between">
-                        <span className={
-                          invoice.dgiStatus === 'accepted' ? 'text-green-700'
-                          : invoice.dgiStatus === 'rejected' ? 'text-red-700' : 'text-amber-700'
-                        }>
-                          DGI: {invoice.dgiStatus === 'accepted' ? 'Aceptado' : invoice.dgiStatus === 'rejected' ? 'Rechazado' : 'Pendiente'}
-                        </span>
-                        <button
-                          onClick={async () => { try { await checkDgiStatus(client.id, year, month); await onRefresh() } catch (e) { window.alert(e.message) } }}
-                          className="text-indigo-600 hover:underline"
-                        >
-                          Actualizar
-                        </button>
-                      </div>
-                      {invoice.invoiceUrl && (
-                        <a
-                          href={invoice.invoiceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
-                        >
-                          Ver factura
-                        </a>
-                      )}
-                      {user?.role === 'superadmin' && (
-                        <button
-                          onClick={async () => {
-                            if (!window.confirm('¿Anular la factura? Se generará una nota de crédito en Biller.')) return
-                            try { await voidInvoice(client.id, year, month); await onRefresh() }
-                            catch (e) { window.alert(`No se pudo anular: ${e.message}`) }
-                          }}
-                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                        >
-                          Anular factura
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {(emitErr || invoice?.emitError) && (
-                        <div className="px-3 py-2 text-xs text-red-600 border-b border-gray-100">
-                          {emitErr || invoice.emitError}
-                        </div>
-                      )}
-                      <button
-                        onClick={handleEmitInvoice}
-                        disabled={emitting}
-                        className="w-full px-3 py-2 text-left text-sm text-indigo-700 font-medium hover:bg-indigo-50 disabled:opacity-50"
-                      >
-                        {emitting ? 'Emitiendo…' : 'Emitir e-Ticket'}
-                      </button>
-                      <button
-                        onClick={() => { setInvoiceDropOpen(false); setModal('invoice') }}
-                        className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
-                      >
-                        Marcar como facturado manualmente
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
           </div>
           )}
@@ -1088,13 +1005,27 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
         }
       />
 
-      {/* ── InvoiceModal ── */}
+      {/* ── InvoiceModal (marca manual, fallback) ── */}
       <InvoiceModal
         isOpen={modal === 'invoice'}
         onClose={closeModal}
         onConfirm={(number, url) =>
           withProcessing(() => markMonthInvoiced(client.id, year, month, number, url))
         }
+      />
+
+      {/* ── EmitInvoiceModal (emisión + info post-factura) ── */}
+      <EmitInvoiceModal
+        isOpen={emitModalOpen}
+        onClose={() => setEmitModalOpen(false)}
+        client={client}
+        plan={plan}
+        year={year}
+        month={month}
+        discountedDays={discountedDays}
+        invoice={invoice}
+        onRefresh={onRefresh}
+        userRole={user?.role}
       />
 
       {/* ── AbsenceModal ── */}
