@@ -79,6 +79,16 @@ export {
 } from './invoices/invoiceService'
 
 // ============================================
+// BILLER API (facturación electrónica)
+// ============================================
+export {
+  emitInvoice,
+  syncClientToBiller,
+  checkDgiStatus,
+  voidInvoice
+} from './biller/billerService'
+
+// ============================================
 // USERS API (Accesos)
 // ============================================
 export {
