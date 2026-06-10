@@ -5,7 +5,9 @@ import { es } from 'date-fns/locale'
 import { NavArrowLeft, NavArrowRight, WarningTriangle, Clock } from 'iconoir-react'
 import Card, { CardHeader, CardContent } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import Modal from '../../components/ui/Modal'
 import { getDashboardMetrics } from '../../services/dashboard/dashboardService'
+import { getClients, calculateMonthBilling, emitInvoice } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 
 function formatCurrency(amount) {
@@ -56,6 +58,13 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  // Bulk monthly emission
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkRows, setBulkRows] = useState([])
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkRunning, setBulkRunning] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, failed: [] })
+
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
 
@@ -81,6 +90,57 @@ export default function Dashboard() {
 
   const monthLabel = format(currentDate, 'MMMM yyyy', { locale: es })
 
+  const openBulk = async () => {
+    setBulkOpen(true)
+    setBulkLoading(true)
+    setBulkProgress({ done: 0, total: 0, failed: [] })
+    try {
+      const clients = await getClients()
+      const rows = await Promise.all(clients.map(async (c) => {
+        let amount = 0
+        let reason = null
+        try {
+          const b = await calculateMonthBilling(c.id, year, month)
+          amount = b.totalChargeableGross
+        } catch (_) {
+          reason = 'sin plan'
+        }
+        const status = !c.documentNumber ? 'sin CI'
+          : reason ? reason
+          : amount <= 0 ? 'monto 0'
+          : 'listo'
+        return { id: c.id, name: `${c.firstName} ${c.lastName}`, amount, status, selected: status === 'listo' }
+      }))
+      setBulkRows(rows)
+    } catch (e) {
+      window.alert(`Error cargando clientes: ${e.message}`)
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const runBulk = async () => {
+    const targets = bulkRows.filter(r => r.selected && r.status === 'listo')
+    if (!targets.length) return
+    setBulkRunning(true)
+    setBulkProgress({ done: 0, total: targets.length, failed: [] })
+    const failed = []
+    for (let i = 0; i < targets.length; i++) {
+      try {
+        await emitInvoice(targets[i].id, year, month)
+      } catch (e) {
+        failed.push({ name: targets[i].name, error: e.message })
+      }
+      setBulkProgress({ done: i + 1, total: targets.length, failed: [...failed] })
+      // Biller rate limit: 1 req/seg para emisión
+      if (i < targets.length - 1) await new Promise(res => setTimeout(res, 1100))
+    }
+    setBulkRunning(false)
+    load()
+  }
+
+  const selectedCount = bulkRows.filter(r => r.selected && r.status === 'listo').length
+
   return (
     <div className="-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8 min-h-full bg-gray-50">
       {/* Header */}
@@ -96,6 +156,11 @@ export default function Dashboard() {
           <Button variant="secondary" size="sm" onClick={goNext}>
             <NavArrowRight className="w-4 h-4" />
           </Button>
+          {hasAccess('billing') && (
+            <Button size="sm" onClick={openBulk} className="ml-2">
+              Emitir facturas del mes
+            </Button>
+          )}
         </div>
       </div>
 
@@ -484,6 +549,65 @@ export default function Dashboard() {
 
         </div>
       )}
+
+      <Modal
+        isOpen={bulkOpen}
+        onClose={() => { if (!bulkRunning) setBulkOpen(false) }}
+        title={`Emitir facturas — ${monthLabel}`}
+        size="xl"
+      >
+        {bulkLoading ? (
+          <div className="py-12 text-center text-sm text-gray-400">Calculando montos…</div>
+        ) : (
+          <div className="space-y-4">
+            {bulkProgress.total > 0 && (
+              <div className="text-sm text-gray-700">
+                Emitidas {bulkProgress.done}/{bulkProgress.total}
+                {bulkProgress.failed.length > 0 && (
+                  <span className="text-red-600"> · {bulkProgress.failed.length} fallidas</span>
+                )}
+              </div>
+            )}
+            <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+              {bulkRows.length === 0 ? (
+                <div className="px-3 py-6 text-center text-sm text-gray-400">No hay clientes</div>
+              ) : bulkRows.map((r) => (
+                <label
+                  key={r.id}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm ${r.status === 'listo' ? 'cursor-pointer hover:bg-gray-50' : 'opacity-60'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={r.selected}
+                    disabled={r.status !== 'listo' || bulkRunning}
+                    onChange={(e) => setBulkRows(rows => rows.map(x => x.id === r.id ? { ...x, selected: e.target.checked } : x))}
+                  />
+                  <span className="flex-1 text-gray-900">{r.name}</span>
+                  <span className="text-gray-600">${r.amount.toLocaleString()}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded ${
+                    r.status === 'listo' ? 'bg-green-50 text-green-700'
+                    : r.status === 'sin CI' ? 'bg-red-50 text-red-700'
+                    : 'bg-gray-100 text-gray-500'
+                  }`}>{r.status}</span>
+                </label>
+              ))}
+            </div>
+            {bulkProgress.failed.length > 0 && (
+              <div className="text-xs text-red-600 space-y-0.5 max-h-24 overflow-y-auto">
+                {bulkProgress.failed.map((f, i) => <div key={i}>{f.name}: {f.error}</div>)}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setBulkOpen(false)} disabled={bulkRunning}>
+                Cerrar
+              </Button>
+              <Button onClick={runBulk} loading={bulkRunning} disabled={bulkRunning || selectedCount === 0}>
+                Emitir seleccionadas ({selectedCount})
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
