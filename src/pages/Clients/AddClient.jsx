@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check } from 'iconoir-react'
-import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion } from '../../services/api'
+import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion, syncClientToBiller } from '../../services/api'
 import { geocodeAndCalculateDistance } from '../../services/clients/geocodingService'
 import { getPlanPricing, getPlanPriceSync } from '../../services/pricing/pricingService'
 import { getTransportPricing, getTransportPriceSync } from '../../services/pricing/transportPricingService'
@@ -342,6 +342,9 @@ export default function AddClient() {
         }
         if (avatarFile && newClient?.id) {
           await uploadClientAvatar(newClient.id, avatarFile).catch(console.error)
+        }
+        if (newClient?.id && formData.documentNumber) {
+          syncClientToBiller(newClient.id).catch(err => console.warn('Sync Biller falló:', err))
         }
         navigate('/clientes')
       }

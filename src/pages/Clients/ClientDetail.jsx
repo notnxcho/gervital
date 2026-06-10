@@ -17,6 +17,9 @@ import {
   markMonthPaid,
   markMonthInvoiced,
   emitInvoice,
+  syncClientToBiller,
+  checkDgiStatus,
+  voidInvoice,
   unmarkMonthPaid,
   markDayAbsent,
   unmarkDayAbsent,
@@ -669,6 +672,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const [invoiceDropOpen, setInvoiceDropOpen] = useState(false)
   const [emitting, setEmitting] = useState(false)
   const [emitErr, setEmitErr] = useState(null)
+  const [syncing, setSyncing] = useState(false)
   const paymentDropRef = useRef(null)
   const invoiceDropRef = useRef(null)
   const isDeactivated = !!client.deletedAt
@@ -837,6 +841,30 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
             {isProrated && <span className="ml-2 text-xs font-normal text-blue-600">(prorrateado)</span>}
           </h3>
 
+          {/* Biller receptor sync status */}
+          <div className="flex">
+            {client.billerClientId ? (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                Biller ✓
+              </span>
+            ) : (
+              <button
+                onClick={async () => {
+                  if (isDeactivated) return
+                  setSyncing(true)
+                  try { await syncClientToBiller(client.id); await onRefresh() }
+                  catch (e) { window.alert(`No se pudo sincronizar con Biller: ${e.message}`) }
+                  finally { setSyncing(false) }
+                }}
+                disabled={syncing || isDeactivated}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
+                title={client.billerSyncError || 'Sin sincronizar en Biller'}
+              >
+                {syncing ? 'Sincronizando…' : 'Sincronizar Biller'}
+              </button>
+            )}
+          </div>
+
           {/* Payment + Invoice badges */}
           {canViewBilling && (
           <div className="flex gap-2">
@@ -909,6 +937,20 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
                         {invoice.invoiceNumber && <div className="font-semibold text-gray-900">Nro: {invoice.invoiceNumber}</div>}
                         <div>Facturado el {format(new Date(invoice.invoicedAt), "d/M/yyyy")}</div>
                       </div>
+                      <div className="px-3 py-2 text-xs border-b border-gray-100 flex items-center justify-between">
+                        <span className={
+                          invoice.dgiStatus === 'accepted' ? 'text-green-700'
+                          : invoice.dgiStatus === 'rejected' ? 'text-red-700' : 'text-amber-700'
+                        }>
+                          DGI: {invoice.dgiStatus === 'accepted' ? 'Aceptado' : invoice.dgiStatus === 'rejected' ? 'Rechazado' : 'Pendiente'}
+                        </span>
+                        <button
+                          onClick={async () => { try { await checkDgiStatus(client.id, year, month); await onRefresh() } catch (e) { window.alert(e.message) } }}
+                          className="text-indigo-600 hover:underline"
+                        >
+                          Actualizar
+                        </button>
+                      </div>
                       {invoice.invoiceUrl && (
                         <a
                           href={invoice.invoiceUrl}
@@ -918,6 +960,18 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
                         >
                           Ver factura
                         </a>
+                      )}
+                      {user?.role === 'superadmin' && (
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm('¿Anular la factura? Se generará una nota de crédito en Biller.')) return
+                            try { await voidInvoice(client.id, year, month); await onRefresh() }
+                            catch (e) { window.alert(`No se pudo anular: ${e.message}`) }
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                        >
+                          Anular factura
+                        </button>
                       )}
                     </>
                   ) : (
