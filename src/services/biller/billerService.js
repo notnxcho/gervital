@@ -15,9 +15,18 @@ async function invokeBiller(body) {
   return data
 }
 
-/** Emit a monthly e-Ticket for a client (month is 0-indexed) */
-export async function emitInvoice(clientId, year, month) {
-  return invokeBiller({ action: 'emit_invoice', clientId, year, month })
+/**
+ * Emit a monthly e-Ticket for a client (month is 0-indexed).
+ * @param {object} [override] - Optional edited values from the confirmation modal:
+ *   attendanceConcepto, attendanceAmount, transportConcepto, transportAmount, adenda, fechaEmision, fechaVencimiento
+ */
+export async function emitInvoice(clientId, year, month, override = {}) {
+  return invokeBiller({ action: 'emit_invoice', clientId, year, month, ...override })
+}
+
+/** Fetch the comprobante PDF (base64) for an emitted invoice */
+export async function getInvoicePdf(clientId, year, month) {
+  return invokeBiller({ action: 'get_invoice_pdf', clientId, year, month })
 }
 
 /** Pre-register / sync a client as a Biller receptor */

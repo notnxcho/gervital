@@ -85,7 +85,8 @@ export {
   emitInvoice,
   syncClientToBiller,
   checkDgiStatus,
-  voidInvoice
+  voidInvoice,
+  getInvoicePdf
 } from './biller/billerService'
 
 // ============================================
