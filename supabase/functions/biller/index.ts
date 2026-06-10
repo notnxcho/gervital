@@ -99,6 +99,19 @@ Deno.serve(async (req) => {
       await admin.rpc('mark_invoice_emitted', {
         p_client_id: clientId, p_year: year, p_month: month,
         p_biller_id: parsed.id ?? null, p_serie: parsed.serie ?? '', p_numero: parsed.numero ?? '', p_hash: parsed.hash ?? null,
+        // Snapshot de montos/días al momento de emitir (para reporting del dashboard).
+        p_chargeable_amount: Number(billing.totalChargeableGross) || 0,
+        p_monthly_rate: Number(billing.monthlyRate) || 0,
+        p_planned_days: billing.plannedDays ?? null,
+        p_chargeable_days: billing.chargeableDays ?? null,
+        p_att_rate_net: Number(billing.attendanceMonthlyRateNet) || 0,
+        p_att_rate_gross: Number(billing.attendanceMonthlyRateGross) || 0,
+        p_att_charge_net: Number(billing.attendanceChargeableNet) || 0,
+        p_att_charge_gross: Number(billing.attendanceChargeableGross) || 0,
+        p_trans_rate_net: Number(billing.transportMonthlyRateNet) || 0,
+        p_trans_rate_gross: Number(billing.transportMonthlyRateGross) || 0,
+        p_trans_charge_net: Number(billing.transportChargeableNet) || 0,
+        p_trans_charge_gross: Number(billing.transportChargeableGross) || 0,
       })
       return json({ ok: true, serie: parsed.serie, numero: parsed.numero, id: parsed.id })
     }
