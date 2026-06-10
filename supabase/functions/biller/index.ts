@@ -103,6 +103,75 @@ Deno.serve(async (req) => {
       return json({ ok: true, serie: parsed.serie, numero: parsed.numero, id: parsed.id })
     }
 
+    if (action === 'sync_client') {
+      // Cualquier usuario conocido puede sincronizar (puede crear clientes)
+      const { clientId } = body
+      const { data: client } = await admin.from('clients')
+        .select('id, first_name, last_name, email, document_type, document_number, client_addresses(street)')
+        .eq('id', clientId).single()
+      if (!client) return json({ error: 'Cliente no encontrado' }, 404)
+      if (!client.document_number) return json({ error: 'El cliente no tiene documento cargado' }, 422)
+
+      const fullName = `${client.first_name} ${client.last_name}`.trim().slice(0, 30)
+      const docMap: Record<string, number> = { rut: 2, ci: 3, otro: 4, pasaporte: 5, dni: 6 }
+      const payload = {
+        tipo_documento: docMap[client.document_type] ?? 3,
+        documento: client.document_number,
+        nombre_fantasia: fullName,
+        pais: 'UY',
+        sucursal: {
+          direccion: (client.client_addresses?.[0]?.street ?? '').slice(0, 70),
+          pais: 'UY',
+          emails: client.email ? [client.email] : [],
+        },
+      }
+      const resp = await fetch(`${BILLER_BASE_URL}/clientes/crear`, { method: 'POST', headers: billerHeaders(), body: JSON.stringify(payload) })
+      const raw = await resp.text()
+      if (!resp.ok) {
+        await admin.rpc('set_client_biller_sync', { p_client_id: clientId, p_biller_client_id: null, p_biller_branch_id: null, p_error: `HTTP ${resp.status}: ${raw.slice(0, 300)}` })
+        return json({ error: `Biller rechazó el alta del cliente (HTTP ${resp.status})`, detail: raw.slice(0, 300) }, 502)
+      }
+      let parsedClient: { cliente?: number; sucursal?: number }
+      try { parsedClient = JSON.parse(raw) } catch { parsedClient = {} }
+      await admin.rpc('set_client_biller_sync', { p_client_id: clientId, p_biller_client_id: parsedClient.cliente ?? null, p_biller_branch_id: parsedClient.sucursal ?? null, p_error: null })
+      return json({ ok: true, billerClientId: parsedClient.cliente, billerBranchId: parsedClient.sucursal })
+    }
+
+    if (action === 'check_dgi_status') {
+      if (!isBilling) return json({ error: 'No autorizado' }, 403)
+      const { clientId, year, month } = body
+      const { data: inv } = await admin.from('monthly_invoices')
+        .select('biller_id').eq('client_id', clientId).eq('year', year).eq('month', month).maybeSingle()
+      if (!inv?.biller_id) return json({ error: 'Factura no emitida' }, 422)
+
+      const resp = await fetch(`${BILLER_BASE_URL}/comprobantes/obtener?id=${inv.biller_id}`, { headers: billerHeaders() })
+      const raw = await resp.text()
+      if (!resp.ok) return json({ error: `Biller HTTP ${resp.status}`, detail: raw.slice(0, 300) }, 502)
+      let parsedDgi: { estado?: string } | Array<{ estado?: string }>
+      try { parsedDgi = JSON.parse(raw) } catch { parsedDgi = {} }
+      const record = Array.isArray(parsedDgi) ? (parsedDgi[0] ?? {}) : parsedDgi
+      const estado = (record.estado ?? '').toLowerCase()
+      const status = estado.includes('acept') ? 'accepted' : estado.includes('rechaz') ? 'rejected' : 'pending_dgi'
+      await admin.rpc('set_invoice_dgi_status', { p_client_id: clientId, p_year: year, p_month: month, p_status: status })
+      return json({ ok: true, dgiStatus: status, estado: record.estado })
+    }
+
+    if (action === 'void_invoice') {
+      if (role !== 'superadmin') return json({ error: 'No autorizado' }, 403)
+      const { clientId, year, month } = body
+      const { data: inv } = await admin.from('monthly_invoices')
+        .select('biller_id').eq('client_id', clientId).eq('year', year).eq('month', month).maybeSingle()
+      if (!inv?.biller_id) return json({ error: 'Factura no emitida' }, 422)
+
+      const resp = await fetch(`${BILLER_BASE_URL}/comprobantes/anular`, {
+        method: 'POST', headers: billerHeaders(), body: JSON.stringify({ id: inv.biller_id, fecha_emision_hoy: true }),
+      })
+      const raw = await resp.text()
+      if (!resp.ok) return json({ error: `Biller HTTP ${resp.status}`, detail: raw.slice(0, 300) }, 502)
+      await admin.rpc('mark_invoice_voided', { p_client_id: clientId, p_year: year, p_month: month })
+      return json({ ok: true })
+    }
+
     return json({ error: 'Acción inválida' }, 400)
   } catch (e) {
     return json({ error: String(e) }, 500)
