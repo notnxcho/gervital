@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Check } from 'iconoir-react'
+import { ArrowLeft, Check, Plus, Trash } from 'iconoir-react'
 import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion, syncClientToBiller } from '../../services/api'
 import { geocodeAndCalculateDistance } from '../../services/clients/geocodingService'
 import { getPlanPricing, getPlanPriceSync } from '../../services/pricing/pricingService'
@@ -83,10 +83,10 @@ const INITIAL_FORM_DATA = {
   startDate: new Date().toISOString().split('T')[0],
   documentType: 'ci',
   documentNumber: '',
-  // Contacto emergencia
-  emergencyContactName: '',
-  emergencyContactRelationship: '',
-  emergencyContactPhone: '',
+  // Responsable de transferencia (texto libre)
+  transferResponsible: '',
+  // Contactos de emergencia (1..5)
+  emergencyContacts: [{ name: '', relationship: '', phone: '' }],
   // Dirección
   street: '',
   accessNotes: '',
@@ -157,9 +157,11 @@ export default function AddClient() {
           startDate: client.startDate || '',
           documentType: client.documentType || 'ci',
           documentNumber: client.documentNumber || '',
-          emergencyContactName: client.emergencyContact?.name || '',
-          emergencyContactRelationship: client.emergencyContact?.relationship || '',
-          emergencyContactPhone: client.emergencyContact?.phone || '',
+          transferResponsible: client.transferResponsible || '',
+          emergencyContacts: (client.emergencyContacts?.length
+            ? client.emergencyContacts
+            : (client.emergencyContact ? [client.emergencyContact] : [{ name: '', relationship: '', phone: '' }])
+          ).map(c => ({ name: c.name || '', relationship: c.relationship || '', phone: c.phone || '' })),
           street: client.address?.street || '',
           accessNotes: client.address?.accessNotes || '',
           doorbell: client.address?.doorbell || '',
@@ -227,6 +229,30 @@ export default function AddClient() {
     }))
   }
 
+  const MAX_EMERGENCY_CONTACTS = 5
+
+  const updateContact = (index, field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      emergencyContacts: prev.emergencyContacts.map((c, i) => i === index ? { ...c, [field]: value } : c)
+    }))
+    if (errors[`ec_${index}_${field}`]) {
+      setErrors(prev => ({ ...prev, [`ec_${index}_${field}`]: null }))
+    }
+  }
+
+  const addContact = () => {
+    setFormData(prev => prev.emergencyContacts.length >= MAX_EMERGENCY_CONTACTS
+      ? prev
+      : { ...prev, emergencyContacts: [...prev.emergencyContacts, { name: '', relationship: '', phone: '' }] })
+  }
+
+  const removeContact = (index) => {
+    setFormData(prev => prev.emergencyContacts.length <= 1
+      ? prev
+      : { ...prev, emergencyContacts: prev.emergencyContacts.filter((_, i) => i !== index) })
+  }
+
   const validateStep = (step) => {
     const newErrors = {}
     
@@ -236,8 +262,10 @@ export default function AddClient() {
       if (!formData.email.trim()) newErrors.email = 'Requerido'
       if (!formData.phone.trim()) newErrors.phone = 'Requerido'
       if (!formData.birthDate) newErrors.birthDate = 'Requerido'
-      if (!formData.emergencyContactName.trim()) newErrors.emergencyContactName = 'Requerido'
-      if (!formData.emergencyContactPhone.trim()) newErrors.emergencyContactPhone = 'Requerido'
+      formData.emergencyContacts.forEach((c, i) => {
+        if (!c.name.trim()) newErrors[`ec_${i}_name`] = 'Requerido'
+        if (!c.phone.trim()) newErrors[`ec_${i}_phone`] = 'Requerido'
+      })
       if (!formData.street.trim()) newErrors.street = 'Requerido'
     }
     
@@ -285,17 +313,16 @@ export default function AddClient() {
         startDate: formData.startDate,
         documentType: formData.documentType,
         documentNumber: formData.documentNumber,
+        transferResponsible: formData.transferResponsible,
         plan: {
           frequency: parseInt(formData.frequency),
           schedule: formData.schedule,
           hasTransport: formData.hasTransport,
           assignedDays: formData.assignedDays
         },
-        emergencyContact: {
-          name: formData.emergencyContactName,
-          relationship: formData.emergencyContactRelationship,
-          phone: formData.emergencyContactPhone
-        },
+        emergencyContacts: formData.emergencyContacts
+          .map(c => ({ name: c.name.trim(), relationship: c.relationship.trim(), phone: c.phone.trim() }))
+          .filter(c => c.name && c.phone),
         address: {
           street: formData.street,
           accessNotes: formData.accessNotes,
@@ -545,33 +572,66 @@ export default function AddClient() {
                     error={errors.documentNumber}
                     placeholder="1.234.567-8"
                   />
+                  <Input
+                    label="Responsable de transferencia"
+                    value={formData.transferResponsible}
+                    onChange={(e) => updateField('transferResponsible', e.target.value)}
+                    placeholder="Nombre de quien realiza la transferencia"
+                    className="col-span-2"
+                  />
                 </div>
               </div>
 
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Contacto de emergencia</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <Input
-                    label="Nombre"
-                    value={formData.emergencyContactName}
-                    onChange={(e) => updateField('emergencyContactName', e.target.value)}
-                    error={errors.emergencyContactName}
-                    placeholder="Carlos González"
-                  />
-                  <Input
-                    label="Vínculo"
-                    value={formData.emergencyContactRelationship}
-                    onChange={(e) => updateField('emergencyContactRelationship', e.target.value)}
-                    placeholder="Hijo/a"
-                  />
-                  <Input
-                    label="Teléfono"
-                    value={formData.emergencyContactPhone}
-                    onChange={(e) => updateField('emergencyContactPhone', e.target.value)}
-                    error={errors.emergencyContactPhone}
-                    placeholder="+54 11 8765-4321"
-                  />
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Contactos de emergencia</h3>
+                  <button
+                    type="button"
+                    onClick={addContact}
+                    disabled={formData.emergencyContacts.length >= MAX_EMERGENCY_CONTACTS}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Agregar contacto
+                  </button>
                 </div>
+                <div className="space-y-3">
+                  {formData.emergencyContacts.map((contact, index) => (
+                    <div key={index} className="relative grid grid-cols-3 gap-4 rounded-xl border border-gray-200 p-4">
+                      <Input
+                        label="Nombre"
+                        value={contact.name}
+                        onChange={(e) => updateContact(index, 'name', e.target.value)}
+                        error={errors[`ec_${index}_name`]}
+                        placeholder="Carlos González"
+                      />
+                      <Input
+                        label="Vínculo"
+                        value={contact.relationship}
+                        onChange={(e) => updateContact(index, 'relationship', e.target.value)}
+                        placeholder="Hijo/a"
+                      />
+                      <Input
+                        label="Teléfono"
+                        value={contact.phone}
+                        onChange={(e) => updateContact(index, 'phone', e.target.value)}
+                        error={errors[`ec_${index}_phone`]}
+                        placeholder="+54 11 8765-4321"
+                      />
+                      {formData.emergencyContacts.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeContact(index)}
+                          className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                          title="Eliminar contacto"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">Mínimo 1, máximo {MAX_EMERGENCY_CONTACTS} contactos.</p>
               </div>
 
               <div>

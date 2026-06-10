@@ -538,14 +538,24 @@ export default function ClientDetail() {
             <div className="space-y-6">
               <div>
                 <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                  <Phone className="w-4 h-4" /> Contacto de emergencia
+                  <Phone className="w-4 h-4" /> Contactos de emergencia
                 </h4>
-                <div className="grid grid-cols-3 gap-4 pl-6">
-                  <div><p className="text-sm text-gray-500">Nombre</p><p className="font-medium text-gray-900">{client.emergencyContact?.name}</p></div>
-                  <div><p className="text-sm text-gray-500">Vínculo</p><p className="font-medium text-gray-900">{client.emergencyContact?.relationship}</p></div>
-                  <div><p className="text-sm text-gray-500">Teléfono</p><p className="font-medium text-gray-900">{client.emergencyContact?.phone}</p></div>
+                <div className="space-y-3 pl-6">
+                  {(client.emergencyContacts?.length ? client.emergencyContacts : [client.emergencyContact].filter(Boolean)).map((contact, index) => (
+                    <div key={index} className="grid grid-cols-3 gap-4">
+                      <div><p className="text-sm text-gray-500">Nombre</p><p className="font-medium text-gray-900">{contact?.name || '-'}</p></div>
+                      <div><p className="text-sm text-gray-500">Vínculo</p><p className="font-medium text-gray-900">{contact?.relationship || '-'}</p></div>
+                      <div><p className="text-sm text-gray-500">Teléfono</p><p className="font-medium text-gray-900">{contact?.phone || '-'}</p></div>
+                    </div>
+                  ))}
                 </div>
               </div>
+              {client.transferResponsible && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">Responsable de transferencia</h4>
+                  <p className="font-medium text-gray-900 pl-6">{client.transferResponsible}</p>
+                </div>
+              )}
               <div>
                 <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
                   <MapPin className="w-4 h-4" /> Dirección

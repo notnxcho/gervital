@@ -19,10 +19,9 @@ export function transformClientToDb(clientData) {
     p_plan_schedule: clientData.plan?.schedule || null,
     p_plan_has_transport: clientData.plan?.hasTransport || false,
     p_plan_assigned_days: clientData.plan?.assignedDays || [],
-    // Emergency contact
-    p_ec_name: clientData.emergencyContact?.name || null,
-    p_ec_relationship: clientData.emergencyContact?.relationship || null,
-    p_ec_phone: clientData.emergencyContact?.phone || null,
+    // Emergency contacts (array, 1..5) + transfer responsible
+    p_emergency_contacts: clientData.emergencyContacts || null,
+    p_transfer_responsible: clientData.transferResponsible || null,
     // Address
     p_addr_street: clientData.address?.street || null,
     p_addr_access_notes: clientData.address?.accessNotes || null,
@@ -72,6 +71,8 @@ export function transformClientFromDb(dbClient) {
       relationship: '',
       phone: ''
     },
+    emergencyContacts: dbClient.emergencyContacts || [],
+    transferResponsible: dbClient.transferResponsible || '',
     address: dbClient.address || {
       street: '',
       accessNotes: '',
@@ -116,12 +117,9 @@ export function transformUpdateToDb(clientId, updateData) {
   if (updateData.documentType !== undefined) params.p_document_type = updateData.documentType
   if (updateData.documentNumber !== undefined) params.p_document_number = updateData.documentNumber
 
-  // Emergency contact
-  if (updateData.emergencyContact) {
-    if (updateData.emergencyContact.name !== undefined) params.p_ec_name = updateData.emergencyContact.name
-    if (updateData.emergencyContact.relationship !== undefined) params.p_ec_relationship = updateData.emergencyContact.relationship
-    if (updateData.emergencyContact.phone !== undefined) params.p_ec_phone = updateData.emergencyContact.phone
-  }
+  // Emergency contacts (array, 1..5) + transfer responsible
+  if (updateData.emergencyContacts !== undefined) params.p_emergency_contacts = updateData.emergencyContacts
+  if (updateData.transferResponsible !== undefined) params.p_transfer_responsible = updateData.transferResponsible
 
   // Address
   if (updateData.address) {
