@@ -811,16 +811,17 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   }
 
   const handleEmitInvoice = async () => {
-    setInvoiceDropOpen(false)
+    // Keep the dropdown open while emitting so the "Emitiendo…" state and any
+    // inline error are visible (closing it first hid all feedback until the alert).
     setEmitErr(null)
     setEmitting(true)
     try {
       const res = await emitInvoice(client.id, year, month)
+      setInvoiceDropOpen(false)
       await onRefresh()
       window.alert(`e-Ticket emitido: ${res.serie}-${res.numero}`)
     } catch (err) {
       setEmitErr(err.message)
-      window.alert(`Error al emitir: ${err.message}`)
     } finally {
       setEmitting(false)
     }
