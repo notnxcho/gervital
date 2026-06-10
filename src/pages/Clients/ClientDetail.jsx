@@ -584,7 +584,8 @@ export default function ClientDetail() {
                   const conditions = [
                     { active: client.medicalInfo?.isDiabetic, label: 'Diabético', color: 'bg-blue-100 text-blue-700 border-blue-200' },
                     { active: client.medicalInfo?.isCeliac, label: 'Celíaco', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-                    { active: client.medicalInfo?.isHypertensive, label: 'Hipertenso', color: 'bg-red-100 text-red-700 border-red-200' }
+                    { active: client.medicalInfo?.isHypertensive, label: 'Hipertenso', color: 'bg-red-100 text-red-700 border-red-200' },
+                    { active: client.medicalInfo?.isLactoseIntolerant, label: 'Intolerante a la lactosa', color: 'bg-violet-100 text-violet-700 border-violet-200' }
                   ].filter(c => c.active)
                   if (conditions.length === 0) return <p className="font-medium text-gray-900">-</p>
                   return (
@@ -821,9 +822,10 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
         else if (status === 'vacation') setModal('undoVacation')
       }
     } else {
-      // Non-assigned day
+      // Non-assigned day: always open the recovery modal (it reports when there
+      // are no available recovery credits).
       if (status === 'recovery') setModal('undoRecovery')
-      else if (client.recoveryDaysAvailable > 0) setModal('recovery')
+      else setModal('recovery')
     }
   }
 
@@ -962,16 +964,18 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
               const isWeekend = getDay(day) === 0 || getDay(day) === 6
               const { status, isJustified, isAssigned } = getDayStatus(day)
               const isStartDate = format(day, 'yyyy-MM-dd') === format(clientStart, 'yyyy-MM-dd')
+              // Every weekday (Mon-Fri) is clickable. Recovery still requires an
+              // available credit, but that is enforced inside the recovery modal.
               const canClick = !isWeekend && !isDeactivated && (
                 isAssigned ||
                 status === 'recovery' ||
-                (!isAssigned && client.recoveryDaysAvailable > 0 && status === 'not_scheduled' && !isWeekend)
+                status === 'not_scheduled'
               )
 
               const colorClass = isWeekend
                 ? 'text-gray-300'
                 : status === 'not_scheduled'
-                  ? 'text-gray-300'
+                  ? 'bg-gray-50 text-gray-400 border border-dashed border-gray-200 hover:bg-blue-50 hover:text-blue-500'
                   : getDayStyle(status, isJustified)
 
               return (
@@ -985,7 +989,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
                     ${canClick ? 'hover:opacity-75 cursor-pointer' : 'cursor-default'}
                     ${isStartDate ? 'ring-2 ring-indigo-400 ring-offset-1' : ''}
                   `}
-                  title={isStartDate ? 'Primer día' : getDayTooltip(status, isJustified)}
+                  title={isStartDate ? 'Primer día' : (status === 'not_scheduled' && !isWeekend ? 'Recuperar día' : getDayTooltip(status, isJustified))}
                 >
                   {format(day, 'd')}
                   {getDayTooltip(status, isJustified) && (
@@ -1092,7 +1096,10 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
         isOpen={modal === 'recovery'}
         onClose={closeModal}
         title="Marcar día recuperado"
-        message={`¿Marcar el ${selectedDate ? format(new Date(selectedDate), "d 'de' MMMM", { locale: es }) : ''} como día de recupero? Se usará 1 día de recupero (disponibles: ${client.recoveryDaysAvailable}).`}
+        confirmDisabled={client.recoveryDaysAvailable <= 0}
+        message={client.recoveryDaysAvailable <= 0
+          ? `Este cliente no tiene días de recupero disponibles. Para recuperar un día, primero debe registrarse una falta justificada con recupero.`
+          : `¿Marcar el ${selectedDate ? format(new Date(selectedDate), "d 'de' MMMM", { locale: es }) : ''} como día de recupero? Se usará 1 día de recupero (disponibles: ${client.recoveryDaysAvailable}).`}
         confirmLabel="Confirmar recupero"
         confirmClass="bg-blue-600 hover:bg-blue-700"
         onConfirm={() =>
@@ -1436,16 +1443,18 @@ function VacationModal({ isOpen, onClose, date, isPaid, onConfirmSingle, onConfi
 // ============================================================
 // ConfirmModal (generic)
 // ============================================================
-function ConfirmModal({ isOpen, onClose, title, message, confirmLabel, confirmClass, onConfirm, loading }) {
+function ConfirmModal({ isOpen, onClose, title, message, confirmLabel, confirmClass, onConfirm, loading, confirmDisabled }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="space-y-4">
         <p className="text-gray-600 text-sm">{message}</p>
         <div className="flex gap-3 justify-end pt-2 border-t border-gray-200">
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button onClick={onConfirm} loading={loading} className={confirmClass}>
-            {confirmLabel}
-          </Button>
+          <Button variant="secondary" onClick={onClose}>{confirmDisabled ? 'Cerrar' : 'Cancelar'}</Button>
+          {!confirmDisabled && (
+            <Button onClick={onConfirm} loading={loading} className={confirmClass}>
+              {confirmLabel}
+            </Button>
+          )}
         </div>
       </div>
     </Modal>

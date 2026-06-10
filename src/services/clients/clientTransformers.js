@@ -37,7 +37,8 @@ export function transformClientToDb(clientData) {
     p_med_notes: clientData.medicalInfo?.notes || null,
     p_med_is_diabetic: clientData.medicalInfo?.isDiabetic || false,
     p_med_is_celiac: clientData.medicalInfo?.isCeliac || false,
-    p_med_is_hypertensive: clientData.medicalInfo?.isHypertensive || false
+    p_med_is_hypertensive: clientData.medicalInfo?.isHypertensive || false,
+    p_med_is_lactose_intolerant: clientData.medicalInfo?.isLactoseIntolerant || false
   }
 }
 
@@ -89,7 +90,8 @@ export function transformClientFromDb(dbClient) {
       notes: '',
       isDiabetic: false,
       isCeliac: false,
-      isHypertensive: false
+      isHypertensive: false,
+      isLactoseIntolerant: false
     }
   }
 }
@@ -141,6 +143,7 @@ export function transformUpdateToDb(clientId, updateData) {
     if (updateData.medicalInfo.isDiabetic !== undefined) params.p_med_is_diabetic = updateData.medicalInfo.isDiabetic
     if (updateData.medicalInfo.isCeliac !== undefined) params.p_med_is_celiac = updateData.medicalInfo.isCeliac
     if (updateData.medicalInfo.isHypertensive !== undefined) params.p_med_is_hypertensive = updateData.medicalInfo.isHypertensive
+    if (updateData.medicalInfo.isLactoseIntolerant !== undefined) params.p_med_is_lactose_intolerant = updateData.medicalInfo.isLactoseIntolerant
   }
 
   return params

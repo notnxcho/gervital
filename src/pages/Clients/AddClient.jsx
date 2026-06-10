@@ -108,7 +108,8 @@ const INITIAL_FORM_DATA = {
   // Condiciones
   isDiabetic: false,
   isCeliac: false,
-  isHypertensive: false
+  isHypertensive: false,
+  isLactoseIntolerant: false
 }
 
 export default function AddClient() {
@@ -179,7 +180,8 @@ export default function AddClient() {
           notes: client.medicalInfo?.notes || '',
           isDiabetic: client.medicalInfo?.isDiabetic || false,
           isCeliac: client.medicalInfo?.isCeliac || false,
-          isHypertensive: client.medicalInfo?.isHypertensive || false
+          isHypertensive: client.medicalInfo?.isHypertensive || false,
+          isLactoseIntolerant: client.medicalInfo?.isLactoseIntolerant || false
         })
 
         const invoices = await getClientInvoices(id).catch(() => [])
@@ -341,7 +343,8 @@ export default function AddClient() {
           notes: formData.notes,
           isDiabetic: formData.isDiabetic,
           isCeliac: formData.isCeliac,
-          isHypertensive: formData.isHypertensive
+          isHypertensive: formData.isHypertensive,
+          isLactoseIntolerant: formData.isLactoseIntolerant
         }
       }
       
@@ -834,6 +837,11 @@ export default function AddClient() {
                     label="Hipertenso"
                     checked={formData.isHypertensive}
                     onChange={(e) => updateField('isHypertensive', e.target.checked)}
+                  />
+                  <Checkbox
+                    label="Intolerante a la lactosa"
+                    checked={formData.isLactoseIntolerant}
+                    onChange={(e) => updateField('isLactoseIntolerant', e.target.checked)}
                   />
                 </div>
               </div>

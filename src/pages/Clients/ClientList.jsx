@@ -39,7 +39,8 @@ const SCHEDULE_CONFIG = {
 const MEDICAL_FLAGS = [
   { key: 'isDiabetic', label: 'Diabético', initial: 'D', color: '#3b82f6' },
   { key: 'isCeliac', label: 'Celíaco', initial: 'C', color: '#f59e0b' },
-  { key: 'isHypertensive', label: 'Hipertenso', initial: 'H', color: '#ef4444' }
+  { key: 'isHypertensive', label: 'Hipertenso', initial: 'H', color: '#ef4444' },
+  { key: 'isLactoseIntolerant', label: 'Intolerante a la lactosa', initial: 'L', color: '#8b5cf6' }
 ]
 
 // Configuración de filtros
