@@ -5,7 +5,6 @@ export const IVA_MINIMA = 2   // 10% — transporte
 
 const DOC_TYPE_MAP: Record<string, number> = { rut: 2, ci: 3, otro: 4, pasaporte: 5, dni: 6 }
 const SCHEDULE_LABEL: Record<string, string> = { morning: 'Mañana', afternoon: 'Tarde', full_day: 'Día completo' }
-const MONTH_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
 
 export interface BillerClient {
   id: string; first_name: string; last_name: string; email: string | null
@@ -13,6 +12,17 @@ export interface BillerClient {
 }
 export interface PlanInfo { frequency: number; schedule: string; distance_range: string | null }
 export interface Billing { hasTransport: boolean; attendanceChargeableGross: number; transportChargeableGross: number; totalChargeableGross: number }
+
+// Valores editables que la persona confirma en el modal. El IVA y los códigos NO se overridean acá.
+export interface Overrides {
+  attendanceConcepto?: string
+  attendanceAmount?: number
+  transportConcepto?: string
+  transportAmount?: number
+  adenda?: string
+  fechaEmision?: string
+  fechaVencimiento?: string
+}
 
 export function buildClientePayload(client: BillerClient) {
   const fullName = `${client.first_name} ${client.last_name}`.trim().slice(0, 30)
@@ -61,29 +71,38 @@ export interface Comprobante {
   emails_notificacion: string[]
   items: ComprobanteItem[]
   sucursal?: number
+  adenda?: string
+  fecha_emision?: string
+  fecha_vencimiento?: string
 }
 
 export function buildComprobante(
-  { client, plan, billing, year, month, emisorSucursal }:
-  { client: BillerClient; plan: PlanInfo; billing: Billing; year: number; month: number; emisorSucursal?: number }
+  { client, plan, billing, year, month, emisorSucursal, overrides }:
+  { client: BillerClient; plan: PlanInfo; billing: Billing; year: number; month: number; emisorSucursal?: number; overrides?: Overrides }
 ): Comprobante {
-  const monthLabel = `${MONTH_ES[month]} ${year}`
+  const o = overrides ?? {}
+
+  const attConcepto = o.attendanceConcepto ?? `Plan ${plan.frequency} días x semana – ${SCHEDULE_LABEL[plan.schedule] ?? plan.schedule}`
+  const attPrecio = o.attendanceAmount ?? billing.attendanceChargeableGross
   const items: ComprobanteItem[] = [{
     codigo: `PLAN-${plan.frequency}-${plan.schedule.toUpperCase()}`,
     cantidad: 1,
-    concepto: `Plan ${plan.frequency}x ${SCHEDULE_LABEL[plan.schedule] ?? plan.schedule} - ${monthLabel}`,
-    precio: billing.attendanceChargeableGross,
+    concepto: attConcepto,
+    precio: attPrecio,
     indicador_facturacion: IVA_BASICA,
   }]
-  if (billing.hasTransport && billing.transportChargeableGross > 0) {
+
+  const transPrecio = o.transportAmount ?? billing.transportChargeableGross
+  if (billing.hasTransport && transPrecio > 0) {
     items.push({
       codigo: `TRANS-${plan.distance_range ?? 'NA'}-${plan.frequency}`,
       cantidad: 1,
-      concepto: `Transporte - ${monthLabel}`,
-      precio: billing.transportChargeableGross,
+      concepto: o.transportConcepto ?? 'Transporte',
+      precio: transPrecio,
       indicador_facturacion: IVA_MINIMA,
     })
   }
+
   const cliente = buildClientePayload(client)
   const comprobante: Comprobante = {
     tipo_comprobante: TIPO_ETICKET,
@@ -96,5 +115,8 @@ export function buildComprobante(
     items,
   }
   if (emisorSucursal) comprobante.sucursal = emisorSucursal
+  if (o.adenda) comprobante.adenda = o.adenda
+  if (o.fechaEmision) comprobante.fecha_emision = o.fechaEmision
+  if (o.fechaVencimiento) comprobante.fecha_vencimiento = o.fechaVencimiento
   return comprobante
 }

@@ -29,6 +29,11 @@ Deno.test('e-Ticket CI: una sola línea de asistencia con IVA 22%', () => {
   assert(c.cliente.sucursal.emails.includes('ana@example.com'))
 })
 
+Deno.test('default de concepto: "Plan N días x semana – turno"', () => {
+  const c = buildComprobante({ client: baseClient, plan, billing: billingNoTransport, year: 2026, month: 5 })
+  assertEquals(c.items[0].concepto, 'Plan 3 días x semana – Tarde')
+})
+
 Deno.test('con transporte: agrega línea TRANS con IVA 10%', () => {
   const billing = { hasTransport: true, attendanceChargeableGross: 9000, transportChargeableGross: 1500, totalChargeableGross: 10500 }
   const c = buildComprobante({ client: baseClient, plan: { frequency: 3, schedule: 'afternoon', distance_range: '2_to_5km' }, billing, year: 2026, month: 0 })
@@ -36,9 +41,41 @@ Deno.test('con transporte: agrega línea TRANS con IVA 10%', () => {
   assertEquals(c.items[1].codigo, 'TRANS-2_to_5km-3')
   assertEquals(c.items[1].precio, 1500)
   assertEquals(c.items[1].indicador_facturacion, 2)
+  assertEquals(c.items[1].concepto, 'Transporte')
 })
 
 Deno.test('sin email: no rompe y emails queda vacío', () => {
   const c = buildComprobante({ client: { ...baseClient, email: null }, plan, billing: billingNoTransport, year: 2026, month: 5 })
   assertEquals(c.cliente.sucursal.emails, [])
+})
+
+Deno.test('overrides: concepto/monto/adenda/fechas se aplican; IVA y código quedan fijos', () => {
+  const c = buildComprobante({
+    client: baseClient, plan, billing: billingNoTransport, year: 2026, month: 5,
+    overrides: {
+      attendanceConcepto: 'Mensualidad junio',
+      attendanceAmount: 12345,
+      adenda: 'Días no facturados: 03/06',
+      fechaEmision: '2026-06-30',
+      fechaVencimiento: '2026-07-10',
+    },
+  })
+  assertEquals(c.items[0].concepto, 'Mensualidad junio')
+  assertEquals(c.items[0].precio, 12345)
+  assertEquals(c.items[0].indicador_facturacion, 3)   // IVA no overrideable
+  assertEquals(c.items[0].codigo, 'PLAN-3-AFTERNOON')  // código no overrideable
+  assertEquals(c.adenda, 'Días no facturados: 03/06')
+  assertEquals(c.fecha_emision, '2026-06-30')
+  assertEquals(c.fecha_vencimiento, '2026-07-10')
+})
+
+Deno.test('override de monto de transporte', () => {
+  const billing = { hasTransport: true, attendanceChargeableGross: 9000, transportChargeableGross: 1500, totalChargeableGross: 10500 }
+  const c = buildComprobante({
+    client: baseClient, plan: { frequency: 3, schedule: 'afternoon', distance_range: '2_to_5km' }, billing, year: 2026, month: 0,
+    overrides: { transportConcepto: 'Traslados', transportAmount: 2000 },
+  })
+  assertEquals(c.items[1].concepto, 'Traslados')
+  assertEquals(c.items[1].precio, 2000)
+  assertEquals(c.items[1].indicador_facturacion, 2)
 })

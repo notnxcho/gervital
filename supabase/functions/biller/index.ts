@@ -73,17 +73,36 @@ Deno.serve(async (req) => {
       const plan = await resolvePlan(admin, clientId, year, month)
       if (!plan) return json({ error: 'Plan no encontrado' }, 422)
 
+      // Montos finales: override del modal si vino, si no el cálculo del server.
+      const attGross = body.attendanceAmount != null ? Number(body.attendanceAmount) : Number(billing.attendanceChargeableGross)
+      const transGross = billing.hasTransport
+        ? (body.transportAmount != null ? Number(body.transportAmount) : Number(billing.transportChargeableGross))
+        : 0
+      const totalGross = attGross + transGross
+      if (totalGross <= 0) return json({ error: 'Monto a facturar es 0' }, 422)
+      const attNet = Math.round(attGross / 1.22)
+      const transNet = transGross > 0 ? Math.round(transGross / 1.10) : 0
+
       const comprobante = buildComprobante({
         client: { ...client, street: client.client_addresses?.[0]?.street ?? null },
         plan: { frequency: plan.frequency, schedule: plan.schedule, distance_range: plan.distance_range },
         billing: {
           hasTransport: billing.hasTransport,
-          attendanceChargeableGross: Number(billing.attendanceChargeableGross),
-          transportChargeableGross: Number(billing.transportChargeableGross),
-          totalChargeableGross: Number(billing.totalChargeableGross),
+          attendanceChargeableGross: attGross,
+          transportChargeableGross: transGross,
+          totalChargeableGross: totalGross,
         },
         year, month,
         emisorSucursal: BILLER_SUCURSAL ? Number(BILLER_SUCURSAL) : undefined,
+        overrides: {
+          attendanceConcepto: body.attendanceConcepto,
+          attendanceAmount: body.attendanceAmount != null ? attGross : undefined,
+          transportConcepto: body.transportConcepto,
+          transportAmount: body.transportAmount != null ? transGross : undefined,
+          adenda: body.adenda,
+          fechaEmision: body.fechaEmision,
+          fechaVencimiento: body.fechaVencimiento,
+        },
       })
 
       const resp = await fetch(`${BILLER_BASE_URL}/comprobantes/crear`, {
@@ -99,19 +118,19 @@ Deno.serve(async (req) => {
       await admin.rpc('mark_invoice_emitted', {
         p_client_id: clientId, p_year: year, p_month: month,
         p_biller_id: parsed.id ?? null, p_serie: parsed.serie ?? '', p_numero: parsed.numero ?? '', p_hash: parsed.hash ?? null,
-        // Snapshot de montos/días al momento de emitir (para reporting del dashboard).
-        p_chargeable_amount: Number(billing.totalChargeableGross) || 0,
+        // Snapshot de lo REALMENTE facturado (override del modal o cálculo del server).
+        p_chargeable_amount: totalGross,
         p_monthly_rate: Number(billing.monthlyRate) || 0,
         p_planned_days: billing.plannedDays ?? null,
         p_chargeable_days: billing.chargeableDays ?? null,
         p_att_rate_net: Number(billing.attendanceMonthlyRateNet) || 0,
         p_att_rate_gross: Number(billing.attendanceMonthlyRateGross) || 0,
-        p_att_charge_net: Number(billing.attendanceChargeableNet) || 0,
-        p_att_charge_gross: Number(billing.attendanceChargeableGross) || 0,
+        p_att_charge_net: attNet,
+        p_att_charge_gross: attGross,
         p_trans_rate_net: Number(billing.transportMonthlyRateNet) || 0,
         p_trans_rate_gross: Number(billing.transportMonthlyRateGross) || 0,
-        p_trans_charge_net: Number(billing.transportChargeableNet) || 0,
-        p_trans_charge_gross: Number(billing.transportChargeableGross) || 0,
+        p_trans_charge_net: transNet,
+        p_trans_charge_gross: transGross,
       })
       return json({ ok: true, serie: parsed.serie, numero: parsed.numero, id: parsed.id })
     }
@@ -183,6 +202,19 @@ Deno.serve(async (req) => {
       if (!resp.ok) return json({ error: `Biller HTTP ${resp.status}`, detail: raw.slice(0, 300) }, 502)
       await admin.rpc('mark_invoice_voided', { p_client_id: clientId, p_year: year, p_month: month })
       return json({ ok: true })
+    }
+
+    if (action === 'get_invoice_pdf') {
+      if (!isBilling) return json({ error: 'No autorizado' }, 403)
+      const { clientId, year, month } = body
+      const { data: inv } = await admin.from('monthly_invoices')
+        .select('biller_id').eq('client_id', clientId).eq('year', year).eq('month', month).maybeSingle()
+      if (!inv?.biller_id) return json({ error: 'Factura no emitida' }, 422)
+      const resp = await fetch(`${BILLER_BASE_URL}/comprobantes/pdf?id=${inv.biller_id}`, { headers: billerHeaders() })
+      const raw = await resp.text()
+      if (!resp.ok) return json({ error: `Biller HTTP ${resp.status}`, detail: raw.slice(0, 300) }, 502)
+      // Biller devuelve el PDF en base64 en el body.
+      return json({ ok: true, pdf: raw.trim() })
     }
 
     return json({ error: 'Acción inválida' }, 400)
