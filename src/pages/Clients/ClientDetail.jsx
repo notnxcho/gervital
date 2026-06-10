@@ -16,6 +16,7 @@ import {
   calculateMonthBilling,
   markMonthPaid,
   markMonthInvoiced,
+  emitInvoice,
   unmarkMonthPaid,
   markDayAbsent,
   unmarkDayAbsent,
@@ -666,6 +667,8 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [paymentDropOpen, setPaymentDropOpen] = useState(false)
   const [invoiceDropOpen, setInvoiceDropOpen] = useState(false)
+  const [emitting, setEmitting] = useState(false)
+  const [emitErr, setEmitErr] = useState(null)
   const paymentDropRef = useRef(null)
   const invoiceDropRef = useRef(null)
   const isDeactivated = !!client.deletedAt
@@ -807,6 +810,22 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     await withProcessing(() => unmarkMonthPaid(client.id, year, month))
   }
 
+  const handleEmitInvoice = async () => {
+    setInvoiceDropOpen(false)
+    setEmitErr(null)
+    setEmitting(true)
+    try {
+      const res = await emitInvoice(client.id, year, month)
+      await onRefresh()
+      window.alert(`e-Ticket emitido: ${res.serie}-${res.numero}`)
+    } catch (err) {
+      setEmitErr(err.message)
+      window.alert(`Error al emitir: ${err.message}`)
+    } finally {
+      setEmitting(false)
+    }
+  }
+
   return (
     <>
       <Card className="flex-shrink-0 w-80 snap-center">
@@ -901,12 +920,26 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
                       )}
                     </>
                   ) : (
-                    <button
-                      onClick={() => { setInvoiceDropOpen(false); setModal('invoice') }}
-                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      Marcar como facturado
-                    </button>
+                    <>
+                      {(emitErr || invoice?.emitError) && (
+                        <div className="px-3 py-2 text-xs text-red-600 border-b border-gray-100">
+                          {emitErr || invoice.emitError}
+                        </div>
+                      )}
+                      <button
+                        onClick={handleEmitInvoice}
+                        disabled={emitting}
+                        className="w-full px-3 py-2 text-left text-sm text-indigo-700 font-medium hover:bg-indigo-50 disabled:opacity-50"
+                      >
+                        {emitting ? 'Emitiendo…' : 'Emitir e-Ticket'}
+                      </button>
+                      <button
+                        onClick={() => { setInvoiceDropOpen(false); setModal('invoice') }}
+                        className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
+                      >
+                        Marcar como facturado manualmente
+                      </button>
+                    </>
                   )}
                 </div>
               )}
