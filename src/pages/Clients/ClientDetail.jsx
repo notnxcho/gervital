@@ -132,6 +132,7 @@ export default function ClientDetail() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [recoveryCredits, setRecoveryCredits] = useState([])
   const [recoveryModalOpen, setRecoveryModalOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
 
   const optionsMenuRef = useRef(null)
   const avatarInputRef = useRef(null)
@@ -349,6 +350,29 @@ export default function ClientDetail() {
           <p className="text-sm text-gray-500">
             Cliente desde {format(new Date(client.startDate), "d 'de' MMMM, yyyy", { locale: es })}
           </p>
+          {/* Biller receptor sync status */}
+          <div className="mt-1">
+            {client.billerClientId ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                Biller ✓
+              </span>
+            ) : (
+              <button
+                onClick={async () => {
+                  if (client.deletedAt) return
+                  setSyncing(true)
+                  try { await syncClientToBiller(client.id); await loadClientData() }
+                  catch (e) { window.alert(`No se pudo sincronizar con Biller: ${e.message}`) }
+                  finally { setSyncing(false) }
+                }}
+                disabled={syncing || !!client.deletedAt}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
+                title={client.billerSyncError || 'Sin sincronizar en Biller'}
+              >
+                {syncing ? 'Sincronizando…' : 'Sincronizar Biller'}
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {!client.deletedAt && (
@@ -668,7 +692,6 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [paymentDropOpen, setPaymentDropOpen] = useState(false)
   const [emitModalOpen, setEmitModalOpen] = useState(false)
-  const [syncing, setSyncing] = useState(false)
   const paymentDropRef = useRef(null)
   const isDeactivated = !!client.deletedAt
 
@@ -823,30 +846,6 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
             {format(new Date(year, month, 1), 'MMMM yyyy', { locale: es })}
             {isProrated && <span className="ml-2 text-xs font-normal text-blue-600">(prorrateado)</span>}
           </h3>
-
-          {/* Biller receptor sync status */}
-          <div className="flex">
-            {client.billerClientId ? (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                Biller ✓
-              </span>
-            ) : (
-              <button
-                onClick={async () => {
-                  if (isDeactivated) return
-                  setSyncing(true)
-                  try { await syncClientToBiller(client.id); await onRefresh() }
-                  catch (e) { window.alert(`No se pudo sincronizar con Biller: ${e.message}`) }
-                  finally { setSyncing(false) }
-                }}
-                disabled={syncing || isDeactivated}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
-                title={client.billerSyncError || 'Sin sincronizar en Biller'}
-              >
-                {syncing ? 'Sincronizando…' : 'Sincronizar Biller'}
-              </button>
-            )}
-          </div>
 
           {/* Payment + Invoice badges */}
           {canViewBilling && (
