@@ -23,13 +23,18 @@ import {
   updateSupplier,
   updateExpense,
   SUPPLIER_CATEGORIES,
-  getSalaries,
-  createSalary,
-  deactivateSalary,
-  deleteSalary,
-  SALARY_ONE_TIME_TYPES,
-  salaryOneTimeLabel
+  getEmployees,
+  getStandaloneExtraCosts,
+  createEmployee,
+  deleteEmployee,
+  addSalaryAdjustment,
+  deleteSalaryAdjustment,
+  addExtraCost,
+  deleteExtraCost,
+  EXTRA_COST_TYPES,
+  extraCostLabel
 } from '../../services/api'
+import { currentSalary, costoAnualMensualizado, aguinaldoAnual, salarioVacacionalAnual, extraordinarios12m } from '../../services/salaries/salaryCalc'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Modal from '../../components/ui/Modal'
@@ -39,7 +44,8 @@ export default function SupplierList() {
   const { hasAccess } = useAuth()
   const [suppliers, setSuppliers] = useState([])
   const [expenses, setExpenses] = useState([])
-  const [salaries, setSalaries] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [standaloneCosts, setStandaloneCosts] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date())
 
@@ -47,7 +53,9 @@ export default function SupplierList() {
   const [supplierModal, setSupplierModal] = useState({ open: false, supplier: null })
   const [expenseModal, setExpenseModal] = useState({ open: false, expense: null })
   const [deleteModal, setDeleteModal] = useState({ open: false, type: null, item: null })
-  const [salaryModal, setSalaryModal] = useState({ open: false, kind: 'recurring' })
+  const [employeeModal, setEmployeeModal] = useState({ open: false, employee: null })
+  const [addEmployeeOpen, setAddEmployeeOpen] = useState(false)
+  const [standaloneModalOpen, setStandaloneModalOpen] = useState(false)
   
   const year = selectedDate.getFullYear()
   const month = selectedDate.getMonth()
@@ -67,8 +75,12 @@ export default function SupplierList() {
       setSuppliers(suppliersData)
       setExpenses(expensesData)
       if (hasAccess('salaries')) {
-        const salariesData = await getSalaries()
-        setSalaries(salariesData)
+        const [employeesData, standaloneData] = await Promise.all([
+          getEmployees(),
+          getStandaloneExtraCosts()
+        ])
+        setEmployees(employeesData)
+        setStandaloneCosts(standaloneData)
       }
     } catch (error) {
       console.error('Error cargando datos:', error)
@@ -128,21 +140,23 @@ export default function SupplierList() {
     }
   }
 
-  const handleDeactivateSalary = async (id) => {
+  const handleDeleteEmployee = async (id) => {
+    if (!window.confirm('¿Eliminar empleado y toda su historia de sueldos? Esta acción no se puede deshacer.')) return
     try {
-      await deactivateSalary(id)
-      loadData()
-    } catch (error) {
-      console.error('Error dando de baja sueldo:', error)
+      await deleteEmployee(id)
+      setEmployeeModal({ open: false, employee: null })
+      await loadData()
+    } catch (e) {
+      alert('Error al eliminar: ' + e.message)
     }
   }
 
-  const handleDeleteSalary = async (id) => {
+  const handleDeleteStandalone = async (id) => {
     try {
-      await deleteSalary(id)
-      loadData()
-    } catch (error) {
-      console.error('Error eliminando sueldo:', error)
+      await deleteExtraCost(id)
+      await loadData()
+    } catch (e) {
+      alert('Error al eliminar: ' + e.message)
     }
   }
 
@@ -330,105 +344,84 @@ export default function SupplierList() {
         </div>
       </div>
 
-      {/* Sueldos (solo superadmin) */}
+      {/* Sueldos / Empleados (solo superadmin) */}
       {hasAccess('salaries') && (
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Sueldos</h3>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => setSalaryModal({ open: true, kind: 'recurring' })}
-              >
-                <Plus className="w-4 h-4" />
-                Costo recurrente
-              </Button>
-              <Button
-                onClick={() => setSalaryModal({ open: true, kind: 'one_time' })}
-                className="bg-purple-600 hover:bg-purple-700"
-              >
-                <Plus className="w-4 h-4" />
-                Costo puntual
-              </Button>
-            </div>
+            <Button onClick={() => setAddEmployeeOpen(true)}>
+              <Plus className="w-4 h-4" />
+              Empleado
+            </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recurrentes activos */}
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">Recurrentes mensuales</h4>
-              {salaries.filter(s => s.kind === 'recurring' && s.active).length === 0 ? (
-                <Card className="p-6 text-center"><p className="text-gray-500">Sin costos recurrentes</p></Card>
-              ) : (
-                <div className="space-y-3">
-                  {salaries.filter(s => s.kind === 'recurring' && s.active).map(s => (
-                    <Card key={s.id} className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h5 className="font-medium text-gray-900">{s.concept || 'Sin concepto'}</h5>
-                          {s.description && <p className="text-xs text-gray-400 mt-1">{s.description}</p>}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-semibold text-gray-900">${s.amount.toLocaleString('es-AR')}</p>
-                        </div>
+          {employees.length === 0 ? (
+            <Card className="p-6 text-center"><p className="text-gray-500">Sin empleados</p></Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {employees.map(emp => {
+                const cur = currentSalary(emp.adjustments)
+                const mensualizado = cur
+                  ? costoAnualMensualizado({ nominal: cur.nominal, liquido: cur.liquido, extraCosts: emp.extraCosts })
+                  : 0
+                return (
+                  <Card
+                    key={emp.id}
+                    className={`p-4 cursor-pointer hover:shadow-md transition-shadow ${!emp.active ? 'opacity-60' : ''}`}
+                    onClick={() => setEmployeeModal({ open: true, employee: emp })}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h5 className="font-medium text-gray-900">{emp.name}</h5>
+                        {emp.role && <p className="text-xs text-gray-500">{emp.role}</p>}
                       </div>
-                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100 justify-end">
-                        <button
-                          onClick={() => handleDeactivateSalary(s.id)}
-                          className="px-3 py-1.5 text-xs text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
-                        >
-                          Dar de baja
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSalary(s.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
+                      {!emp.active && <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded">Baja</span>}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-xs text-gray-500">Costo anual mensualizado</p>
+                      <p className="text-lg font-semibold text-gray-900">${Math.round(mensualizado).toLocaleString('es-AR')}</p>
+                      {cur && <p className="text-xs text-gray-400 mt-0.5">Nominal: ${cur.nominal.toLocaleString('es-AR')}</p>}
+                    </div>
+                  </Card>
+                )
+              })}
             </div>
+          )}
 
-            {/* Puntuales */}
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">Puntuales</h4>
-              {salaries.filter(s => s.kind === 'one_time').length === 0 ? (
-                <Card className="p-6 text-center"><p className="text-gray-500">Sin costos puntuales</p></Card>
-              ) : (
-                <div className="space-y-3">
-                  {salaries.filter(s => s.kind === 'one_time').map(s => (
-                    <Card key={s.id} className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h5 className="font-medium text-gray-900">{salaryOneTimeLabel(s.oneTimeType)}</h5>
-                            {s.concept && <span className="text-xs text-gray-500">· {s.concept}</span>}
-                          </div>
-                          {s.description && <p className="text-xs text-gray-400 mt-1">{s.description}</p>}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-semibold text-gray-900">${s.amount.toLocaleString('es-AR')}</p>
-                          {s.date && (
-                            <p className="text-xs text-gray-400">{format(new Date(s.date), 'd MMM yyyy', { locale: es })}</p>
-                          )}
-                        </div>
+          {/* Extraordinarios sin empleado */}
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-gray-700">Extraordinarios sin empleado</h4>
+              <Button variant="secondary" onClick={() => setStandaloneModalOpen(true)}>
+                <Plus className="w-4 h-4" />
+                Agregar
+              </Button>
+            </div>
+            {standaloneCosts.length === 0 ? (
+              <Card className="p-6 text-center"><p className="text-gray-500">Sin gastos extraordinarios</p></Card>
+            ) : (
+              <div className="space-y-3">
+                {standaloneCosts.map(c => (
+                  <Card key={c.id} className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h5 className="font-medium text-gray-900">{c.concept || 'Sin concepto'}</h5>
+                        <p className="text-xs text-gray-400 mt-1">{format(new Date(c.date), 'd MMM yyyy', { locale: es })}</p>
                       </div>
-                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100 justify-end">
+                      <div className="flex items-center gap-3">
+                        <p className="text-lg font-semibold text-gray-900">${c.amount.toLocaleString('es-AR')}</p>
                         <button
-                          onClick={() => handleDeleteSalary(s.id)}
+                          onClick={() => handleDeleteStandalone(c.id)}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         >
                           <Trash className="w-4 h-4" />
                         </button>
                       </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -452,11 +445,26 @@ export default function SupplierList() {
         onSave={loadData}
       />
 
-      {/* Salary Modal */}
-      <SalaryModal
-        isOpen={salaryModal.open}
-        kind={salaryModal.kind}
-        onClose={() => setSalaryModal({ open: false, kind: 'recurring' })}
+      {/* Employee ficha modal */}
+      <EmployeeFichaModal
+        isOpen={employeeModal.open}
+        employee={employeeModal.employee}
+        onClose={() => setEmployeeModal({ open: false, employee: null })}
+        onChanged={loadData}
+        onDelete={handleDeleteEmployee}
+      />
+
+      {/* Add employee modal */}
+      <AddEmployeeModal
+        isOpen={addEmployeeOpen}
+        onClose={() => setAddEmployeeOpen(false)}
+        onSave={loadData}
+      />
+
+      {/* Standalone extra cost modal */}
+      <StandaloneCostModal
+        isOpen={standaloneModalOpen}
+        onClose={() => setStandaloneModalOpen(false)}
         onSave={loadData}
       />
 
@@ -684,107 +692,303 @@ function SupplierModal({ isOpen, onClose, supplier, onSave }) {
   )
 }
 
-// Modal de sueldo (recurrente o puntual)
-function SalaryModal({ isOpen, kind, onClose, onSave }) {
-  const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({
-    oneTimeType: 'aguinaldo',
-    concept: '',
-    description: '',
-    amount: '',
-    date: ''
-  })
+function AddEmployeeModal({ isOpen, onClose, onSave }) {
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const [form, setForm] = useState({ name: '', role: '', nominal: '', liquido: '', semesterAdjustmentPct: '3.5', effectiveDate: today })
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    setForm({ oneTimeType: 'aguinaldo', concept: '', description: '', amount: '', date: '' })
-  }, [isOpen, kind])
+    if (isOpen) setForm({ name: '', role: '', nominal: '', liquido: '', semesterAdjustmentPct: '3.5', effectiveDate: today })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
+    setSaving(true)
     try {
-      await createSalary({
-        kind,
-        oneTimeType: form.oneTimeType,
-        concept: form.concept,
-        description: form.description,
-        amount: parseFloat(form.amount),
-        date: form.date
+      await createEmployee({
+        name: form.name,
+        role: form.role,
+        semesterAdjustmentPct: Number(form.semesterAdjustmentPct) || 3.5,
+        nominal: Number(form.nominal),
+        liquido: Number(form.liquido),
+        effectiveDate: form.effectiveDate
       })
       onSave()
       onClose()
-    } catch (error) {
-      console.error('Error guardando sueldo:', error)
+    } catch (err) {
+      alert('Error al crear empleado: ' + err.message)
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={kind === 'recurring' ? 'Nuevo costo recurrente' : 'Nuevo costo puntual'}
-    >
+    <Modal isOpen={isOpen} onClose={onClose} title="Nuevo empleado">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {kind === 'one_time' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-            <select
-              value={form.oneTimeType}
-              onChange={(e) => setForm({ ...form, oneTimeType: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              required
-            >
-              {SALARY_ONE_TIME_TYPES.map(t => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <Input
-          label="Concepto"
-          value={form.concept}
-          onChange={(e) => setForm({ ...form, concept: e.target.value })}
-          placeholder={kind === 'recurring' ? 'Ej: Sueldo coordinador' : 'Ej: Juan Pérez'}
-        />
-
+        <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+        <Input label="Rol" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder="Ej: Coordinadora" />
         <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="Monto"
-            type="number"
-            value={form.amount}
-            onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            placeholder="0"
-            required
-          />
-          {kind === 'one_time' && (
-            <Input
-              label="Fecha"
-              type="date"
-              value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
-            />
-          )}
+          <Input label="Sueldo nominal" type="number" value={form.nominal} onChange={(e) => setForm({ ...form, nominal: e.target.value })} required />
+          <Input label="Sueldo líquido" type="number" value={form.liquido} onChange={(e) => setForm({ ...form, liquido: e.target.value })} required />
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            rows={2}
-            placeholder="Detalles adicionales..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Ajuste semestral (%)" type="number" step="0.1" value={form.semesterAdjustmentPct} onChange={(e) => setForm({ ...form, semesterAdjustmentPct: e.target.value })} />
+          <Input label="Vigente desde" type="date" value={form.effectiveDate} onChange={(e) => setForm({ ...form, effectiveDate: e.target.value })} required />
         </div>
-
-        <div className="flex gap-3 justify-end pt-4">
+        <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" loading={loading}>Guardar</Button>
+          <Button type="submit" disabled={saving}>{saving ? 'Guardando...' : 'Crear'}</Button>
         </div>
       </form>
+    </Modal>
+  )
+}
+
+function StandaloneCostModal({ isOpen, onClose, onSave }) {
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const [form, setForm] = useState({ concept: '', amount: '', date: today })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) setForm({ concept: '', amount: '', date: today })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await addExtraCost({ employeeId: null, concept: form.concept, amount: Number(form.amount), date: form.date })
+      onSave()
+      onClose()
+    } catch (err) {
+      alert('Error al guardar: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Gasto extraordinario (sin empleado)">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input label="Concepto" value={form.concept} onChange={(e) => setForm({ ...form, concept: e.target.value })} placeholder="Ej: Consultoría" required />
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Monto" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+          <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" disabled={saving}>{saving ? 'Guardando...' : 'Agregar'}</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) {
+  const [adjForm, setAdjForm] = useState(null)
+  const [extraForm, setExtraForm] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  if (!employee) return null
+
+  const cur = currentSalary(employee.adjustments)
+  const nominal = cur ? cur.nominal : 0
+  const liquido = cur ? cur.liquido : 0
+  const ag = aguinaldoAnual(nominal)
+  const sv = salarioVacacionalAnual(liquido)
+  const extra12 = extraordinarios12m(employee.extraCosts)
+  const mensualizado = costoAnualMensualizado({ nominal, liquido, extraCosts: employee.extraCosts })
+
+  const today = format(new Date(), 'yyyy-MM-dd')
+
+  const submitAdjustment = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await addSalaryAdjustment(employee.id, {
+        nominal: Number(adjForm.nominal),
+        liquido: Number(adjForm.liquido),
+        effectiveDate: adjForm.effectiveDate,
+        notes: adjForm.notes
+      })
+      setAdjForm(null)
+      onChanged()
+      onClose()
+    } catch (err) {
+      alert('Error al registrar ajuste: ' + err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const submitExtra = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await addExtraCost({
+        employeeId: employee.id,
+        type: extraForm.type,
+        concept: extraForm.concept,
+        amount: Number(extraForm.amount),
+        date: extraForm.date
+      })
+      setExtraForm(null)
+      onChanged()
+      onClose()
+    } catch (err) {
+      alert('Error al guardar: ' + err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeAdjustment = async (id) => {
+    if (employee.adjustments.length <= 1) {
+      alert('No se puede borrar el único ajuste de sueldo del empleado.')
+      return
+    }
+    setBusy(true)
+    try {
+      await deleteSalaryAdjustment(id)
+      onChanged()
+      onClose()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeExtra = async (id) => {
+    setBusy(true)
+    try {
+      await deleteExtraCost(id)
+      onChanged()
+      onClose()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={employee.name}>
+      <div className="space-y-6">
+        {/* Header: costo anual mensualizado + desglose */}
+        <div className="bg-gray-50 rounded-xl p-4">
+          <p className="text-xs text-gray-500">Costo anual mensualizado (≠ nominal)</p>
+          <p className="text-2xl font-bold text-gray-900">${Math.round(mensualizado).toLocaleString('es-AR')}</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3 text-xs text-gray-600">
+            <span>Nominal: ${nominal.toLocaleString('es-AR')}</span>
+            <span>Líquido: ${liquido.toLocaleString('es-AR')}</span>
+            <span>Aguinaldo/año: ${Math.round(ag).toLocaleString('es-AR')}</span>
+            <span>Sal. vacacional/año: ${Math.round(sv).toLocaleString('es-AR')}</span>
+            <span>Extraord. 12m: ${Math.round(extra12).toLocaleString('es-AR')}</span>
+            <span>Ajuste semestral: {employee.semesterAdjustmentPct}%</span>
+          </div>
+        </div>
+
+        {/* Sueldo: historia de ajustes */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-semibold text-gray-700">Sueldo (historia)</h4>
+            <button className="text-xs text-blue-600 hover:underline" onClick={() => setAdjForm({ nominal: '', liquido: '', effectiveDate: today, notes: '' })}>
+              + Registrar ajuste
+            </button>
+          </div>
+          {adjForm && (
+            <form onSubmit={submitAdjustment} className="bg-blue-50 rounded-lg p-3 mb-3 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Nominal" type="number" value={adjForm.nominal} onChange={(e) => setAdjForm({ ...adjForm, nominal: e.target.value })} required />
+                <Input label="Líquido" type="number" value={adjForm.liquido} onChange={(e) => setAdjForm({ ...adjForm, liquido: e.target.value })} required />
+              </div>
+              <Input label="Vigente desde" type="date" value={adjForm.effectiveDate} onChange={(e) => setAdjForm({ ...adjForm, effectiveDate: e.target.value })} required />
+              <Input label="Notas" value={adjForm.notes} onChange={(e) => setAdjForm({ ...adjForm, notes: e.target.value })} />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => setAdjForm(null)}>Cancelar</Button>
+                <Button type="submit" disabled={busy}>Guardar</Button>
+              </div>
+            </form>
+          )}
+          <div className="space-y-2">
+            {employee.adjustments.map(a => (
+              <div key={a.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2">
+                <div>
+                  <span className="font-medium text-gray-900">${a.nominal.toLocaleString('es-AR')}</span>
+                  <span className="text-gray-400"> nom · ${a.liquido.toLocaleString('es-AR')} líq</span>
+                  {a.notes && <span className="text-gray-400"> · {a.notes}</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">{format(new Date(a.effectiveDate), 'd MMM yyyy', { locale: es })}</span>
+                  <button onClick={() => removeAdjustment(a.id)} className="p-1 text-gray-300 hover:text-red-600 rounded">
+                    <Trash className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Extraordinarios del empleado */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-semibold text-gray-700">Extraordinarios</h4>
+            <button className="text-xs text-blue-600 hover:underline" onClick={() => setExtraForm({ type: 'otro', concept: '', amount: '', date: today })}>
+              + Agregar
+            </button>
+          </div>
+          {extraForm && (
+            <form onSubmit={submitExtra} className="bg-purple-50 rounded-lg p-3 mb-3 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                  <select
+                    value={extraForm.type}
+                    onChange={(e) => setExtraForm({ ...extraForm, type: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    {EXTRA_COST_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <Input label="Monto" type="number" value={extraForm.amount} onChange={(e) => setExtraForm({ ...extraForm, amount: e.target.value })} required />
+              </div>
+              <Input label="Concepto" value={extraForm.concept} onChange={(e) => setExtraForm({ ...extraForm, concept: e.target.value })} />
+              <Input label="Fecha" type="date" value={extraForm.date} onChange={(e) => setExtraForm({ ...extraForm, date: e.target.value })} required />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => setExtraForm(null)}>Cancelar</Button>
+                <Button type="submit" disabled={busy}>Guardar</Button>
+              </div>
+            </form>
+          )}
+          <div className="space-y-2">
+            {employee.extraCosts.map(c => (
+              <div key={c.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2">
+                <div>
+                  <span className="font-medium text-gray-900">{extraCostLabel(c.type)}</span>
+                  {c.concept && <span className="text-gray-400"> · {c.concept}</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-900">${c.amount.toLocaleString('es-AR')}</span>
+                  <span className="text-xs text-gray-400">{format(new Date(c.date), 'd MMM yyyy', { locale: es })}</span>
+                  <button onClick={() => removeExtra(c.id)} className="p-1 text-gray-300 hover:text-red-600 rounded">
+                    <Trash className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer: eliminar empleado */}
+        <div className="flex justify-end pt-2 border-t border-gray-100">
+          <button onClick={() => onDelete(employee.id)} className="text-sm text-red-600 hover:underline">
+            Eliminar empleado
+          </button>
+        </div>
+      </div>
     </Modal>
   )
 }
