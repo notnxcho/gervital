@@ -153,6 +153,7 @@ export default function SupplierList() {
   }
 
   const handleDeleteStandalone = async (id) => {
+    if (!window.confirm('¿Eliminar este gasto extraordinario?')) return
     try {
       await deleteExtraCost(id)
       await loadData()
@@ -160,6 +161,10 @@ export default function SupplierList() {
       alert('Error al eliminar: ' + e.message)
     }
   }
+
+  const selectedEmployee = employeeModal.employee
+    ? employees.find(e => e.id === employeeModal.employee.id) || null
+    : null
 
   return (
     <div className="bg-gray-50 min-h-screen -mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8">
@@ -449,7 +454,7 @@ export default function SupplierList() {
       {/* Employee ficha modal */}
       <EmployeeFichaModal
         isOpen={employeeModal.open}
-        employee={employeeModal.employee}
+        employee={selectedEmployee}
         onClose={() => setEmployeeModal({ open: false, employee: null })}
         onChanged={loadData}
         onDelete={handleDeleteEmployee}
@@ -817,7 +822,6 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
       })
       setAdjForm(null)
       onChanged()
-      onClose()
     } catch (err) {
       alert('Error al registrar ajuste: ' + err.message)
     } finally {
@@ -836,7 +840,6 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
       })
       setEditForm(null)
       onChanged()
-      onClose()
     } catch (err) {
       alert('Error al editar: ' + err.message)
     } finally {
@@ -849,7 +852,6 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
     try {
       await updateEmployee(employee.id, { active: !employee.active })
       onChanged()
-      onClose()
     } catch (err) {
       alert('Error: ' + err.message)
     } finally {
@@ -870,7 +872,6 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
       })
       setExtraForm(null)
       onChanged()
-      onClose()
     } catch (err) {
       alert('Error al guardar: ' + err.message)
     } finally {
@@ -883,11 +884,11 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
       alert('No se puede borrar el único ajuste de sueldo del empleado.')
       return
     }
+    if (!window.confirm('¿Eliminar este ajuste de sueldo del histórico?')) return
     setBusy(true)
     try {
       await deleteSalaryAdjustment(id)
       onChanged()
-      onClose()
     } catch (err) {
       alert('Error: ' + err.message)
     } finally {
@@ -896,11 +897,11 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
   }
 
   const removeExtra = async (id) => {
+    if (!window.confirm('¿Eliminar este gasto extraordinario?')) return
     setBusy(true)
     try {
       await deleteExtraCost(id)
       onChanged()
-      onClose()
     } catch (err) {
       alert('Error: ' + err.message)
     } finally {
