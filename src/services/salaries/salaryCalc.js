@@ -12,7 +12,9 @@ export function currentSalary(adjustments) {
   if (!adjustments || adjustments.length === 0) return null
   const sorted = [...adjustments].sort((a, b) => {
     if (a.effectiveDate !== b.effectiveDate) return a.effectiveDate < b.effectiveDate ? 1 : -1
-    return (a.createdAt || '') < (b.createdAt || '') ? 1 : -1
+    const aCA = a.createdAt || '', bCA = b.createdAt || ''
+    if (aCA !== bCA) return aCA < bCA ? 1 : -1
+    return 0
   })
   const top = sorted[0]
   return { nominal: Number(top.nominal), liquido: Number(top.liquido), effectiveDate: top.effectiveDate }
@@ -43,7 +45,8 @@ export function extraordinarios12m(extraCosts, asOf) {
 }
 
 // Costo anual = nominal*12 + aguinaldo + salario vacacional + extraordinarios 12m.
-export function costoAnual({ nominal, liquido, extraCosts }, asOf) {
+export function costoAnual(args, asOf) {
+  const { nominal, liquido, extraCosts } = args || {}
   return (Number(nominal) || 0) * 12
     + aguinaldoAnual(nominal)
     + salarioVacacionalAnual(liquido)

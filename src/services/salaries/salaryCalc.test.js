@@ -87,3 +87,27 @@ describe('proyectarNominal', () => {
     expect(proyectarNominal(100000, 3.5, 0)).toBe(100000)
   })
 })
+
+describe('currentSalary tie-break determinism', () => {
+  test('returns 0-equivalent stable order when createdAt missing on both', () => {
+    const adj = [
+      { nominal: 100, liquido: 80, effectiveDate: '2026-01-01' },
+      { nominal: 200, liquido: 90, effectiveDate: '2026-01-01' }
+    ]
+    // both lack createdAt and share effectiveDate -> must not throw and must be deterministic
+    expect(currentSalary(adj)).toEqual({ nominal: 100, liquido: 80, effectiveDate: '2026-01-01' })
+  })
+})
+
+describe('costoAnual null/undefined safety', () => {
+  test('returns 0 when args is null (no current salary)', () => {
+    expect(costoAnual(null, '2026-06-11')).toBe(0)
+    expect(costoAnualMensualizado(null, '2026-06-11')).toBe(0)
+  })
+  test('returns 0 when args is undefined', () => {
+    expect(costoAnual(undefined, '2026-06-11')).toBe(0)
+  })
+  test('handles missing extraCosts key', () => {
+    expect(costoAnual({ nominal: 0, liquido: 0 }, '2026-06-11')).toBe(0)
+  })
+})
