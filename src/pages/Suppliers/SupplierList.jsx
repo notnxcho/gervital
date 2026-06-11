@@ -26,6 +26,7 @@ import {
   getEmployees,
   getStandaloneExtraCosts,
   createEmployee,
+  updateEmployee,
   deleteEmployee,
   addSalaryAdjustment,
   deleteSalaryAdjustment,
@@ -789,6 +790,7 @@ function StandaloneCostModal({ isOpen, onClose, onSave }) {
 function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) {
   const [adjForm, setAdjForm] = useState(null)
   const [extraForm, setExtraForm] = useState(null)
+  const [editForm, setEditForm] = useState(null)
   const [busy, setBusy] = useState(false)
 
   if (!employee) return null
@@ -818,6 +820,38 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
       onClose()
     } catch (err) {
       alert('Error al registrar ajuste: ' + err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const submitEdit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await updateEmployee(employee.id, {
+        name: editForm.name,
+        role: editForm.role,
+        semesterAdjustmentPct: Number(editForm.semesterAdjustmentPct) || 3.5
+      })
+      setEditForm(null)
+      onChanged()
+      onClose()
+    } catch (err) {
+      alert('Error al editar: ' + err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const toggleActive = async () => {
+    setBusy(true)
+    try {
+      await updateEmployee(employee.id, { active: !employee.active })
+      onChanged()
+      onClose()
+    } catch (err) {
+      alert('Error: ' + err.message)
     } finally {
       setBusy(false)
     }
@@ -877,6 +911,17 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={employee.name}>
       <div className="space-y-6">
+        {editForm && (
+          <form onSubmit={submitEdit} className="bg-gray-50 rounded-lg p-3 space-y-3">
+            <Input label="Nombre" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
+            <Input label="Rol" value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} placeholder="Ej: Coordinadora" />
+            <Input label="Ajuste semestral (%)" type="number" step="0.1" value={editForm.semesterAdjustmentPct} onChange={(e) => setEditForm({ ...editForm, semesterAdjustmentPct: e.target.value })} />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setEditForm(null)}>Cancelar</Button>
+              <Button type="submit" disabled={busy}>Guardar</Button>
+            </div>
+          </form>
+        )}
         {/* Header: costo anual mensualizado + desglose */}
         <div className="bg-gray-50 rounded-xl p-4">
           <p className="text-xs text-gray-500">Costo anual mensualizado (≠ nominal)</p>
@@ -982,8 +1027,19 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
           </div>
         </div>
 
-        {/* Footer: eliminar empleado */}
-        <div className="flex justify-end pt-2 border-t border-gray-100">
+        {/* Footer: acciones de ficha */}
+        <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setEditForm({ name: employee.name, role: employee.role || '', semesterAdjustmentPct: String(employee.semesterAdjustmentPct) })}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Editar
+            </button>
+            <button onClick={toggleActive} disabled={busy} className="text-sm text-amber-700 hover:underline">
+              {employee.active ? 'Dar de baja' : 'Reactivar'}
+            </button>
+          </div>
           <button onClick={() => onDelete(employee.id)} className="text-sm text-red-600 hover:underline">
             Eliminar empleado
           </button>
