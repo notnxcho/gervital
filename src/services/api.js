@@ -132,13 +132,17 @@ export {
 // SALARIES API (Sueldos)
 // ============================================
 export {
-  getSalaries,
-  createSalary,
-  updateSalary,
-  deactivateSalary,
-  deleteSalary,
-  SALARY_ONE_TIME_TYPES,
-  salaryOneTimeLabel
+  EXTRA_COST_TYPES,
+  extraCostLabel,
+  getEmployees,
+  getStandaloneExtraCosts,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+  addSalaryAdjustment,
+  deleteSalaryAdjustment,
+  addExtraCost,
+  deleteExtraCost
 } from './salaries/salaryService'
 
 // ============================================

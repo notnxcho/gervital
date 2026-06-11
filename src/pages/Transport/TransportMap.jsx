@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GoogleMap, useJsApiLoader, OverlayViewF, OverlayView } from '@react-google-maps/api'
 import { HomeAlt, Xmark } from 'iconoir-react'
-import { differenceInYears } from 'date-fns'
 import { UNASSIGNED_COLOR, CLUB_LOCATION } from '../../services/transport/transportConstants'
 import './TransportMap.css'
 
 const TIER_HEX = { A: '#34d399', B: '#38bdf8', C: '#fbbf24', D: '#fb7185' }
-
-function calculateAge(birthDate) {
-  if (!birthDate) return null
-  return differenceInYears(new Date(), new Date(birthDate))
-}
 
 const MAP_CONTAINER_STYLE = {
   width: '100%',
@@ -66,7 +60,7 @@ function MarkerAvatar({ client }) {
 }
 
 function ClientPopup({ client, color, onClose }) {
-  const age = calculateAge(client.birthDate)
+  const phone = client.phone?.trim()
   const tier = client.cognitiveLevel
   const street = client.address?.street?.trim()
 
@@ -89,8 +83,8 @@ function ClientPopup({ client, color, onClose }) {
       </div>
 
       <div className="tm-popup-rows">
-        {age != null && (
-          <div className="tm-popup-row"><span className="tm-popup-key">Edad</span>{age} años</div>
+        {phone && (
+          <div className="tm-popup-row"><span className="tm-popup-key">Cel:</span>{phone}</div>
         )}
         <div className="tm-popup-col">
           <span className="tm-popup-key">Dirección</span>
