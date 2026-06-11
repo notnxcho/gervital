@@ -1,114 +1,168 @@
 import { supabase } from '../supabase/client'
 
-// Tipos discretos para costos puntuales (one_time)
-export const SALARY_ONE_TIME_TYPES = [
-  { value: 'aguinaldo', label: 'Aguinaldo' },
+// Tipos discretos para gastos extraordinarios de empleado.
+export const EXTRA_COST_TYPES = [
   { value: 'despido', label: 'Despido' },
-  { value: 'licencia_vacacional', label: 'Licencia vacacional' },
   { value: 'liquidacion', label: 'Liquidación' },
+  { value: 'bono', label: 'Bono' },
   { value: 'otro', label: 'Otro' }
 ]
 
-const SALARY_ONE_TIME_LABELS = SALARY_ONE_TIME_TYPES.reduce((acc, t) => {
+const EXTRA_COST_LABELS = EXTRA_COST_TYPES.reduce((acc, t) => {
   acc[t.value] = t.label
   return acc
 }, {})
 
-export function salaryOneTimeLabel(type) {
-  return SALARY_ONE_TIME_LABELS[type] || type || ''
+export function extraCostLabel(type) {
+  return EXTRA_COST_LABELS[type] || type || ''
 }
 
-function mapRow(row) {
+function mapAdjustment(row) {
   return {
     id: row.id,
-    kind: row.kind,
-    oneTimeType: row.one_time_type,
+    employeeId: row.employee_id,
+    nominal: Number(row.nominal),
+    liquido: Number(row.liquido),
+    effectiveDate: row.effective_date,
+    notes: row.notes,
+    createdAt: row.created_at
+  }
+}
+
+function mapExtraCost(row) {
+  return {
+    id: row.id,
+    employeeId: row.employee_id,
+    type: row.type,
     concept: row.concept,
-    description: row.description,
     amount: Number(row.amount),
-    active: row.active,
     date: row.date,
     createdAt: row.created_at
   }
 }
 
+function mapEmployee(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    role: row.role,
+    semesterAdjustmentPct: Number(row.semester_adjustment_pct),
+    active: row.active,
+    adjustments: (row.adjustments || []).map(mapAdjustment),
+    extraCosts: (row.extra_costs || []).map(mapExtraCost),
+    createdAt: row.created_at
+  }
+}
+
 /**
- * Get all salaries (both recurring and one_time), newest first.
+ * Get all employees with nested salary history and extra costs, newest first.
  * @returns {Promise<Array>}
  */
-export async function getSalaries() {
+export async function getEmployees() {
   const { data, error } = await supabase
-    .from('salaries')
+    .from('employees_full')
     .select('*')
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(error.message)
-  return data.map(mapRow)
+  return data.map(mapEmployee)
 }
 
 /**
- * Create a salary entry.
- * @param {object} input - { kind, oneTimeType?, concept?, description?, amount, date? }
+ * Get standalone extra costs (no employee).
+ * @returns {Promise<Array>}
  */
-export async function createSalary(input) {
-  const payload = {
-    kind: input.kind,
-    one_time_type: input.kind === 'one_time' ? input.oneTimeType : null,
-    concept: input.concept || null,
-    description: input.description || null,
-    amount: input.amount,
-    date: input.kind === 'one_time' ? (input.date || null) : null,
-    active: true
-  }
+export async function getStandaloneExtraCosts() {
   const { data, error } = await supabase
-    .from('salaries')
-    .insert(payload)
-    .select()
-    .single()
+    .from('employee_extra_costs')
+    .select('*')
+    .is('employee_id', null)
+    .order('date', { ascending: false })
 
   if (error) throw new Error(error.message)
-  return mapRow(data)
+  return data.map(mapExtraCost)
 }
 
 /**
- * Update a salary entry (partial).
- * @param {string} id
- * @param {object} input
+ * Create an employee + its first salary adjustment atomically.
+ * @param {object} input - { name, role, semesterAdjustmentPct, nominal, liquido, effectiveDate, notes? }
+ * @returns {Promise<string>} new employee id
  */
-export async function updateSalary(id, input) {
+export async function createEmployee(input) {
+  const { data, error } = await supabase.rpc('create_employee_with_salary', {
+    p_name: input.name,
+    p_role: input.role || null,
+    p_semester_adjustment_pct: input.semesterAdjustmentPct ?? 3.5,
+    p_nominal: input.nominal,
+    p_liquido: input.liquido,
+    p_effective_date: input.effectiveDate,
+    p_notes: input.notes || null
+  })
+
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/**
+ * Update employee fields (name, role, %, active).
+ */
+export async function updateEmployee(id, input) {
   const payload = {}
-  if (input.concept !== undefined) payload.concept = input.concept
-  if (input.description !== undefined) payload.description = input.description
-  if (input.amount !== undefined) payload.amount = input.amount
-  if (input.oneTimeType !== undefined) payload.one_time_type = input.oneTimeType
-  if (input.date !== undefined) payload.date = input.date
+  if (input.name !== undefined) payload.name = input.name
+  if (input.role !== undefined) payload.role = input.role
+  if (input.semesterAdjustmentPct !== undefined) payload.semester_adjustment_pct = input.semesterAdjustmentPct
   if (input.active !== undefined) payload.active = input.active
   payload.updated_at = new Date().toISOString()
 
-  const { data, error } = await supabase
-    .from('salaries')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single()
-
+  const { error } = await supabase.from('employees').update(payload).eq('id', id)
   if (error) throw new Error(error.message)
-  return mapRow(data)
+}
+
+/** Delete an employee (cascade removes adjustments and extra costs). */
+export async function deleteEmployee(id) {
+  const { error } = await supabase.from('employees').delete().eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 /**
- * Deactivate a recurring salary (baja). Keeps the record for history.
- * @param {string} id
+ * Add a salary adjustment row (a real raise/change, kept in history).
+ * @param {string} employeeId
+ * @param {object} input - { nominal, liquido, effectiveDate, notes? }
  */
-export async function deactivateSalary(id) {
-  return updateSalary(id, { active: false })
+export async function addSalaryAdjustment(employeeId, input) {
+  const { error } = await supabase.from('employee_salary_adjustments').insert({
+    employee_id: employeeId,
+    nominal: input.nominal,
+    liquido: input.liquido,
+    effective_date: input.effectiveDate,
+    notes: input.notes || null
+  })
+  if (error) throw new Error(error.message)
+}
+
+/** Delete a salary adjustment (UI prevents deleting the only/first one). */
+export async function deleteSalaryAdjustment(id) {
+  const { error } = await supabase.from('employee_salary_adjustments').delete().eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 /**
- * Delete a salary entry permanently.
- * @param {string} id
+ * Add an extra cost. employeeId null => standalone (no employee, no type).
+ * @param {object} input - { employeeId?, type?, concept?, amount, date }
  */
-export async function deleteSalary(id) {
-  const { error } = await supabase.from('salaries').delete().eq('id', id)
+export async function addExtraCost(input) {
+  const { error } = await supabase.from('employee_extra_costs').insert({
+    employee_id: input.employeeId || null,
+    type: input.employeeId ? (input.type || null) : null,
+    concept: input.concept || null,
+    amount: input.amount,
+    date: input.date
+  })
+  if (error) throw new Error(error.message)
+}
+
+/** Delete an extra cost. */
+export async function deleteExtraCost(id) {
+  const { error } = await supabase.from('employee_extra_costs').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }
