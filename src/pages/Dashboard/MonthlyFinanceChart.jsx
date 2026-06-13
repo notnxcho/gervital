@@ -39,13 +39,22 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
   const opts = { basis, withIva }
   const data = useMemo(() => (series || []).slice(-range), [series, range])
 
+  const visibleIncome = row =>
+    (active.asistencia ? incomePart(row, 'asistencia', withIva, basis) : 0) +
+    (active.transporte ? incomePart(row, 'transporte', withIva, basis) : 0)
+
+  const visibleExpense = row =>
+    (active.gastos ? row.expenses : 0) +
+    (active.sueldos ? row.salaries : 0)
+
   const maxVal = useMemo(() => {
     let m = 1
     for (const row of data) {
-      m = Math.max(m, selectIncome(row, opts), selectExpensesTotal(row))
+      m = Math.max(m, visibleIncome(row), visibleExpense(row))
     }
     return m
-  }, [data, basis, withIva])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, basis, withIva, active])
 
   const H = 170 // chart body px
   const y = v => Math.max(2, (v / maxVal) * H)
@@ -144,6 +153,7 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
                     key={`${row.year}-${row.month}`}
                     onClick={() => onSelectMonth?.({ year: row.year, month: row.month })}
                     className="flex-1 flex flex-col items-center gap-1.5 group"
+                    style={type === 'lines' ? { pointerEvents: 'none' } : undefined}
                     title={`${MONTH_LABELS[row.month]} ${row.year}\nIngreso: ${formatCurrency(selectIncome(row, opts))}\nGastos: ${formatCurrency(selectExpensesTotal(row))}\nMargen: ${formatCurrency(selectMargin(row, opts))}`}
                   >
                     <div className="flex items-end gap-1" style={{ height: H }}>
