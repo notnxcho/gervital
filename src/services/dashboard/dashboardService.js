@@ -1,5 +1,7 @@
 import { supabase } from '../supabase/client'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
+import { getEmployees } from '../salaries/salaryService'
+import { mergeFinanceSeries } from './financeSeries'
 
 /**
  * Fetch all dashboard KPIs for a given month in a single parallel batch.
@@ -149,4 +151,28 @@ export async function getDashboardMetrics(year, month) {
     },
     unpaidClients
   }
+}
+
+/**
+ * Month-over-month finance series for the dashboard hero + KPIs.
+ * Inclusive range. Months are 0-indexed.
+ * @param {number} fromYear
+ * @param {number} fromMonth - 0-indexed
+ * @param {number} toYear
+ * @param {number} toMonth - 0-indexed
+ * @returns {Promise<Array>} merged month objects (see mergeFinanceSeries)
+ */
+export async function getDashboardFinanceSeries(fromYear, fromMonth, toYear, toMonth) {
+  const [seriesRes, employees] = await Promise.all([
+    supabase.rpc('get_dashboard_finance_series', {
+      p_from_year: fromYear,
+      p_from_month: fromMonth,
+      p_to_year: toYear,
+      p_to_month: toMonth
+    }),
+    getEmployees().catch(() => []) // operador lacks salary access → empty, never throws
+  ])
+
+  if (seriesRes.error) throw new Error(seriesRes.error.message)
+  return mergeFinanceSeries(seriesRes.data || [], employees)
 }
