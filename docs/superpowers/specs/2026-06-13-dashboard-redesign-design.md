@@ -21,6 +21,16 @@ Composition, top to bottom:
 
 The current dashboard is discarded entirely; this design is uninfluenced by it.
 
+### v1 scope (this build)
+**Build fully:** hero chart (§5.1) + KPI row (§5.2), with the complete data layer and
+accounting model behind them.
+
+**Placeholders only:** everything below the KPI row — facturación & cobranza (§5.3),
+turnos de hoy (§5.4), transporte de hoy (§5.5) — ships as styled placeholder cards that
+reserve the layout space. Their detailed design needs more thought from the product owner
+and will be specced in a follow-up. Sections §5.3–§5.5 below document the intended target
+so the placeholders are sized/labeled sensibly, but are **not implemented in v1**.
+
 ---
 
 ## 2. Accounting model (the foundation)
@@ -108,7 +118,7 @@ The chart series for a month = `{ attendanceNet, attendanceGross, transportNet,
 transportGross, paidNet, paidGross, expenses, salaries }`. The component the chart shows
 depends on the active toggles (basis, IVA, which series are on).
 
-### Daily summaries
+### Daily summaries (deferred — not in v1)
 - **Turnos de hoy** — `clients_full.plan` (assignedDays ∩ today's weekday, by schedule)
   for planned counts, joined with `attendance_view` for today to derive present / absent
   (justified vs unjustified) / recovery.
@@ -142,7 +152,9 @@ depends on the active toggles (basis, IVA, which series are on).
 
 Deltas computed against the prior month from the same series.
 
-### 5.3 Facturación & cobranza (main column)
+### 5.3 Facturación & cobranza (main column) — PLACEHOLDER in v1
+*Target design below; v1 renders a placeholder card in this slot.*
+
 Actionable list of the selected month's invoices (`invoices_view`).
 - Per row: avatar · nombre · chip de cobranza (Cobrada / Pendiente / Vencida) ·
   chip de factura (Facturada / Sin factura) · monto · acción.
@@ -153,12 +165,16 @@ Actionable list of the selected month's invoices (`invoices_view`).
   Biller 1 req/s rate limit and per-client readiness states: sin CI / sin plan / monto 0 / listo).
 - Sort: vencidas → pendientes → listas; footer "ver los N clientes".
 
-### 5.4 Turnos de hoy (right rail)
+### 5.4 Turnos de hoy (right rail) — PLACEHOLDER in v1
+*Target design below; v1 renders a placeholder card in this slot.*
+
 - Counts by shift: mañana / tarde / día completo.
 - Presentes / planificados, faltas (justif. vs injust.), recuperos del día.
 - Empty state when no schedule today (e.g., weekend).
 
-### 5.5 Transporte de hoy (right rail)
+### 5.5 Transporte de hoy (right rail) — PLACEHOLDER in v1
+*Target design below; v1 renders a placeholder card in this slot.*
+
 - Autos activos, viajes totales, sin asignar.
 - Per-car breakdown (color dot · nombre · viajes), matching transport module colors.
 - Links to `/transporte` for the full board.
