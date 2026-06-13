@@ -39,21 +39,16 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
   const opts = { basis, withIva }
   const data = useMemo(() => (series || []).slice(-range), [series, range])
 
-  const visibleIncome = row =>
-    (active.asistencia ? incomePart(row, 'asistencia', withIva, basis) : 0) +
-    (active.transporte ? incomePart(row, 'transporte', withIva, basis) : 0)
-
-  const visibleExpense = row =>
-    (active.gastos ? row.expenses : 0) +
-    (active.sueldos ? row.salaries : 0)
-
   const maxVal = useMemo(() => {
+    const vi = row =>
+      (active.asistencia ? incomePart(row, 'asistencia', withIva, basis) : 0) +
+      (active.transporte ? incomePart(row, 'transporte', withIva, basis) : 0)
+    const ve = row =>
+      (active.gastos ? row.expenses : 0) +
+      (active.sueldos ? row.salaries : 0)
     let m = 1
-    for (const row of data) {
-      m = Math.max(m, visibleIncome(row), visibleExpense(row))
-    }
+    for (const row of data) m = Math.max(m, vi(row), ve(row))
     return m
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, basis, withIva, active])
 
   const H = 170 // chart body px

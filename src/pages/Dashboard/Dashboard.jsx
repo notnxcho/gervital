@@ -13,15 +13,14 @@ import { getClients, calculateMonthBilling, emitInvoice } from '../../services/a
 import { useAuth } from '../../context/AuthContext'
 
 const RANGE_MONTHS = 24 // fetch a generous window; the chart slices to 6/12/24
+const TODAY = startOfMonth(new Date())
 
 export default function Dashboard() {
   const { hasAccess } = useAuth()
   const showFinancials = hasAccess('dashboard_financials')
 
-  const [selected, setSelected] = useState(() => {
-    const d = startOfMonth(new Date())
-    return { year: d.getFullYear(), month: d.getMonth() }
-  })
+  const [selected, setSelected] = useState(() => ({ year: TODAY.getFullYear(), month: TODAY.getMonth() }))
+  const [windowEnd, setWindowEnd] = useState(() => ({ year: TODAY.getFullYear(), month: TODAY.getMonth() }))
   const [series, setSeries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -38,8 +37,8 @@ export default function Dashboard() {
     if (!showFinancials) { setLoading(false); return }
     setLoading(true); setError(null)
     try {
-      const to = selected
-      const fromDate = subMonths(new Date(selected.year, selected.month, 1), RANGE_MONTHS - 1)
+      const to = windowEnd
+      const fromDate = subMonths(new Date(windowEnd.year, windowEnd.month, 1), RANGE_MONTHS - 1)
       const data = await getDashboardFinanceSeries(
         fromDate.getFullYear(), fromDate.getMonth(), to.year, to.month
       )
@@ -49,7 +48,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [selected, showFinancials])
+  }, [windowEnd, showFinancials])
 
   useEffect(() => { load() }, [load])
 
@@ -60,8 +59,19 @@ export default function Dashboard() {
 
   const currentDate = new Date(selected.year, selected.month, 1)
   const monthLabel = format(currentDate, 'MMMM yyyy', { locale: es })
-  const goBack = () => setSelected(s => { const d = subMonths(new Date(s.year, s.month, 1), 1); return { year: d.getFullYear(), month: d.getMonth() } })
-  const goNext = () => setSelected(s => { const d = addMonths(new Date(s.year, s.month, 1), 1); return { year: d.getFullYear(), month: d.getMonth() } })
+  const goBack = () => {
+    const d = subMonths(new Date(selected.year, selected.month, 1), 1)
+    const next = { year: d.getFullYear(), month: d.getMonth() }
+    setSelected(next)
+    setWindowEnd(next)
+  }
+  const goNext = () => {
+    const d = addMonths(new Date(selected.year, selected.month, 1), 1)
+    const next = { year: d.getFullYear(), month: d.getMonth() }
+    setSelected(next)
+    setWindowEnd(next)
+  }
+  const isAtOrBeyondToday = selected.year * 12 + selected.month >= TODAY.getFullYear() * 12 + TODAY.getMonth()
 
   // --- bulk emission (unchanged behavior) ---
   const openBulk = async () => {
@@ -102,7 +112,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" onClick={goBack}><NavArrowLeft className="w-4 h-4" /></Button>
           <span className="text-sm font-medium text-gray-700 capitalize w-36 text-center">{monthLabel}</span>
-          <Button variant="secondary" size="sm" onClick={goNext}><NavArrowRight className="w-4 h-4" /></Button>
+          <Button variant="secondary" size="sm" onClick={goNext} disabled={isAtOrBeyondToday}><NavArrowRight className="w-4 h-4" /></Button>
           {hasAccess('billing') && (
             <Button size="sm" onClick={openBulk} className="ml-2">Facturar el mes</Button>
           )}
