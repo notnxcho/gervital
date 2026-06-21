@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search } from 'iconoir-react'
 import { differenceInYears, format } from 'date-fns'
@@ -136,19 +136,23 @@ export default function ClientList() {
     }
   }
 
-  const filteredClients = clients.filter((client) => {
-    const fullName = `${client.firstName} ${client.lastName}`.toLowerCase()
-    const phone = client.emergencyContact?.phone?.toLowerCase() || ''
-    const address = client.address?.street?.toLowerCase() || ''
+  const filteredClients = useMemo(() => {
     const searchLower = search.toLowerCase()
-    const matchesSearch = fullName.includes(searchLower) || phone.includes(searchLower) || address.includes(searchLower)
+    return clients.filter((client) => {
+      const fullName = `${client.firstName} ${client.lastName}`.toLowerCase()
+      const phone = client.emergencyContact?.phone?.toLowerCase() || ''
+      const address = client.address?.street?.toLowerCase() || ''
+      const matchesSearch = fullName.includes(searchLower) || phone.includes(searchLower) || address.includes(searchLower)
 
-    const matchesCognitive = filters.cognitiveLevel === null || client.cognitiveLevel === filters.cognitiveLevel
-    const matchesFrequency = filters.frequency === null || client.plan.frequency === filters.frequency
-    const matchesTransport = filters.hasTransport === null || client.plan.hasTransport === filters.hasTransport
+      const matchesCognitive = filters.cognitiveLevel === null || client.cognitiveLevel === filters.cognitiveLevel
+      const matchesFrequency = filters.frequency === null || client.plan.frequency === filters.frequency
+      const matchesTransport = filters.hasTransport === null || client.plan.hasTransport === filters.hasTransport
 
-    return matchesSearch && matchesCognitive && matchesFrequency && matchesTransport
-  })
+      return matchesSearch && matchesCognitive && matchesFrequency && matchesTransport
+    })
+  }, [clients, search, filters.cognitiveLevel, filters.frequency, filters.hasTransport])
+
+  const handleView = useCallback((id) => navigate(`/clientes/${id}`), [navigate])
 
   const activeFiltersCount = getActiveFiltersCount(filters)
 
@@ -237,7 +241,7 @@ export default function ClientList() {
               <ClientCard
                 key={client.id}
                 client={client}
-                onView={() => navigate(`/clientes/${client.id}`)}
+                onView={handleView}
               />
             ))
           )}
@@ -255,7 +259,7 @@ export default function ClientList() {
   )
 }
 
-function ClientCard({ client, onView }) {
+const ClientCard = memo(function ClientCard({ client, onView }) {
   const age = calculateAge(client.birthDate)
   const isDeactivated = !!client.deletedAt
   const deactivatedLabel = isDeactivated
@@ -265,10 +269,10 @@ function ClientCard({ client, onView }) {
   const schedule = SCHEDULE_CONFIG[client.plan.schedule]
 
   return (
-    <div onClick={onView} className={`client-card${isDeactivated ? ' is-deactivated' : ''}`}>
+    <div onClick={() => onView(client.id)} className={`client-card${isDeactivated ? ' is-deactivated' : ''}`}>
       {/* Foto / iniciales */}
       {client.avatarUrl ? (
-        <img className="cc-photo" src={client.avatarUrl} alt={`${client.firstName} ${client.lastName}`} />
+        <img className="cc-photo" src={client.avatarUrl} alt={`${client.firstName} ${client.lastName}`} loading="lazy" decoding="async" />
       ) : (
         <div className="cc-initials">{client.firstName[0]}{client.lastName[0]}</div>
       )}
@@ -337,4 +341,4 @@ function ClientCard({ client, onView }) {
       </div>
     </div>
   )
-}
+})
