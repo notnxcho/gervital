@@ -22,3 +22,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .superpowers/
+
+# local scratch (client-load scripts/data, session notes — not for git)
+/.scratch/

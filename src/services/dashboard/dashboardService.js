@@ -178,40 +178,39 @@ export async function getDashboardFinanceSeries(fromYear, fromMonth, toYear, toM
 }
 
 /**
- * Per-client invoice rows for a single month, enriched with client name/avatar.
+ * Per-client collection rows for a single month, enriched with client name/avatar.
  * Feeds the dashboard collection panel (pending payments / pending invoices tabs).
+ * Amounts are LIVE plan-derived (via get_month_collection_panel → calculate_month_billing),
+ * independent of whether an invoice has been emitted. Payment/invoice status come from the
+ * monthly_invoices snapshot (default 'pending' when no row exists yet).
  * @param {number} year
  * @param {number} month - 0-indexed
  * @returns {Promise<Array>} rows: { id, firstName, lastName, avatarUrl, isDeactivated, amount, paidAmount, paymentStatus, invoiceStatus }
  */
 export async function getMonthInvoicePanel(year, month) {
-  const [invoicesRes, clientsRes] = await Promise.all([
-    supabase
-      .from('invoices_view')
-      .select('clientId, chargeableAmount, paidAmount, paymentStatus, invoiceStatus')
-      .eq('year', year)
-      .eq('month', month),
+  const [panelRes, clientsRes] = await Promise.all([
+    supabase.rpc('get_month_collection_panel', { p_year: year, p_month: month }),
     supabase
       .from('clients_full')
       .select('id, firstName, lastName, avatarUrl, deletedAt')
   ])
 
-  if (invoicesRes.error) throw new Error(invoicesRes.error.message)
+  if (panelRes.error) throw new Error(panelRes.error.message)
   if (clientsRes.error) throw new Error(clientsRes.error.message)
 
   const byId = new Map((clientsRes.data || []).map(c => [c.id, c]))
-  return (invoicesRes.data || []).map(inv => {
-    const c = byId.get(inv.clientId) || {}
+  return (panelRes.data || []).map(row => {
+    const c = byId.get(row.client_id) || {}
     return {
-      id: inv.clientId,
+      id: row.client_id,
       firstName: c.firstName || '',
       lastName: c.lastName || '',
       avatarUrl: c.avatarUrl || null,
       isDeactivated: !!c.deletedAt,
-      amount: Number(inv.chargeableAmount || 0),
-      paidAmount: Number(inv.paidAmount || 0),
-      paymentStatus: inv.paymentStatus,
-      invoiceStatus: inv.invoiceStatus
+      amount: Number(row.attendance_gross || 0) + Number(row.transport_gross || 0),
+      paidAmount: Number(row.paid_amount || 0),
+      paymentStatus: row.payment_status,
+      invoiceStatus: row.invoice_status
     }
   })
 }

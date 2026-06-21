@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency } from '../../utils/format'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Check, Plus, Trash } from 'iconoir-react'
+import { ArrowLeft, Check, Plus, Trash, Bus } from 'iconoir-react'
 import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion, syncClientToBiller } from '../../services/api'
 import { geocodeAndCalculateDistance } from '../../services/clients/geocodingService'
 import { getPlanPricing, getPlanPriceSync } from '../../services/pricing/pricingService'
@@ -12,6 +12,8 @@ import Card, { CardContent } from '../../components/ui/Card'
 import { useAuth } from '../../context/AuthContext'
 
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
+
+const DISTANCE_LABELS = { '0_to_2km': '0 a 2 km', '2_to_5km': '2 a 5 km', '5_to_10km': '5 a 10 km' }
 
 // Build month options from floorKey ('YYYY-MM') through floor + 6 months.
 function buildEffectiveMonthOptions(floorKey) {
@@ -756,13 +758,68 @@ export default function AddClient() {
                 )}
               </div>
 
-              <div>
-                <Checkbox
-                  label="Incluir transporte"
-                  checked={formData.hasTransport}
-                  onChange={(e) => updateField('hasTransport', e.target.checked)}
-                />
-              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={formData.hasTransport}
+                aria-label="Incluir transporte"
+                onClick={() => updateField('hasTransport', !formData.hasTransport)}
+                className={`w-full text-left rounded-2xl border p-4 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
+                  formData.hasTransport
+                    ? 'border-emerald-300 bg-emerald-50/60 shadow-sm'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
+                    formData.hasTransport ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'
+                  }`}>
+                    <Bus className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-900">Transporte puerta a puerta</p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      El club retira y trae al cliente. Se factura aparte, según la distancia.
+                    </p>
+                  </div>
+                  {/* toggle visual (the card itself is the switch control) */}
+                  <span className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors duration-200 ${
+                    formData.hasTransport ? 'bg-emerald-500' : 'bg-gray-300'
+                  }`}>
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                      formData.hasTransport ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </span>
+                </div>
+
+                {/* revealed context when transport is on */}
+                <div className={`grid transition-all duration-200 ${
+                  formData.hasTransport ? 'mt-3 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                }`}>
+                  <div className="overflow-hidden">
+                    <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-white/70 px-3 py-2 text-xs">
+                      {formData.distanceRange ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 flex-shrink-0 text-emerald-600" />
+                          <span className="font-medium text-emerald-800">{DISTANCE_LABELS[formData.distanceRange]}</span>
+                          {hasAccess('billing') && (
+                            <>
+                              <span className="text-gray-300">·</span>
+                              <span className="text-gray-600">
+                                {transportPrice.priceGross > 0
+                                  ? `${formatCurrency(transportPrice.priceGross)} / mes aprox.`
+                                  : 'precio no configurado'}
+                              </span>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-amber-700">Definí la distancia al club en el paso 1 para calcular el costo.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </button>
 
               {/* Price preview */}
               {hasAccess('billing') && (
