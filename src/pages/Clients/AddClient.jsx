@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { formatCurrency } from '../../utils/format'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, Plus, Trash } from 'iconoir-react'
 import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion, syncClientToBiller } from '../../services/api'
@@ -768,15 +769,15 @@ export default function AddClient() {
               <div className="bg-indigo-50 rounded-lg p-4 space-y-2">
                 <p className="text-sm text-indigo-700">Precio mensual estimado</p>
                 <p className="text-2xl font-bold text-indigo-900">
-                  ${estimatedTotalGross.toLocaleString()}
+                  {formatCurrency(estimatedTotalGross)}
                 </p>
                 <div className="text-xs text-indigo-700 space-y-0.5">
-                  <p>Mensualidad: ${planPrice.priceGross.toLocaleString()}</p>
+                  <p>Mensualidad: {formatCurrency(planPrice.priceGross)}</p>
                   {formData.hasTransport && (
                     <p>
                       Transporte:{' '}
                       {transportPrice.priceGross > 0
-                        ? `$${transportPrice.priceGross.toLocaleString()}`
+                        ? formatCurrency(transportPrice.priceGross)
                         : '— (definir distancia)'}
                     </p>
                   )}

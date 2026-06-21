@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { NavArrowRight } from 'iconoir-react'
 import Card from '../../components/ui/Card'
 import SemiCircleGauge from './SemiCircleGauge'
-import { formatCurrency, formatCompact } from '../../services/dashboard/format'
+import { formatCurrency, formatCompact } from '../../utils/format'
 
 const TABS = [
   { id: 'pagos', label: 'Pagos' },

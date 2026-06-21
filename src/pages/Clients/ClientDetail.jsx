@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { formatCurrency } from '../../utils/format'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Edit, Phone, MapPin, Calendar, MoreVert, Trash, Check, NavArrowDown, NavArrowRight } from 'iconoir-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, differenceInCalendarDays } from 'date-fns'
@@ -887,7 +888,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
                     <>
                       <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100">
                         <div>Fecha de pago: {invoice.paidDate ? format(new Date(invoice.paidDate + 'T12:00:00'), "d/M/yyyy") : format(new Date(invoice.paidAt), "d/M/yyyy")}</div>
-                        {invoice.paidAmount && <div className="font-semibold text-gray-900">${invoice.paidAmount.toLocaleString()}</div>}
+                        {invoice.paidAmount && <div className="font-semibold text-gray-900">{formatCurrency(invoice.paidAmount)}</div>}
                         {invoice.paymentMethod && <div>{invoice.paymentMethod}</div>}
                       </div>
                       <button
@@ -943,7 +944,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
             )}
             {canViewBilling && (
               <span className="ml-auto text-base font-bold text-gray-900">
-                ${displayAmount.toLocaleString()}
+                {formatCurrency(displayAmount)}
               </span>
             )}
           </div>
@@ -1187,15 +1188,15 @@ function PaymentModal({ isOpen, onClose, clientId, year, month, liveAmount, user
               <span>Días a cobrar:</span><span>{billing.chargeableDays}</span>
             </div>
             <div className="flex justify-between text-gray-700 pt-1">
-              <span>Mensualidad:</span><span>${billing.attendanceChargeableGross.toLocaleString()}</span>
+              <span>Mensualidad:</span><span>{formatCurrency(billing.attendanceChargeableGross)}</span>
             </div>
             {billing.hasTransport && (
               <div className="flex justify-between text-gray-700">
-                <span>Transporte:</span><span>${billing.transportChargeableGross.toLocaleString()}</span>
+                <span>Transporte:</span><span>{formatCurrency(billing.transportChargeableGross)}</span>
               </div>
             )}
             <div className="flex justify-between font-semibold text-gray-900 border-t border-gray-300 pt-1">
-              <span>Total a cobrar:</span><span>${billing.totalChargeableGross.toLocaleString()}</span>
+              <span>Total a cobrar:</span><span>{formatCurrency(billing.totalChargeableGross)}</span>
             </div>
           </div>
         )}

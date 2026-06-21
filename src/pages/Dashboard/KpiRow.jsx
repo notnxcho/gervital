@@ -1,5 +1,5 @@
 import Card from '../../components/ui/Card'
-import { formatCurrency, formatCompact } from '../../services/dashboard/format'
+import { formatCurrency, formatCompact } from '../../utils/format'
 
 // Directional pill from a currency delta. `invert` flips the color semantics
 // (used for Gastos, where a rise is bad). Shows % when the prior value is known.

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { formatCurrency } from '../../utils/format'
 import { format, endOfMonth } from 'date-fns'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
@@ -222,7 +223,7 @@ export default function EmitInvoiceModal({
           </div>
 
           <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-            <span className="text-sm font-semibold text-gray-900">Total: ${total.toLocaleString()}</span>
+            <span className="text-sm font-semibold text-gray-900">Total: {formatCurrency(total)}</span>
             <div className="flex gap-2">
               <Button variant="secondary" onClick={onClose} disabled={emitting}>Cancelar</Button>
               <Button onClick={handleEmit} loading={emitting} disabled={!canEmit}>Emitir e-Ticket</Button>

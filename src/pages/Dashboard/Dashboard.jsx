@@ -10,6 +10,7 @@ import PlaceholderCard from './PlaceholderCard'
 import CollectionPanel from './CollectionPanel'
 import { getDashboardFinanceSeries, getMonthInvoicePanel } from '../../services/dashboard/dashboardService'
 import { deriveKpis } from '../../services/dashboard/financeSeries'
+import { formatCurrency } from '../../utils/format'
 import { getClients, calculateMonthBilling, emitInvoice } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 
@@ -202,7 +203,7 @@ export default function Dashboard() {
                   <input type="checkbox" checked={r.selected} disabled={r.status !== 'listo' || bulkRunning}
                     onChange={(e) => setBulkRows(rows => rows.map(x => x.id === r.id ? { ...x, selected: e.target.checked } : x))} />
                   <span className="flex-1 text-gray-900">{r.name}</span>
-                  <span className="text-gray-600">${r.amount.toLocaleString()}</span>
+                  <span className="text-gray-600">{formatCurrency(r.amount)}</span>
                   <span className={`text-xs px-2 py-0.5 rounded ${r.status === 'listo' ? 'bg-green-50 text-green-700' : r.status === 'sin CI' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{r.status}</span>
                 </label>
               ))}

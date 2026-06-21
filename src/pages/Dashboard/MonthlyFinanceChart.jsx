@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import Card from '../../components/ui/Card'
-import { formatCurrency, formatCompact } from '../../services/dashboard/format'
+import { formatCurrency, formatCompact } from '../../utils/format'
 import { selectIncome, selectExpensesTotal, selectMargin } from '../../services/dashboard/financeSeries'
 
 const MONTH_LABELS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']

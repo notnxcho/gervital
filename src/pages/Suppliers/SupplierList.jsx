@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { formatCurrency } from '../../utils/format'
 import { format, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useAuth } from '../../context/AuthContext'
@@ -221,27 +222,27 @@ export default function SupplierList() {
         <Card className="p-4">
           <p className="text-sm text-gray-500">Total del mes</p>
           <p className="text-2xl font-bold text-gray-900">
-            ${totalMonth.toLocaleString('es-AR')}
+            {formatCurrency(totalMonth)}
           </p>
         </Card>
         <Card className="p-4">
           <p className="text-sm text-gray-500">Gastos recurrentes</p>
           <p className="text-2xl font-bold text-blue-600">
-            ${totalRecurring.toLocaleString('es-AR')}
+            {formatCurrency(totalRecurring)}
           </p>
           <p className="text-xs text-gray-400">{recurringExpenses.length} servicios</p>
         </Card>
         <Card className="p-4">
           <p className="text-sm text-gray-500">Gastos extraordinarios</p>
           <p className="text-2xl font-bold text-amber-600">
-            ${totalExtraordinary.toLocaleString('es-AR')}
+            {formatCurrency(totalExtraordinary)}
           </p>
           <p className="text-xs text-gray-400">{extraordinaryExpenses.length} gastos</p>
         </Card>
         <Card className="p-4">
           <p className="text-sm text-gray-500">Pendiente de pago</p>
           <p className="text-2xl font-bold text-red-600">
-            ${totalPending.toLocaleString('es-AR')}
+            {formatCurrency(totalPending)}
           </p>
         </Card>
       </div>
@@ -385,8 +386,8 @@ export default function SupplierList() {
                     </div>
                     <div className="mt-3 pt-3 border-t border-gray-100">
                       <p className="text-xs text-gray-500">Costo anual mensualizado</p>
-                      <p className="text-lg font-semibold text-gray-900">${Math.round(mensualizado).toLocaleString('es-AR')}</p>
-                      {cur && <p className="text-xs text-gray-400 mt-0.5">Nominal: ${cur.nominal.toLocaleString('es-AR')}</p>}
+                      <p className="text-lg font-semibold text-gray-900">{formatCurrency(mensualizado)}</p>
+                      {cur && <p className="text-xs text-gray-400 mt-0.5">Nominal: {formatCurrency(cur.nominal)}</p>}
                     </div>
                   </Card>
                 )
@@ -415,7 +416,7 @@ export default function SupplierList() {
                         <p className="text-xs text-gray-400 mt-1">{format(new Date(c.date), 'd MMM yyyy', { locale: es })}</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <p className="text-lg font-semibold text-gray-900">${c.amount.toLocaleString('es-AR')}</p>
+                        <p className="text-lg font-semibold text-gray-900">{formatCurrency(c.amount)}</p>
                         <button
                           onClick={() => handleDeleteStandalone(c.id)}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -532,7 +533,7 @@ function ExpenseCard({ expense, supplierName, onMarkPaid, onEdit, onDelete }) {
         </div>
         <div className="text-right">
           <p className="text-lg font-semibold text-gray-900">
-            ${expense.amount.toLocaleString('es-AR')}
+            {formatCurrency(expense.amount)}
           </p>
           <p className="text-xs text-gray-400">
             {format(new Date(expense.date), 'd MMM', { locale: es })}
@@ -926,13 +927,13 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
         {/* Header: costo anual mensualizado + desglose */}
         <div className="bg-gray-50 rounded-xl p-4">
           <p className="text-xs text-gray-500">Costo anual mensualizado (≠ nominal)</p>
-          <p className="text-2xl font-bold text-gray-900">${Math.round(mensualizado).toLocaleString('es-AR')}</p>
+          <p className="text-2xl font-bold text-gray-900">{formatCurrency(mensualizado)}</p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3 text-xs text-gray-600">
-            <span>Nominal: ${nominal.toLocaleString('es-AR')}</span>
-            <span>Líquido: ${liquido.toLocaleString('es-AR')}</span>
-            <span>Aguinaldo/año: ${Math.round(ag).toLocaleString('es-AR')}</span>
-            <span>Sal. vacacional/año: ${Math.round(sv).toLocaleString('es-AR')}</span>
-            <span>Extraord. 12m: ${Math.round(extra12).toLocaleString('es-AR')}</span>
+            <span>Nominal: {formatCurrency(nominal)}</span>
+            <span>Líquido: {formatCurrency(liquido)}</span>
+            <span>Aguinaldo/año: {formatCurrency(ag)}</span>
+            <span>Sal. vacacional/año: {formatCurrency(sv)}</span>
+            <span>Extraord. 12m: {formatCurrency(extra12)}</span>
             <span>Ajuste semestral: {employee.semesterAdjustmentPct}%</span>
           </div>
         </div>
@@ -963,8 +964,8 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
             {employee.adjustments.map(a => (
               <div key={a.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2">
                 <div>
-                  <span className="font-medium text-gray-900">${a.nominal.toLocaleString('es-AR')}</span>
-                  <span className="text-gray-400"> nom · ${a.liquido.toLocaleString('es-AR')} líq</span>
+                  <span className="font-medium text-gray-900">{formatCurrency(a.nominal)}</span>
+                  <span className="text-gray-400"> nom · {formatCurrency(a.liquido)} líq</span>
                   {a.notes && <span className="text-gray-400"> · {a.notes}</span>}
                 </div>
                 <div className="flex items-center gap-2">
@@ -1017,7 +1018,7 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
                   {c.concept && <span className="text-gray-400"> · {c.concept}</span>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900">${c.amount.toLocaleString('es-AR')}</span>
+                  <span className="font-medium text-gray-900">{formatCurrency(c.amount)}</span>
                   <span className="text-xs text-gray-400">{format(new Date(c.date), 'd MMM yyyy', { locale: es })}</span>
                   <button onClick={() => removeExtra(c.id)} className="p-1 text-gray-300 hover:text-red-600 rounded">
                     <Trash className="w-3.5 h-3.5" />
