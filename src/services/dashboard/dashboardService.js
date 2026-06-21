@@ -176,3 +176,42 @@ export async function getDashboardFinanceSeries(fromYear, fromMonth, toYear, toM
   if (seriesRes.error) throw new Error(seriesRes.error.message)
   return mergeFinanceSeries(seriesRes.data || [], employees)
 }
+
+/**
+ * Per-client invoice rows for a single month, enriched with client name/avatar.
+ * Feeds the dashboard collection panel (pending payments / pending invoices tabs).
+ * @param {number} year
+ * @param {number} month - 0-indexed
+ * @returns {Promise<Array>} rows: { id, firstName, lastName, avatarUrl, isDeactivated, amount, paidAmount, paymentStatus, invoiceStatus }
+ */
+export async function getMonthInvoicePanel(year, month) {
+  const [invoicesRes, clientsRes] = await Promise.all([
+    supabase
+      .from('invoices_view')
+      .select('clientId, chargeableAmount, paidAmount, paymentStatus, invoiceStatus')
+      .eq('year', year)
+      .eq('month', month),
+    supabase
+      .from('clients_full')
+      .select('id, firstName, lastName, avatarUrl, deletedAt')
+  ])
+
+  if (invoicesRes.error) throw new Error(invoicesRes.error.message)
+  if (clientsRes.error) throw new Error(clientsRes.error.message)
+
+  const byId = new Map((clientsRes.data || []).map(c => [c.id, c]))
+  return (invoicesRes.data || []).map(inv => {
+    const c = byId.get(inv.clientId) || {}
+    return {
+      id: inv.clientId,
+      firstName: c.firstName || '',
+      lastName: c.lastName || '',
+      avatarUrl: c.avatarUrl || null,
+      isDeactivated: !!c.deletedAt,
+      amount: Number(inv.chargeableAmount || 0),
+      paidAmount: Number(inv.paidAmount || 0),
+      paymentStatus: inv.paymentStatus,
+      invoiceStatus: inv.invoiceStatus
+    }
+  })
+}

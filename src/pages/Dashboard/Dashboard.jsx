@@ -7,7 +7,8 @@ import Modal from '../../components/ui/Modal'
 import MonthlyFinanceChart from './MonthlyFinanceChart'
 import KpiRow from './KpiRow'
 import PlaceholderCard from './PlaceholderCard'
-import { getDashboardFinanceSeries } from '../../services/dashboard/dashboardService'
+import CollectionPanel from './CollectionPanel'
+import { getDashboardFinanceSeries, getMonthInvoicePanel } from '../../services/dashboard/dashboardService'
 import { deriveKpis } from '../../services/dashboard/financeSeries'
 import { getClients, calculateMonthBilling, emitInvoice } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
@@ -25,6 +26,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [kpiOpts, setKpiOpts] = useState({ basis: 'previsto', withIva: false })
+
+  // Collection panel rows for the selected month (per-client, separate from the series).
+  const [panelRows, setPanelRows] = useState([])
+  const [panelLoading, setPanelLoading] = useState(true)
 
   // Bulk monthly emission (preserved from old dashboard)
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -51,6 +56,22 @@ export default function Dashboard() {
   }, [windowEnd, showFinancials])
 
   useEffect(() => { load() }, [load])
+
+  // Collection panel rows track the selected month (a bar click updates them too).
+  const loadPanel = useCallback(async () => {
+    if (!showFinancials) { setPanelLoading(false); return }
+    setPanelLoading(true)
+    try {
+      const rows = await getMonthInvoicePanel(selected.year, selected.month)
+      setPanelRows(rows)
+    } catch (_) {
+      setPanelRows([])
+    } finally {
+      setPanelLoading(false)
+    }
+  }, [selected, showFinancials])
+
+  useEffect(() => { loadPanel() }, [loadPanel])
 
   const kpis = useMemo(
     () => deriveKpis(series, selected.year, selected.month, kpiOpts),
@@ -100,7 +121,7 @@ export default function Dashboard() {
       setBulkProgress({ done: i + 1, total: targets.length, failed: [...failed] })
       if (i < targets.length - 1) await new Promise(res => setTimeout(res, 1100))
     }
-    setBulkRunning(false); load()
+    setBulkRunning(false); load(); loadPanel()
   }
   const selectedCount = bulkRows.filter(r => r.selected && r.status === 'listo').length
 
@@ -125,40 +146,41 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="space-y-6">
-        {showFinancials && (
-          <>
-            {loading ? (
-              <div className="flex items-center justify-center py-32 text-gray-400 text-sm">Cargando métricas…</div>
-            ) : (
-              <>
-                <MonthlyFinanceChart
-                  series={series}
-                  selected={selected}
-                  onSelectMonth={setSelected}
-                  onOptionsChange={setKpiOpts}
-                />
-                <KpiRow kpis={kpis} />
-              </>
-            )}
-          </>
-        )}
+      {showFinancials ? (
+        loading ? (
+          <div className="flex items-center justify-center py-32 text-gray-400 text-sm">Cargando métricas…</div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-stretch">
+            {/* left: chart + KPIs + daily summaries */}
+            <div className="flex flex-col gap-6 min-w-0">
+              <MonthlyFinanceChart
+                series={series}
+                selected={selected}
+                onSelectMonth={setSelected}
+                onOptionsChange={setKpiOpts}
+              />
+              <KpiRow kpis={kpis} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <PlaceholderCard title="Turnos de hoy" hint="Resumen de asistencia del día." minHeight={130} />
+                <PlaceholderCard title="Transporte de hoy" hint="Resumen de viajes y autos del día." minHeight={130} />
+              </div>
+            </div>
 
-        {/* deferred regions — placeholders (spec §5.3–§5.5) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2">
-            <PlaceholderCard
-              title="Facturación & cobranza"
-              hint="Lista accionable de cobranza y facturación del mes. Diseño en definición."
-              minHeight={280}
+            {/* right: facturación & cobranza */}
+            <CollectionPanel
+              rows={panelRows}
+              loading={panelLoading}
+              kpis={kpis}
+              monthLabel={monthLabel}
             />
           </div>
-          <div className="space-y-4">
-            <PlaceholderCard title="Turnos de hoy" hint="Resumen de asistencia del día." minHeight={130} />
-            <PlaceholderCard title="Transporte de hoy" hint="Resumen de viajes y autos del día." minHeight={130} />
-          </div>
+        )
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <PlaceholderCard title="Turnos de hoy" hint="Resumen de asistencia del día." minHeight={130} />
+          <PlaceholderCard title="Transporte de hoy" hint="Resumen de viajes y autos del día." minHeight={130} />
         </div>
-      </div>
+      )}
 
       {/* bulk emission modal (preserved) */}
       <Modal isOpen={bulkOpen} onClose={() => { if (!bulkRunning) setBulkOpen(false) }} title={`Emitir facturas — ${monthLabel}`} size="xl">
