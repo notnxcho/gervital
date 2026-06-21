@@ -31,3 +31,18 @@
 .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+
+/* Slim scrollbar for dashboard lists */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}

@@ -1,165 +1,141 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { format, addMonths, subMonths, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { NavArrowLeft, NavArrowRight, WarningTriangle, Clock } from 'iconoir-react'
-import Card, { CardHeader, CardContent } from '../../components/ui/Card'
+import { NavArrowLeft, NavArrowRight } from 'iconoir-react'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
-import { getDashboardMetrics } from '../../services/dashboard/dashboardService'
+import MonthlyFinanceChart from './MonthlyFinanceChart'
+import KpiRow from './KpiRow'
+import PlaceholderCard from './PlaceholderCard'
+import CollectionPanel from './CollectionPanel'
+import { getDashboardFinanceSeries, getMonthInvoicePanel } from '../../services/dashboard/dashboardService'
+import { deriveKpis } from '../../services/dashboard/financeSeries'
 import { getClients, calculateMonthBilling, emitInvoice } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    maximumFractionDigits: 0
-  }).format(amount)
-}
-
-function ProgressBar({ value, max, colorClass = 'bg-indigo-500' }) {
-  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
-  return (
-    <div className="w-full bg-gray-100 rounded-full h-2">
-      <div
-        className={`${colorClass} h-2 rounded-full transition-all`}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  )
-}
-
-function StatCard({ label, value, sub, colorClass = 'text-gray-900' }) {
-  return (
-    <Card className="flex-1 min-w-0">
-      <CardContent className="py-5">
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 truncate">{label}</p>
-        <p className={`text-2xl font-bold ${colorClass} truncate`}>{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-1 truncate">{sub}</p>}
-      </CardContent>
-    </Card>
-  )
-}
-
-const TIER_COLORS = {
-  A: 'bg-green-100 text-green-700',
-  B: 'bg-blue-100 text-blue-700',
-  C: 'bg-amber-100 text-amber-700',
-  D: 'bg-red-100 text-red-700'
-}
+const RANGE_MONTHS = 24 // fetch a generous window; the chart slices to 6/12/24
+const TODAY = startOfMonth(new Date())
 
 export default function Dashboard() {
-  const navigate = useNavigate()
   const { hasAccess } = useAuth()
-  // Start with current month (0-indexed)
-  const [currentDate, setCurrentDate] = useState(() => startOfMonth(new Date()))
-  const [metrics, setMetrics] = useState(null)
+  const showFinancials = hasAccess('dashboard_financials')
+
+  const [selected, setSelected] = useState(() => ({ year: TODAY.getFullYear(), month: TODAY.getMonth() }))
+  const [windowEnd, setWindowEnd] = useState(() => ({ year: TODAY.getFullYear(), month: TODAY.getMonth() }))
+  const [series, setSeries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [kpiOpts, setKpiOpts] = useState({ basis: 'previsto', withIva: false })
 
-  // Bulk monthly emission
+  // Collection panel rows for the selected month (per-client, separate from the series).
+  const [panelRows, setPanelRows] = useState([])
+  const [panelLoading, setPanelLoading] = useState(true)
+
+  // Bulk monthly emission (preserved from old dashboard)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkRows, setBulkRows] = useState([])
   const [bulkLoading, setBulkLoading] = useState(false)
   const [bulkRunning, setBulkRunning] = useState(false)
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, failed: [] })
 
-  const year = currentDate.getFullYear()
-  const month = currentDate.getMonth()
-
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    if (!showFinancials) { setLoading(false); return }
+    setLoading(true); setError(null)
     try {
-      const data = await getDashboardMetrics(year, month)
-      setMetrics(data)
+      const to = windowEnd
+      const fromDate = subMonths(new Date(windowEnd.year, windowEnd.month, 1), RANGE_MONTHS - 1)
+      const data = await getDashboardFinanceSeries(
+        fromDate.getFullYear(), fromDate.getMonth(), to.year, to.month
+      )
+      setSeries(data)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [year, month])
+  }, [windowEnd, showFinancials])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useEffect(() => { load() }, [load])
 
-  const goBack = () => setCurrentDate(d => subMonths(d, 1))
-  const goNext = () => setCurrentDate(d => addMonths(d, 1))
+  // Collection panel rows track the selected month (a bar click updates them too).
+  const loadPanel = useCallback(async () => {
+    if (!showFinancials) { setPanelLoading(false); return }
+    setPanelLoading(true)
+    try {
+      const rows = await getMonthInvoicePanel(selected.year, selected.month)
+      setPanelRows(rows)
+    } catch (_) {
+      setPanelRows([])
+    } finally {
+      setPanelLoading(false)
+    }
+  }, [selected, showFinancials])
 
+  useEffect(() => { loadPanel() }, [loadPanel])
+
+  const kpis = useMemo(
+    () => deriveKpis(series, selected.year, selected.month, kpiOpts),
+    [series, selected, kpiOpts]
+  )
+
+  const currentDate = new Date(selected.year, selected.month, 1)
   const monthLabel = format(currentDate, 'MMMM yyyy', { locale: es })
+  const goBack = () => {
+    const d = subMonths(new Date(selected.year, selected.month, 1), 1)
+    const next = { year: d.getFullYear(), month: d.getMonth() }
+    setSelected(next)
+    setWindowEnd(next)
+  }
+  const goNext = () => {
+    const d = addMonths(new Date(selected.year, selected.month, 1), 1)
+    const next = { year: d.getFullYear(), month: d.getMonth() }
+    setSelected(next)
+    setWindowEnd(next)
+  }
+  const isAtOrBeyondToday = selected.year * 12 + selected.month >= TODAY.getFullYear() * 12 + TODAY.getMonth()
 
+  // --- bulk emission (unchanged behavior) ---
   const openBulk = async () => {
-    setBulkOpen(true)
-    setBulkLoading(true)
-    setBulkProgress({ done: 0, total: 0, failed: [] })
+    setBulkOpen(true); setBulkLoading(true); setBulkProgress({ done: 0, total: 0, failed: [] })
     try {
       const clients = await getClients()
       const rows = await Promise.all(clients.map(async (c) => {
-        let amount = 0
-        let reason = null
-        try {
-          const b = await calculateMonthBilling(c.id, year, month)
-          amount = b.totalChargeableGross
-        } catch (_) {
-          reason = 'sin plan'
-        }
-        const status = !c.documentNumber ? 'sin CI'
-          : reason ? reason
-          : amount <= 0 ? 'monto 0'
-          : 'listo'
+        let amount = 0, reason = null
+        try { amount = (await calculateMonthBilling(c.id, selected.year, selected.month)).totalChargeableGross }
+        catch (_) { reason = 'sin plan' }
+        const status = !c.documentNumber ? 'sin CI' : reason ? reason : amount <= 0 ? 'monto 0' : 'listo'
         return { id: c.id, name: `${c.firstName} ${c.lastName}`, amount, status, selected: status === 'listo' }
       }))
       setBulkRows(rows)
-    } catch (e) {
-      window.alert(`Error cargando clientes: ${e.message}`)
-    } finally {
-      setBulkLoading(false)
-    }
+    } catch (e) { window.alert(`Error cargando clientes: ${e.message}`) }
+    finally { setBulkLoading(false) }
   }
-
   const runBulk = async () => {
     const targets = bulkRows.filter(r => r.selected && r.status === 'listo')
     if (!targets.length) return
-    setBulkRunning(true)
-    setBulkProgress({ done: 0, total: targets.length, failed: [] })
+    setBulkRunning(true); setBulkProgress({ done: 0, total: targets.length, failed: [] })
     const failed = []
     for (let i = 0; i < targets.length; i++) {
-      try {
-        await emitInvoice(targets[i].id, year, month)
-      } catch (e) {
-        failed.push({ name: targets[i].name, error: e.message })
-      }
+      try { await emitInvoice(targets[i].id, selected.year, selected.month) }
+      catch (e) { failed.push({ name: targets[i].name, error: e.message }) }
       setBulkProgress({ done: i + 1, total: targets.length, failed: [...failed] })
-      // Biller rate limit: 1 req/seg para emisión
       if (i < targets.length - 1) await new Promise(res => setTimeout(res, 1100))
     }
-    setBulkRunning(false)
-    load()
+    setBulkRunning(false); load(); loadPanel()
   }
-
   const selectedCount = bulkRows.filter(r => r.selected && r.status === 'listo').length
 
   return (
     <div className="-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8 min-h-full bg-gray-50">
-      {/* Header */}
+      {/* header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={goBack}>
-            <NavArrowLeft className="w-4 h-4" />
-          </Button>
-          <span className="text-sm font-medium text-gray-700 capitalize w-36 text-center">
-            {monthLabel}
-          </span>
-          <Button variant="secondary" size="sm" onClick={goNext}>
-            <NavArrowRight className="w-4 h-4" />
-          </Button>
+          <Button variant="secondary" size="sm" onClick={goBack}><NavArrowLeft className="w-4 h-4" /></Button>
+          <span className="text-sm font-medium text-gray-700 capitalize w-36 text-center">{monthLabel}</span>
+          <Button variant="secondary" size="sm" onClick={goNext} disabled={isAtOrBeyondToday}><NavArrowRight className="w-4 h-4" /></Button>
           {hasAccess('billing') && (
-            <Button size="sm" onClick={openBulk} className="ml-2">
-              Emitir facturas del mes
-            </Button>
+            <Button size="sm" onClick={openBulk} className="ml-2">Facturar el mes</Button>
           )}
         </div>
       </div>
@@ -170,392 +146,44 @@ export default function Dashboard() {
         </div>
       )}
 
-      {loading ? (
-        <div className="flex items-center justify-center py-32 text-gray-400 text-sm">
-          Cargando métricas...
-        </div>
-      ) : metrics && (
-        <div className="space-y-6">
+      {showFinancials ? (
+        loading ? (
+          <div className="flex items-center justify-center py-32 text-gray-400 text-sm">Cargando métricas…</div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-stretch">
+            {/* left: chart + KPIs + daily summaries */}
+            <div className="flex flex-col gap-6 min-w-0">
+              <MonthlyFinanceChart
+                series={series}
+                selected={selected}
+                onSelectMonth={setSelected}
+                onOptionsChange={setKpiOpts}
+              />
+              <KpiRow kpis={kpis} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <PlaceholderCard title="Turnos de hoy" hint="Resumen de asistencia del día." minHeight={130} />
+                <PlaceholderCard title="Transporte de hoy" hint="Resumen de viajes y autos del día." minHeight={130} />
+              </div>
+            </div>
 
-          {hasAccess('dashboard_financials') && (
-            <>
-          {/* KPI row: 5 stat cards */}
-          <div className="flex gap-4 flex-wrap">
-            <StatCard
-              label="Facturación del mes"
-              value={formatCurrency(metrics.financial.totalBilling)}
-              sub={`${metrics.financial.totalInvoicesCount} clientes`}
-            />
-            <StatCard
-              label="Cobrado"
-              value={formatCurrency(metrics.financial.totalCollected)}
-              sub={`${metrics.financial.paidCount} pagados`}
-              colorClass="text-green-700"
-            />
-            <StatCard
-              label="Gastos del mes"
-              value={formatCurrency(metrics.financial.totalExpenses)}
-              colorClass="text-red-700"
-            />
-            <StatCard
-              label="Margen estimado"
-              value={formatCurrency(metrics.financial.margin)}
-              colorClass={metrics.financial.margin >= 0 ? 'text-green-700' : 'text-red-700'}
-              sub="Cobrado − Gastos"
-            />
-            <StatCard
-              label="Tasa de cobro"
-              value={`${metrics.financial.collectionRate.toFixed(0)}%`}
-              sub="Cobrado / Facturación"
-              colorClass={
-                metrics.financial.collectionRate >= 80
-                  ? 'text-green-700'
-                  : metrics.financial.collectionRate >= 50
-                  ? 'text-amber-700'
-                  : 'text-red-700'
-              }
+            {/* right: facturación & cobranza */}
+            <CollectionPanel
+              rows={panelRows}
+              loading={panelLoading}
+              kpis={kpis}
+              monthLabel={monthLabel}
             />
           </div>
-
-          {/* Financial performance section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-            {/* Estado de cobros */}
-            <Card>
-              <CardHeader>
-                <h2 className="text-sm font-semibold text-gray-800">Estado de cobros</h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Paid */}
-                <div>
-                  <div className="flex justify-between text-xs text-gray-600 mb-1">
-                    <span>Cobrados</span>
-                    <span className="font-medium text-green-700">
-                      {metrics.financial.paidCount} / {metrics.financial.totalInvoicesCount}
-                    </span>
-                  </div>
-                  <ProgressBar
-                    value={metrics.financial.paidCount}
-                    max={metrics.financial.totalInvoicesCount}
-                    colorClass="bg-green-500"
-                  />
-                </div>
-
-                {/* Pending payment */}
-                <div>
-                  <div className="flex justify-between text-xs text-gray-600 mb-1">
-                    <span>Pendientes de pago</span>
-                    <span className="font-medium text-amber-700">
-                      {metrics.financial.pendingPaymentCount}
-                    </span>
-                  </div>
-                  <ProgressBar
-                    value={metrics.financial.pendingPaymentCount}
-                    max={metrics.financial.totalInvoicesCount}
-                    colorClass="bg-amber-400"
-                  />
-                </div>
-
-                {/* Overdue */}
-                <div>
-                  <div className="flex justify-between text-xs text-gray-600 mb-1">
-                    <span>Vencidas</span>
-                    <span className="font-medium text-red-700">
-                      {metrics.financial.overdueCount}
-                    </span>
-                  </div>
-                  <ProgressBar
-                    value={metrics.financial.overdueCount}
-                    max={metrics.financial.totalInvoicesCount}
-                    colorClass="bg-red-500"
-                  />
-                </div>
-
-                {/* Collection rate big bar */}
-                <div className="pt-2 border-t border-gray-100">
-                  <div className="flex justify-between text-xs text-gray-600 mb-1">
-                    <span className="font-medium">Tasa de cobro</span>
-                    <span className="font-bold text-indigo-700">
-                      {metrics.financial.collectionRate.toFixed(1)}%
-                    </span>
-                  </div>
-                  <ProgressBar
-                    value={metrics.financial.collectionRate}
-                    max={100}
-                    colorClass="bg-indigo-500"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Alertas accionables */}
-            <Card>
-              <CardHeader>
-                <h2 className="text-sm font-semibold text-gray-800">Alertas</h2>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {metrics.financial.overdueCount > 0 && (
-                  <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
-                    <WarningTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-red-800">
-                        {metrics.financial.overdueCount} factura{metrics.financial.overdueCount !== 1 ? 's' : ''} vencida{metrics.financial.overdueCount !== 1 ? 's' : ''}
-                      </p>
-                      <p className="text-xs text-red-600 mt-0.5">Cobro pendiente y fuera de plazo</p>
-                    </div>
-                    <button
-                      onClick={() => navigate('/clientes')}
-                      className="ml-auto text-xs text-red-700 underline whitespace-nowrap"
-                    >
-                      Ver clientes
-                    </button>
-                  </div>
-                )}
-
-                {metrics.financial.notInvoicedCount > 0 && (
-                  <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg">
-                    <Clock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-amber-800">
-                        {metrics.financial.notInvoicedCount} sin factura electrónica
-                      </p>
-                      <p className="text-xs text-amber-600 mt-0.5">Aún no se emitió la factura</p>
-                    </div>
-                    <button
-                      onClick={() => navigate('/clientes')}
-                      className="ml-auto text-xs text-amber-700 underline whitespace-nowrap"
-                    >
-                      Ver clientes
-                    </button>
-                  </div>
-                )}
-
-                {metrics.financial.overdueCount === 0 && metrics.financial.notInvoicedCount === 0 && (
-                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
-                    <span className="text-green-600 text-sm font-medium">Sin alertas para este mes</span>
-                  </div>
-                )}
-
-                {/* Summary row */}
-                <div className="pt-2 border-t border-gray-100 grid grid-cols-2 gap-3">
-                  <div className="text-center p-2 bg-gray-50 rounded-lg">
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(metrics.financial.totalCollected)}</p>
-                    <p className="text-xs text-gray-500">cobrado</p>
-                  </div>
-                  <div className="text-center p-2 bg-gray-50 rounded-lg">
-                    <p className="text-lg font-bold text-gray-900">
-                      {formatCurrency(metrics.financial.totalBilling - metrics.financial.totalCollected)}
-                    </p>
-                    <p className="text-xs text-gray-500">pendiente</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Unpaid clients list */}
-          {metrics.unpaidClients.length > 0 && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-gray-800">
-                    Pendientes de pago — {metrics.unpaidClients.length}
-                  </h2>
-                  <span className="text-xs text-gray-400">
-                    {formatCurrency(metrics.unpaidClients.reduce((s, c) => s + c.amount, 0))} total
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="divide-y divide-gray-100">
-                  {metrics.unpaidClients.map(client => (
-                    <button
-                      key={client.id}
-                      onClick={() => navigate(`/clientes/${client.id}`)}
-                      className="flex items-center gap-3 w-full py-2.5 px-1 hover:bg-gray-50 rounded-lg transition-colors text-left"
-                    >
-                      {/* Avatar */}
-                      {client.avatarUrl ? (
-                        <img
-                          src={client.avatarUrl}
-                          alt={`${client.firstName} ${client.lastName}`}
-                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-500 flex-shrink-0">
-                          {client.firstName[0]}{client.lastName[0]}
-                        </div>
-                      )}
-
-                      {/* Name */}
-                      <span className="text-sm font-medium text-gray-800 flex-1 truncate">
-                        {client.firstName} {client.lastName}
-                        {client.isDeactivated && (
-                          <span className="ml-2 text-xs font-normal text-gray-500">(desactivado)</span>
-                        )}
-                      </span>
-
-                      {/* Status badge */}
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        client.status === 'overdue'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {client.status === 'overdue' ? 'Vencido' : 'Pendiente'}
-                      </span>
-
-                      {/* Amount */}
-                      <span className="text-sm font-semibold text-gray-700 w-24 text-right">
-                        {formatCurrency(client.amount)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-            </>
-          )}
-
-          {/* Operational performance section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-            {/* Distribución de clientes */}
-            <Card>
-              <CardHeader>
-                <h2 className="text-sm font-semibold text-gray-800">
-                  Clientes — {metrics.clients.total} activos
-                </h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Tier distribution */}
-                <div>
-                  <p className="text-xs text-gray-500 mb-2">Por nivel cognitivo</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {['A', 'B', 'C', 'D'].map(tier => (
-                      <div key={tier} className={`px-3 py-1.5 rounded-lg ${TIER_COLORS[tier]}`}>
-                        <span className="text-xs font-medium">{tier}: </span>
-                        <span className="text-sm font-bold">{metrics.clients.byTier[tier]}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Frequency distribution */}
-                <div>
-                  <p className="text-xs text-gray-500 mb-2">Por frecuencia semanal</p>
-                  <div className="space-y-1.5">
-                    {[4, 3, 2, 1].map(freq => (
-                      <div key={freq} className="flex items-center gap-2">
-                        <span className="text-xs text-gray-600 w-6">{freq}x</span>
-                        <div className="flex-1">
-                          <ProgressBar
-                            value={metrics.clients.byFrequency[freq]}
-                            max={metrics.clients.total}
-                            colorClass="bg-indigo-400"
-                          />
-                        </div>
-                        <span className="text-xs font-medium text-gray-700 w-4 text-right">
-                          {metrics.clients.byFrequency[freq]}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Transport & recovery */}
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Con transporte</p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {metrics.clients.withTransport}
-                      <span className="text-xs font-normal text-gray-500 ml-1">
-                        ({metrics.clients.transportPct.toFixed(0)}%)
-                      </span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Pool de recupero</p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {metrics.clients.totalRecoveryDays}
-                      <span className="text-xs font-normal text-gray-500 ml-1">días</span>
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Asistencia */}
-            <Card>
-              <CardHeader>
-                <h2 className="text-sm font-semibold text-gray-800">Asistencia del mes</h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {metrics.attendance.total === 0 ? (
-                  <p className="text-sm text-gray-400 py-4 text-center">
-                    Sin registros de asistencia para este mes
-                  </p>
-                ) : (
-                  <>
-                    {/* Attendance rate big display */}
-                    <div className="flex items-end gap-3">
-                      <p className="text-4xl font-bold text-gray-900">
-                        {metrics.attendance.attendanceRate.toFixed(0)}%
-                      </p>
-                      <p className="text-sm text-gray-500 mb-1">tasa de asistencia</p>
-                    </div>
-                    <ProgressBar
-                      value={metrics.attendance.attendanceRate}
-                      max={100}
-                      colorClass={
-                        metrics.attendance.attendanceRate >= 80
-                          ? 'bg-green-500'
-                          : metrics.attendance.attendanceRate >= 60
-                          ? 'bg-amber-400'
-                          : 'bg-red-500'
-                      }
-                    />
-
-                    {/* Breakdown */}
-                    <div className="grid grid-cols-3 gap-3 pt-2 border-t border-gray-100">
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-green-700">
-                          {metrics.attendance.attended}
-                        </p>
-                        <p className="text-xs text-gray-500">asistencias</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-amber-700">
-                          {metrics.attendance.justifiedAbsences}
-                        </p>
-                        <p className="text-xs text-gray-500">faltas just.</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-red-700">
-                          {metrics.attendance.unjustifiedAbsences}
-                        </p>
-                        <p className="text-xs text-gray-500">faltas injust.</p>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-gray-400">
-                      Total registros: {metrics.attendance.total}
-                    </p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
+        )
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <PlaceholderCard title="Turnos de hoy" hint="Resumen de asistencia del día." minHeight={130} />
+          <PlaceholderCard title="Transporte de hoy" hint="Resumen de viajes y autos del día." minHeight={130} />
         </div>
       )}
 
-      <Modal
-        isOpen={bulkOpen}
-        onClose={() => { if (!bulkRunning) setBulkOpen(false) }}
-        title={`Emitir facturas — ${monthLabel}`}
-        size="xl"
-      >
+      {/* bulk emission modal (preserved) */}
+      <Modal isOpen={bulkOpen} onClose={() => { if (!bulkRunning) setBulkOpen(false) }} title={`Emitir facturas — ${monthLabel}`} size="xl">
         {bulkLoading ? (
           <div className="py-12 text-center text-sm text-gray-400">Calculando montos…</div>
         ) : (
@@ -563,32 +191,19 @@ export default function Dashboard() {
             {bulkProgress.total > 0 && (
               <div className="text-sm text-gray-700">
                 Emitidas {bulkProgress.done}/{bulkProgress.total}
-                {bulkProgress.failed.length > 0 && (
-                  <span className="text-red-600"> · {bulkProgress.failed.length} fallidas</span>
-                )}
+                {bulkProgress.failed.length > 0 && <span className="text-red-600"> · {bulkProgress.failed.length} fallidas</span>}
               </div>
             )}
             <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
               {bulkRows.length === 0 ? (
                 <div className="px-3 py-6 text-center text-sm text-gray-400">No hay clientes</div>
               ) : bulkRows.map((r) => (
-                <label
-                  key={r.id}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm ${r.status === 'listo' ? 'cursor-pointer hover:bg-gray-50' : 'opacity-60'}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={r.selected}
-                    disabled={r.status !== 'listo' || bulkRunning}
-                    onChange={(e) => setBulkRows(rows => rows.map(x => x.id === r.id ? { ...x, selected: e.target.checked } : x))}
-                  />
+                <label key={r.id} className={`flex items-center gap-3 px-3 py-2 text-sm ${r.status === 'listo' ? 'cursor-pointer hover:bg-gray-50' : 'opacity-60'}`}>
+                  <input type="checkbox" checked={r.selected} disabled={r.status !== 'listo' || bulkRunning}
+                    onChange={(e) => setBulkRows(rows => rows.map(x => x.id === r.id ? { ...x, selected: e.target.checked } : x))} />
                   <span className="flex-1 text-gray-900">{r.name}</span>
                   <span className="text-gray-600">${r.amount.toLocaleString()}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    r.status === 'listo' ? 'bg-green-50 text-green-700'
-                    : r.status === 'sin CI' ? 'bg-red-50 text-red-700'
-                    : 'bg-gray-100 text-gray-500'
-                  }`}>{r.status}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded ${r.status === 'listo' ? 'bg-green-50 text-green-700' : r.status === 'sin CI' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{r.status}</span>
                 </label>
               ))}
             </div>
@@ -598,9 +213,7 @@ export default function Dashboard() {
               </div>
             )}
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setBulkOpen(false)} disabled={bulkRunning}>
-                Cerrar
-              </Button>
+              <Button variant="secondary" onClick={() => setBulkOpen(false)} disabled={bulkRunning}>Cerrar</Button>
               <Button onClick={runBulk} loading={bulkRunning} disabled={bulkRunning || selectedCount === 0}>
                 Emitir seleccionadas ({selectedCount})
               </Button>

@@ -1,5 +1,7 @@
 import { supabase } from '../supabase/client'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
+import { getEmployees } from '../salaries/salaryService'
+import { mergeFinanceSeries } from './financeSeries'
 
 /**
  * Fetch all dashboard KPIs for a given month in a single parallel batch.
@@ -149,4 +151,67 @@ export async function getDashboardMetrics(year, month) {
     },
     unpaidClients
   }
+}
+
+/**
+ * Month-over-month finance series for the dashboard hero + KPIs.
+ * Inclusive range. Months are 0-indexed.
+ * @param {number} fromYear
+ * @param {number} fromMonth - 0-indexed
+ * @param {number} toYear
+ * @param {number} toMonth - 0-indexed
+ * @returns {Promise<Array>} merged month objects (see mergeFinanceSeries)
+ */
+export async function getDashboardFinanceSeries(fromYear, fromMonth, toYear, toMonth) {
+  const [seriesRes, employees] = await Promise.all([
+    supabase.rpc('get_dashboard_finance_series', {
+      p_from_year: fromYear,
+      p_from_month: fromMonth,
+      p_to_year: toYear,
+      p_to_month: toMonth
+    }),
+    getEmployees().catch(() => []) // operador lacks salary access → empty, never throws
+  ])
+
+  if (seriesRes.error) throw new Error(seriesRes.error.message)
+  return mergeFinanceSeries(seriesRes.data || [], employees)
+}
+
+/**
+ * Per-client invoice rows for a single month, enriched with client name/avatar.
+ * Feeds the dashboard collection panel (pending payments / pending invoices tabs).
+ * @param {number} year
+ * @param {number} month - 0-indexed
+ * @returns {Promise<Array>} rows: { id, firstName, lastName, avatarUrl, isDeactivated, amount, paidAmount, paymentStatus, invoiceStatus }
+ */
+export async function getMonthInvoicePanel(year, month) {
+  const [invoicesRes, clientsRes] = await Promise.all([
+    supabase
+      .from('invoices_view')
+      .select('clientId, chargeableAmount, paidAmount, paymentStatus, invoiceStatus')
+      .eq('year', year)
+      .eq('month', month),
+    supabase
+      .from('clients_full')
+      .select('id, firstName, lastName, avatarUrl, deletedAt')
+  ])
+
+  if (invoicesRes.error) throw new Error(invoicesRes.error.message)
+  if (clientsRes.error) throw new Error(clientsRes.error.message)
+
+  const byId = new Map((clientsRes.data || []).map(c => [c.id, c]))
+  return (invoicesRes.data || []).map(inv => {
+    const c = byId.get(inv.clientId) || {}
+    return {
+      id: inv.clientId,
+      firstName: c.firstName || '',
+      lastName: c.lastName || '',
+      avatarUrl: c.avatarUrl || null,
+      isDeactivated: !!c.deletedAt,
+      amount: Number(inv.chargeableAmount || 0),
+      paidAmount: Number(inv.paidAmount || 0),
+      paymentStatus: inv.paymentStatus,
+      invoiceStatus: inv.invoiceStatus
+    }
+  })
 }
