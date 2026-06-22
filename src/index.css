@@ -46,3 +46,23 @@
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: #d1d5db;
 }
+
+/* Low-profile, subtle scrollbar for the dashboard chart (content is also drag-to-pan).
+   Overrides the generic .overflow-x-auto scrollbar (defined earlier). */
+.chart-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.chart-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chart-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+.chart-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
+.chart-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}

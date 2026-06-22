@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { format, addMonths, subMonths, startOfMonth } from 'date-fns'
+import { format, subMonths, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { NavArrowLeft, NavArrowRight } from 'iconoir-react'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import MonthlyFinanceChart from './MonthlyFinanceChart'
@@ -11,10 +10,10 @@ import CollectionPanel from './CollectionPanel'
 import { getDashboardFinanceSeries, getMonthInvoicePanel } from '../../services/dashboard/dashboardService'
 import { deriveKpis } from '../../services/dashboard/financeSeries'
 import { formatCurrency } from '../../utils/format'
-import { getClients, calculateMonthBilling, emitInvoice } from '../../services/api'
+import { emitInvoice, markMonthPaid } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 
-const RANGE_MONTHS = 24 // fetch a generous window; the chart slices to 6/12/24
+const RANGE_MONTHS = 24 // fetch window: last 24 months ending today; the chart scrolls within it
 const TODAY = startOfMonth(new Date())
 
 export default function Dashboard() {
@@ -22,7 +21,6 @@ export default function Dashboard() {
   const showFinancials = hasAccess('dashboard_financials')
 
   const [selected, setSelected] = useState(() => ({ year: TODAY.getFullYear(), month: TODAY.getMonth() }))
-  const [windowEnd, setWindowEnd] = useState(() => ({ year: TODAY.getFullYear(), month: TODAY.getMonth() }))
   const [series, setSeries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -32,10 +30,10 @@ export default function Dashboard() {
   const [panelRows, setPanelRows] = useState([])
   const [panelLoading, setPanelLoading] = useState(true)
 
-  // Bulk monthly emission (preserved from old dashboard)
+  // Bulk monthly action (emit invoices / mark paid) — triggered from the collection panel.
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkMode, setBulkMode] = useState('emit') // 'emit' | 'pay'
   const [bulkRows, setBulkRows] = useState([])
-  const [bulkLoading, setBulkLoading] = useState(false)
   const [bulkRunning, setBulkRunning] = useState(false)
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, failed: [] })
 
@@ -43,10 +41,9 @@ export default function Dashboard() {
     if (!showFinancials) { setLoading(false); return }
     setLoading(true); setError(null)
     try {
-      const to = windowEnd
-      const fromDate = subMonths(new Date(windowEnd.year, windowEnd.month, 1), RANGE_MONTHS - 1)
+      const fromDate = subMonths(TODAY, RANGE_MONTHS - 1)
       const data = await getDashboardFinanceSeries(
-        fromDate.getFullYear(), fromDate.getMonth(), to.year, to.month
+        fromDate.getFullYear(), fromDate.getMonth(), TODAY.getFullYear(), TODAY.getMonth()
       )
       setSeries(data)
     } catch (err) {
@@ -54,7 +51,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [windowEnd, showFinancials])
+  }, [showFinancials])
 
   useEffect(() => { load() }, [load])
 
@@ -81,35 +78,23 @@ export default function Dashboard() {
 
   const currentDate = new Date(selected.year, selected.month, 1)
   const monthLabel = format(currentDate, 'MMMM yyyy', { locale: es })
-  const goBack = () => {
-    const d = subMonths(new Date(selected.year, selected.month, 1), 1)
-    const next = { year: d.getFullYear(), month: d.getMonth() }
-    setSelected(next)
-    setWindowEnd(next)
-  }
-  const goNext = () => {
-    const d = addMonths(new Date(selected.year, selected.month, 1), 1)
-    const next = { year: d.getFullYear(), month: d.getMonth() }
-    setSelected(next)
-    setWindowEnd(next)
-  }
-  const isAtOrBeyondToday = selected.year * 12 + selected.month >= TODAY.getFullYear() * 12 + TODAY.getMonth()
 
-  // --- bulk emission (unchanged behavior) ---
-  const openBulk = async () => {
-    setBulkOpen(true); setBulkLoading(true); setBulkProgress({ done: 0, total: 0, failed: [] })
-    try {
-      const clients = await getClients()
-      const rows = await Promise.all(clients.map(async (c) => {
-        let amount = 0, reason = null
-        try { amount = (await calculateMonthBilling(c.id, selected.year, selected.month)).totalChargeableGross }
-        catch (_) { reason = 'sin plan' }
-        const status = !c.documentNumber ? 'sin CI' : reason ? reason : amount <= 0 ? 'monto 0' : 'listo'
-        return { id: c.id, name: `${c.firstName} ${c.lastName}`, amount, status, selected: status === 'listo' }
-      }))
-      setBulkRows(rows)
-    } catch (e) { window.alert(`Error cargando clientes: ${e.message}`) }
-    finally { setBulkLoading(false) }
+  // --- bulk action (emit invoices / mark paid) ---
+  // Rows are built from the collection panel data (live amounts already loaded), so no extra fetch.
+  const openBulk = (mode) => {
+    setBulkMode(mode)
+    setBulkOpen(true)
+    setBulkProgress({ done: 0, total: 0, failed: [] })
+    const candidates = panelRows.filter(r =>
+      mode === 'pay' ? r.paymentStatus !== 'paid' : r.invoiceStatus !== 'invoiced'
+    )
+    const rows = candidates.map(r => {
+      const status = (mode === 'emit' && !r.documentNumber) ? 'sin CI'
+        : r.amount <= 0 ? 'monto 0'
+        : 'listo'
+      return { id: r.id, name: `${r.firstName} ${r.lastName}`, amount: r.amount, status, selected: status === 'listo' }
+    })
+    setBulkRows(rows)
   }
   const runBulk = async () => {
     const targets = bulkRows.filter(r => r.selected && r.status === 'listo')
@@ -117,7 +102,10 @@ export default function Dashboard() {
     setBulkRunning(true); setBulkProgress({ done: 0, total: targets.length, failed: [] })
     const failed = []
     for (let i = 0; i < targets.length; i++) {
-      try { await emitInvoice(targets[i].id, selected.year, selected.month) }
+      try {
+        if (bulkMode === 'pay') await markMonthPaid(targets[i].id, selected.year, selected.month, targets[i].amount)
+        else await emitInvoice(targets[i].id, selected.year, selected.month)
+      }
       catch (e) { failed.push({ name: targets[i].name, error: e.message }) }
       setBulkProgress({ done: i + 1, total: targets.length, failed: [...failed] })
       if (i < targets.length - 1) await new Promise(res => setTimeout(res, 1100))
@@ -125,20 +113,14 @@ export default function Dashboard() {
     setBulkRunning(false); load(); loadPanel()
   }
   const selectedCount = bulkRows.filter(r => r.selected && r.status === 'listo').length
+  const isPay = bulkMode === 'pay'
 
   return (
     <div className="-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8 min-h-full bg-gray-50">
       {/* header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={goBack}><NavArrowLeft className="w-4 h-4" /></Button>
-          <span className="text-sm font-medium text-gray-700 capitalize w-36 text-center">{monthLabel}</span>
-          <Button variant="secondary" size="sm" onClick={goNext} disabled={isAtOrBeyondToday}><NavArrowRight className="w-4 h-4" /></Button>
-          {hasAccess('billing') && (
-            <Button size="sm" onClick={openBulk} className="ml-2">Facturar el mes</Button>
-          )}
-        </div>
+        <span className="text-sm font-medium text-gray-500 capitalize">{monthLabel}</span>
       </div>
 
       {error && (
@@ -173,6 +155,8 @@ export default function Dashboard() {
               loading={panelLoading}
               kpis={kpis}
               monthLabel={monthLabel}
+              onBulkAction={openBulk}
+              canAct={hasAccess('billing')}
             />
           </div>
         )
@@ -183,15 +167,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* bulk emission modal (preserved) */}
-      <Modal isOpen={bulkOpen} onClose={() => { if (!bulkRunning) setBulkOpen(false) }} title={`Emitir facturas — ${monthLabel}`} size="xl">
-        {bulkLoading ? (
-          <div className="py-12 text-center text-sm text-gray-400">Calculando montos…</div>
-        ) : (
+      {/* bulk action modal (emit invoices / mark paid) */}
+      <Modal isOpen={bulkOpen} onClose={() => { if (!bulkRunning) setBulkOpen(false) }} title={`${isPay ? 'Marcar cobrado' : 'Facturar'} — ${monthLabel}`} size="xl">
+        {(
           <div className="space-y-4">
             {bulkProgress.total > 0 && (
               <div className="text-sm text-gray-700">
-                Emitidas {bulkProgress.done}/{bulkProgress.total}
+                {isPay ? 'Cobradas' : 'Emitidas'} {bulkProgress.done}/{bulkProgress.total}
                 {bulkProgress.failed.length > 0 && <span className="text-red-600"> · {bulkProgress.failed.length} fallidas</span>}
               </div>
             )}
@@ -216,7 +198,7 @@ export default function Dashboard() {
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setBulkOpen(false)} disabled={bulkRunning}>Cerrar</Button>
               <Button onClick={runBulk} loading={bulkRunning} disabled={bulkRunning || selectedCount === 0}>
-                Emitir seleccionadas ({selectedCount})
+                {isPay ? 'Marcar cobradas' : 'Emitir seleccionadas'} ({selectedCount})
               </Button>
             </div>
           </div>

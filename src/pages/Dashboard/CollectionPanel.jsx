@@ -28,7 +28,7 @@ function Avatar({ firstName, lastName, avatarUrl }) {
   )
 }
 
-export default function CollectionPanel({ rows, loading, kpis, monthLabel }) {
+export default function CollectionPanel({ rows, loading, kpis, monthLabel, onBulkAction, canAct }) {
   const [tab, setTab] = useState('pagos')
   const navigate = useNavigate()
 
@@ -113,8 +113,18 @@ export default function CollectionPanel({ rows, loading, kpis, monthLabel }) {
         )}
       </div>
 
-      {/* fixed gauge footer */}
+      {/* fixed footer: bulk CTA + gauge */}
       <div className="border-t border-gray-100 bg-gray-50/60 px-5 py-4 flex-shrink-0">
+        {canAct && onBulkAction && (
+          <button
+            type="button"
+            onClick={() => onBulkAction(tab === 'pagos' ? 'pay' : 'emit')}
+            disabled={list.length === 0}
+            className="w-full mb-4 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {tab === 'pagos' ? 'Marcar cobrado' : 'Facturar el mes'}
+          </button>
+        )}
         <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400 text-center mb-1">
           Cobrado del mes
         </p>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import Card from '../../components/ui/Card'
 import { formatCurrency, formatCompact } from '../../utils/format'
 import { selectIncome, selectExpensesTotal, selectMargin } from '../../services/dashboard/financeSeries'
@@ -66,7 +66,58 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
   }, [basis, withIva, onOptionsChange])
 
   const opts = useMemo(() => ({ basis, withIva }), [basis, withIva])
-  const data = useMemo(() => (series || []).slice(-range), [series, range])
+  // All fetched months render in a horizontally scrollable track; `range` sets how many
+  // are visible at once (the band width = viewport / range), the rest scroll into view.
+  const data = useMemo(() => series || [], [series])
+
+  const scrollRef = useRef(null)
+  const [viewportW, setViewportW] = useState(0)
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setViewportW(el.clientWidth)
+    const ro = new ResizeObserver(entries => setViewportW(entries[0].contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const band = viewportW > 0 ? viewportW / range : 64
+  const contentWidth = Math.max(viewportW, data.length * band)
+
+  // Keep the most recent month in view (scroll to the right edge) when data/zoom changes.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  }, [data.length, range, viewportW])
+
+  // Drag-to-pan: grab the chart and drag horizontally. A move past the threshold flags
+  // the gesture as a drag so the underlying bar click (month select) is suppressed.
+  const dragRef = useRef({ down: false, startX: 0, startLeft: 0, moved: false, pointerId: null })
+  const onPointerDown = (e) => {
+    const el = scrollRef.current
+    if (!el) return
+    dragRef.current = { down: true, startX: e.clientX, startLeft: el.scrollLeft, moved: false, pointerId: e.pointerId }
+  }
+  const onPointerMove = (e) => {
+    const st = dragRef.current
+    const el = scrollRef.current
+    if (!st.down || !el) return
+    const dx = e.clientX - st.startX
+    if (!st.moved && Math.abs(dx) > 5) {
+      st.moved = true
+      try { el.setPointerCapture(st.pointerId) } catch (_) { /* noop */ }
+    }
+    if (st.moved) {
+      el.scrollLeft = st.startLeft - dx
+      e.preventDefault()
+    }
+  }
+  const endDrag = () => {
+    const st = dragRef.current
+    if (st.moved && st.pointerId != null) {
+      try { scrollRef.current?.releasePointerCapture(st.pointerId) } catch (_) { /* noop */ }
+    }
+    st.down = false
+  }
 
   const maxVal = useMemo(() => {
     const vi = row =>
@@ -104,8 +155,8 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
   const marginD = smoothPath(marginPts)
 
   const yTicks = [maxVal, maxVal * 0.66, maxVal * 0.33, 0]
-  const tipIndex = hover != null ? hover : data.findIndex(r => selected && r.year === selected.year && r.month === selected.month)
-  const tipRow = tipIndex >= 0 ? data[tipIndex] : null
+  const tipIndex = hover // tooltip only on hover, not on the selected month
+  const tipRow = tipIndex != null ? data[tipIndex] : null
 
   return (
     <Card className="rounded-2xl border-gray-100 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
@@ -114,7 +165,7 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
         <div>
           <h2 className="text-[15px] font-bold text-gray-900">Ingresos vs Gastos</h2>
           <p className="text-xs text-gray-400 mt-0.5">
-            últimos {range} meses · {withIva ? 'con IVA' : 'sin IVA'} · {basis === 'cobrado' ? 'cobrado' : 'previsto'}
+            {range} meses visibles · {withIva ? 'con IVA' : 'sin IVA'} · {basis === 'cobrado' ? 'cobrado' : 'previsto'}
           </p>
         </div>
         {focal && (
@@ -153,8 +204,18 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
             ))}
           </div>
 
-          {/* plot area */}
-          <div className="flex-1 relative" style={{ height: H + 24 }}>
+          {/* plot area (horizontally scrollable) — extra bottom height so the
+              horizontal scrollbar sits below the month labels, not over them */}
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-x-auto chart-scroll select-none cursor-grab active:cursor-grabbing"
+            style={{ height: H + 44 }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+          >
+            <div className="relative h-full" style={{ minWidth: contentWidth }}>
             {/* dashed gridlines */}
             <div className="absolute left-0 right-0" style={{ top: 0, height: H }}>
               {yTicks.map((_, i) => (
@@ -191,7 +252,7 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
                 return (
                   <button
                     key={`${row.year}-${row.month}`}
-                    onClick={() => onSelectMonth?.({ year: row.year, month: row.month })}
+                    onClick={() => { if (dragRef.current.moved) return; onSelectMonth?.({ year: row.year, month: row.month }) }}
                     onMouseEnter={() => setHover(i)}
                     onMouseLeave={() => setHover(null)}
                     className="flex-1 h-full flex items-end justify-center gap-1 group"
@@ -234,7 +295,7 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
                 className="absolute z-10 pointer-events-none"
                 style={{
                   left: `${((tipIndex + 0.5) / data.length) * 100}%`,
-                  top: -4,
+                  top: 0,
                   transform: `translateX(${tipIndex < data.length / 2 ? '-10%' : '-90%'})`
                 }}
               >
@@ -248,6 +309,7 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
                 </div>
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>

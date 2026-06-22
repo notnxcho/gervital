@@ -192,7 +192,7 @@ export async function getMonthInvoicePanel(year, month) {
     supabase.rpc('get_month_collection_panel', { p_year: year, p_month: month }),
     supabase
       .from('clients_full')
-      .select('id, firstName, lastName, avatarUrl, deletedAt')
+      .select('id, firstName, lastName, avatarUrl, deletedAt, documentNumber')
   ])
 
   if (panelRes.error) throw new Error(panelRes.error.message)
@@ -206,6 +206,7 @@ export async function getMonthInvoicePanel(year, month) {
       firstName: c.firstName || '',
       lastName: c.lastName || '',
       avatarUrl: c.avatarUrl || null,
+      documentNumber: c.documentNumber || null,
       isDeactivated: !!c.deletedAt,
       amount: Number(row.attendance_gross || 0) + Number(row.transport_gross || 0),
       paidAmount: Number(row.paid_amount || 0),
