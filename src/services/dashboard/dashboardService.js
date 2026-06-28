@@ -185,14 +185,14 @@ export async function getDashboardFinanceSeries(fromYear, fromMonth, toYear, toM
  * monthly_invoices snapshot (default 'pending' when no row exists yet).
  * @param {number} year
  * @param {number} month - 0-indexed
- * @returns {Promise<Array>} rows: { id, firstName, lastName, avatarUrl, isDeactivated, amount, paidAmount, paymentStatus, invoiceStatus }
+ * @returns {Promise<Array>} rows: { id, firstName, lastName, avatarUrl, documentNumber, transferResponsible, isDeactivated, amount, paidAmount, paymentStatus, invoiceStatus }
  */
 export async function getMonthInvoicePanel(year, month) {
   const [panelRes, clientsRes] = await Promise.all([
     supabase.rpc('get_month_collection_panel', { p_year: year, p_month: month }),
     supabase
       .from('clients_full')
-      .select('id, firstName, lastName, avatarUrl, deletedAt, documentNumber')
+      .select('id, firstName, lastName, avatarUrl, deletedAt, documentNumber, transferResponsible')
   ])
 
   if (panelRes.error) throw new Error(panelRes.error.message)
@@ -207,6 +207,7 @@ export async function getMonthInvoicePanel(year, month) {
       lastName: c.lastName || '',
       avatarUrl: c.avatarUrl || null,
       documentNumber: c.documentNumber || null,
+      transferResponsible: c.transferResponsible || null,
       isDeactivated: !!c.deletedAt,
       amount: Number(row.attendance_gross || 0) + Number(row.transport_gross || 0),
       paidAmount: Number(row.paid_amount || 0),

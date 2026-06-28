@@ -47,6 +47,16 @@
   background: #d1d5db;
 }
 
+/* Bottom fade for the dashboard collection list — only when the column scrolls
+   internally (xl two-column layout). When stacked on smaller screens the list
+   grows naturally and the fade would clip the last client. */
+@media (min-width: 1280px) {
+  .dashboard-list-fade {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 80px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 80px), transparent);
+  }
+}
+
 /* Low-profile, subtle scrollbar for the dashboard chart (content is also drag-to-pan).
    Overrides the generic .overflow-x-auto scrollbar (defined earlier). */
 .chart-scroll::-webkit-scrollbar {

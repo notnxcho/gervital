@@ -34,6 +34,7 @@ export default function Dashboard() {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkMode, setBulkMode] = useState('emit') // 'emit' | 'pay'
   const [bulkRows, setBulkRows] = useState([])
+  const [bulkSearch, setBulkSearch] = useState('')
   const [bulkRunning, setBulkRunning] = useState(false)
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, failed: [] })
 
@@ -84,6 +85,7 @@ export default function Dashboard() {
   const openBulk = (mode) => {
     setBulkMode(mode)
     setBulkOpen(true)
+    setBulkSearch('')
     setBulkProgress({ done: 0, total: 0, failed: [] })
     const candidates = panelRows.filter(r =>
       mode === 'pay' ? r.paymentStatus !== 'paid' : r.invoiceStatus !== 'invoiced'
@@ -92,7 +94,7 @@ export default function Dashboard() {
       const status = (mode === 'emit' && !r.documentNumber) ? 'sin CI'
         : r.amount <= 0 ? 'monto 0'
         : 'listo'
-      return { id: r.id, name: `${r.firstName} ${r.lastName}`, amount: r.amount, status, selected: status === 'listo' }
+      return { id: r.id, name: `${r.firstName} ${r.lastName}`, transferResponsible: r.transferResponsible, amount: r.amount, status, selected: status === 'listo' }
     })
     setBulkRows(rows)
   }
@@ -114,6 +116,10 @@ export default function Dashboard() {
   }
   const selectedCount = bulkRows.filter(r => r.selected && r.status === 'listo').length
   const isPay = bulkMode === 'pay'
+  const bulkQuery = bulkSearch.trim().toLowerCase()
+  const visibleBulkRows = bulkQuery
+    ? bulkRows.filter(r => r.name.toLowerCase().includes(bulkQuery) || (r.transferResponsible || '').toLowerCase().includes(bulkQuery))
+    : bulkRows
 
   return (
     <div className="-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8 min-h-full bg-gray-50">
@@ -133,8 +139,8 @@ export default function Dashboard() {
         loading ? (
           <div className="flex items-center justify-center py-32 text-gray-400 text-sm">Cargando métricas…</div>
         ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-stretch">
-            {/* left: chart + KPIs + daily summaries */}
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-start">
+            {/* left: chart + KPIs + daily summaries — scrolls with the page normally */}
             <div className="flex flex-col gap-6 min-w-0">
               <MonthlyFinanceChart
                 series={series}
@@ -149,15 +155,17 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* right: facturación & cobranza */}
-            <CollectionPanel
-              rows={panelRows}
-              loading={panelLoading}
-              kpis={kpis}
-              monthLabel={monthLabel}
-              onBulkAction={openBulk}
-              canAct={hasAccess('billing')}
-            />
+            {/* right: facturación & cobranza — sticky, fills the viewport height while the page scrolls */}
+            <div className="xl:sticky xl:top-6 xl:h-[calc(100vh-3rem)]">
+              <CollectionPanel
+                rows={panelRows}
+                loading={panelLoading}
+                kpis={kpis}
+                monthLabel={monthLabel}
+                onBulkAction={openBulk}
+                canAct={hasAccess('billing')}
+              />
+            </div>
           </div>
         )
       ) : (
@@ -177,14 +185,28 @@ export default function Dashboard() {
                 {bulkProgress.failed.length > 0 && <span className="text-red-600"> · {bulkProgress.failed.length} fallidas</span>}
               </div>
             )}
+            <input
+              type="text"
+              value={bulkSearch}
+              onChange={(e) => setBulkSearch(e.target.value)}
+              placeholder="Buscar por nombre o responsable…"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
             <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
               {bulkRows.length === 0 ? (
                 <div className="px-3 py-6 text-center text-sm text-gray-400">No hay clientes</div>
-              ) : bulkRows.map((r) => (
-                <label key={r.id} className={`flex items-center gap-3 px-3 py-2 text-sm ${r.status === 'listo' ? 'cursor-pointer hover:bg-gray-50' : 'opacity-60'}`}>
+              ) : visibleBulkRows.length === 0 ? (
+                <div className="px-3 py-6 text-center text-sm text-gray-400">Sin resultados</div>
+              ) : visibleBulkRows.map((r) => (
+                <label key={r.id} className={`flex items-center gap-3 px-3 py-3 text-sm ${r.status === 'listo' ? 'cursor-pointer hover:bg-gray-50' : 'opacity-60'}`}>
                   <input type="checkbox" checked={r.selected} disabled={r.status !== 'listo' || bulkRunning}
                     onChange={(e) => setBulkRows(rows => rows.map(x => x.id === r.id ? { ...x, selected: e.target.checked } : x))} />
-                  <span className="flex-1 text-gray-900">{r.name}</span>
+                  <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                    <p className="text-gray-900 truncate">{r.name}</p>
+                    <p className={`text-xs truncate ${r.transferResponsible ? 'font-medium text-gray-600' : 'text-gray-400'}`}>
+                      {r.transferResponsible || 'Sin responsable de transferencia'}
+                    </p>
+                  </div>
                   <span className="text-gray-600">{formatCurrency(r.amount)}</span>
                   <span className={`text-xs px-2 py-0.5 rounded ${r.status === 'listo' ? 'bg-green-50 text-green-700' : r.status === 'sin CI' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{r.status}</span>
                 </label>

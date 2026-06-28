@@ -892,10 +892,6 @@ video {
   max-height: 50vh;
 }
 
-.min-h-0 {
-  min-height: 0px;
-}
-
 .min-h-\[40px\] {
   min-height: 40px;
 }
@@ -1211,10 +1207,6 @@ video {
 
 .items-baseline {
   align-items: baseline;
-}
-
-.items-stretch {
-  align-items: stretch;
 }
 
 .justify-end {
@@ -2415,6 +2407,11 @@ video {
   color: rgb(209 213 219 / var(--tw-placeholder-opacity, 1));
 }
 
+.placeholder-gray-400::placeholder {
+  --tw-placeholder-opacity: 1;
+  color: rgb(156 163 175 / var(--tw-placeholder-opacity, 1));
+}
+
 .opacity-0 {
   opacity: 0;
 }
@@ -2605,6 +2602,17 @@ video {
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: #d1d5db;
+}
+
+/* Bottom fade for the dashboard collection list — only when the column scrolls
+   internally (xl two-column layout). When stacked on smaller screens the list
+   grows naturally and the fade would clip the last client. */
+
+@media (min-width: 1280px) {
+  .dashboard-list-fade {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 80px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 80px), transparent);
+  }
 }
 
 /* Low-profile, subtle scrollbar for the dashboard chart (content is also drag-to-pan).
@@ -2826,6 +2834,11 @@ video {
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
 
+.focus\:border-emerald-500:focus {
+  --tw-border-opacity: 1;
+  border-color: rgb(16 185 129 / var(--tw-border-opacity, 1));
+}
+
 .focus\:border-indigo-400:focus {
   --tw-border-opacity: 1;
   border-color: rgb(129 140 248 / var(--tw-border-opacity, 1));
@@ -2861,6 +2874,11 @@ video {
   --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
   --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
   box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
+.focus\:ring-emerald-500:focus {
+  --tw-ring-opacity: 1;
+  --tw-ring-color: rgb(16 185 129 / var(--tw-ring-opacity, 1));
 }
 
 .focus\:ring-green-500:focus {
@@ -3002,7 +3020,36 @@ video {
 }
 
 @media (min-width: 1280px) {
+  .xl\:sticky {
+    position: -webkit-sticky;
+    position: sticky;
+  }
+
+  .xl\:top-6 {
+    top: 1.5rem;
+  }
+
+  .xl\:h-\[calc\(100vh-3rem\)\] {
+    height: calc(100vh - 3rem);
+  }
+
+  .xl\:h-full {
+    height: 100%;
+  }
+
+  .xl\:min-h-0 {
+    min-height: 0px;
+  }
+
+  .xl\:flex-1 {
+    flex: 1 1 0%;
+  }
+
   .xl\:grid-cols-\[1fr_360px\] {
     grid-template-columns: 1fr 360px;
+  }
+
+  .xl\:overflow-y-auto {
+    overflow-y: auto;
   }
 }

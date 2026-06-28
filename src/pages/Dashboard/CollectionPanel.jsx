@@ -44,7 +44,7 @@ export default function CollectionPanel({ rows, loading, kpis, monthLabel, onBul
   const pct = kpis && kpis.ingresoPrevisto > 0 ? (kpis.cobrado / kpis.ingresoPrevisto) * 100 : 0
 
   return (
-    <Card className="rounded-2xl border-gray-100 shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex flex-col h-full overflow-hidden">
+    <Card className="rounded-2xl border-gray-100 shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex flex-col xl:h-full overflow-hidden">
       {/* header */}
       <div className="px-5 pt-5 pb-3 border-b border-gray-100">
         <div className="flex items-baseline justify-between">
@@ -77,8 +77,9 @@ export default function CollectionPanel({ rows, loading, kpis, monthLabel, onBul
         </div>
       </div>
 
-      {/* scrollable list */}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin divide-y divide-gray-50">
+      {/* list — on xl it scrolls inside the column and fades behind the footer;
+          when stacked it grows naturally and the whole page scrolls */}
+      <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto scrollbar-thin divide-y divide-gray-50 dashboard-list-fade">
         {loading ? (
           <div className="px-5 py-10 text-center text-sm text-gray-400">Cargando…</div>
         ) : list.length === 0 ? (
