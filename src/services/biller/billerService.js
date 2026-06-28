@@ -29,9 +29,12 @@ export async function getInvoicePdf(clientId, year, month) {
   return invokeBiller({ action: 'get_invoice_pdf', clientId, year, month })
 }
 
-/** Pre-register / sync a client as a Biller receptor */
-export async function syncClientToBiller(clientId) {
-  return invokeBiller({ action: 'sync_client', clientId })
+/**
+ * Pre-register / sync a client as a Biller receptor.
+ * @param {boolean} [force] - Re-sync even if already linked (e.g. after editing fiscal data)
+ */
+export async function syncClientToBiller(clientId, force = false) {
+  return invokeBiller({ action: 'sync_client', clientId, force })
 }
 
 /** Poll DGI acceptance status for an emitted invoice */

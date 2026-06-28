@@ -367,10 +367,16 @@ export default function ClientDetail() {
                   finally { setSyncing(false) }
                 }}
                 disabled={syncing || !!client.deletedAt}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium border disabled:opacity-50 ${
+                  client.billerSyncError
+                    ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                    : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                }`}
                 title={client.billerSyncError || 'Sin sincronizar en Biller'}
               >
-                {syncing ? 'Sincronizando…' : 'Sincronizar Biller'}
+                {syncing
+                  ? 'Sincronizando…'
+                  : client.billerSyncError ? 'Error Biller — reintentar' : 'Sincronizar Biller'}
               </button>
             )}
           </div>

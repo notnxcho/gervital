@@ -27,6 +27,8 @@ Deno.test('e-Ticket CI: una sola línea de asistencia con IVA 22%', () => {
   assertEquals(c.items[0].precio, 9000)
   assertEquals(c.items[0].indicador_facturacion, 3)
   assert(c.cliente.sucursal.emails.includes('ana@example.com'))
+  assertEquals(c.cliente.sucursal.ciudad, 'Montevideo')
+  assertEquals(c.cliente.sucursal.departamento, 'Montevideo')
 })
 
 Deno.test('default de concepto: "Plan N días x semana – turno"', () => {

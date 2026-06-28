@@ -24,7 +24,11 @@ export interface Overrides {
   fechaVencimiento?: string
 }
 
-export function buildClientePayload(client: BillerClient) {
+// Todos los clientes son de Montevideo (ciudad y departamento fijos).
+const CIUDAD = 'Montevideo'
+const DEPARTAMENTO = 'Montevideo'
+
+export function buildClientePayload(client: BillerClient): ClientePayload {
   const fullName = `${client.first_name} ${client.last_name}`.trim().slice(0, 30)
   return {
     tipo_documento: DOC_TYPE_MAP[client.document_type] ?? 3,
@@ -33,6 +37,8 @@ export function buildClientePayload(client: BillerClient) {
     pais: 'UY',
     sucursal: {
       direccion: (client.street ?? '').slice(0, 70),
+      ciudad: CIUDAD,
+      departamento: DEPARTAMENTO,
       pais: 'UY',
       emails: client.email ? [client.email] : [],
     },
@@ -49,6 +55,8 @@ export interface ComprobanteItem {
 
 export interface ClienteSucursal {
   direccion: string
+  ciudad: string
+  departamento: string
   pais: string
   emails: string[]
 }

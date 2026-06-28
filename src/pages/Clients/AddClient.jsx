@@ -267,6 +267,7 @@ export default function AddClient() {
       if (!formData.email.trim()) newErrors.email = 'Requerido'
       if (!formData.phone.trim()) newErrors.phone = 'Requerido'
       if (!formData.birthDate) newErrors.birthDate = 'Requerido'
+      if (!formData.documentNumber.trim()) newErrors.documentNumber = 'Requerido'
       formData.emergencyContacts.forEach((c, i) => {
         if (!c.name.trim()) newErrors[`ec_${i}_name`] = 'Requerido'
         if (!c.phone.trim()) newErrors[`ec_${i}_phone`] = 'Requerido'
@@ -367,6 +368,10 @@ export default function AddClient() {
         if (avatarFile) {
           await uploadClientAvatar(id, avatarFile).catch(console.error)
         }
+        // Re-sync receptor en Biller: los datos fiscales (nombre/CI/dirección/email) pudieron cambiar.
+        if (formData.documentNumber) {
+          syncClientToBiller(id, true).catch(err => console.warn('Re-sync Biller falló:', err))
+        }
         navigate(`/clientes/${id}`)
       } else {
         const newClient = await createClient(clientData)
@@ -376,8 +381,14 @@ export default function AddClient() {
         if (avatarFile && newClient?.id) {
           await uploadClientAvatar(newClient.id, avatarFile).catch(console.error)
         }
+        // Sync receptor en Biller. No bloquea el alta: el cliente ya quedó creado.
         if (newClient?.id && formData.documentNumber) {
-          syncClientToBiller(newClient.id).catch(err => console.warn('Sync Biller falló:', err))
+          try {
+            await syncClientToBiller(newClient.id)
+          } catch (err) {
+            console.warn('Sync Biller falló:', err)
+            window.alert(`Cliente creado, pero no se pudo sincronizar con Biller: ${err.message}\n\nPodés reintentar desde el detalle del cliente.`)
+          }
         }
         navigate('/clientes')
       }
