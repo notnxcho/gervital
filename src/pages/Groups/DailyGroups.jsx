@@ -26,6 +26,7 @@ import TimeSlotCard from './TimeSlotCard'
 import ClientPool from './ClientPool'
 import { PoolClientChip } from './ClientChip'
 import TemplateModal from './TemplateModal'
+import GroupsWeekTable from './GroupsWeekTable'
 import Button from '../../components/ui/Button'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ export default function DailyGroups() {
   const [allClients, setAllClients] = useState([])
   const [timeSlots, setTimeSlots] = useState([])
   const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [showWeek, setShowWeek] = useState(false)
 
   // DnD state
   const [draggedClient, setDraggedClient] = useState(null)
@@ -314,6 +316,13 @@ export default function DailyGroups() {
           <p className="text-sm text-gray-500 mt-0.5 capitalize">{formattedDate}</p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => setShowWeek(true)}
+          >
+            <Calendar className="w-4 h-4" />
+            Vista semanal
+          </Button>
           {!readOnly && (
             <Button
               variant="secondary"
@@ -464,6 +473,12 @@ export default function DailyGroups() {
         dateStr={dateStr}
         hasExistingData={timeSlots.length > 0}
         onApplied={() => loadSlots(dateStr, activeShift)}
+      />
+
+      <GroupsWeekTable
+        isOpen={showWeek}
+        onClose={() => setShowWeek(false)}
+        clients={allClients}
       />
     </div>
   )

@@ -1,0 +1,156 @@
+/* Weekly groups overview — scrollable grid with sticky headers (read-only) */
+
+.gwk-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.gwk-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); }
+
+.gwk-panel {
+  position: relative;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 12px 44px rgba(0, 0, 0, .26);
+  width: 100%; max-width: 1080px; height: max-content; max-height: 100%;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+.gwk-header {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.gwk-title { font-size: 16px; font-weight: 700; margin: 0; color: #111827; }
+.gwk-subtitle { font-size: 12px; color: #6b7280; margin: 2px 0 0; }
+.gwk-header-actions {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* Search input */
+.gwk-search {
+  position: relative;
+  display: flex; align-items: center;
+}
+.gwk-search-icon {
+  position: absolute; left: 10px;
+  width: 15px; height: 15px;
+  color: #9ca3af; pointer-events: none;
+}
+.gwk-search-input {
+  width: 220px;
+  height: 34px;
+  padding: 0 30px 0 32px;
+  font-size: 13px; color: #111827;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.gwk-search-input::placeholder { color: #9ca3af; }
+.gwk-search-input:focus {
+  background: #fff;
+  border-color: #c7d2fe;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, .12);
+}
+.gwk-search-clear {
+  position: absolute; right: 6px;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; color: #9ca3af;
+  transition: background .15s ease, color .15s ease;
+}
+.gwk-search-clear:hover { background: #f3f4f6; color: #4b5563; }
+
+.gwk-close {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; color: #9ca3af;
+  transition: background .15s ease, color .15s ease;
+}
+.gwk-close:hover { background: #f3f4f6; color: #4b5563; }
+
+/* ── Scroll container ─────────────────────────────────────────── */
+.gwk-scroll { flex: 1; overflow: auto; }
+
+.gwk-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 920px;
+}
+
+/* Top-left corner — highest stacking */
+.gwk-table thead th.gwk-corner {
+  position: sticky; top: 0; left: 0; z-index: 30;
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  min-width: 120px; width: 120px;
+}
+
+/* Day column headers — sticky top */
+.gwk-table thead th.gwk-day {
+  position: sticky; top: 0; z-index: 20;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid #f3f4f6;
+  padding: 12px 14px; text-align: left;
+  min-width: 200px;
+}
+.gwk-day-name { font-size: 14px; font-weight: 700; }
+.gwk-day-sub {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: #9ca3af; font-weight: 500; margin-top: 2px;
+}
+.gwk-day-transport {
+  display: inline-flex; align-items: center; gap: 3px;
+  color: #4f46e5; font-weight: 700;
+}
+.gwk-day-transport svg { width: 13px; height: 13px; }
+
+/* Shift label column — sticky left */
+.gwk-table tbody th.gwk-shift {
+  position: sticky; left: 0; z-index: 10;
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #f3f4f6;
+  text-align: left; padding: 12px 14px;
+  vertical-align: top;
+  min-width: 120px; width: 120px;
+}
+.gwk-shift-label { font-size: 14px; font-weight: 700; line-height: 1.2; }
+
+/* Data cells */
+.gwk-table td.gwk-cell {
+  border-bottom: 1px solid #f3f4f6;
+  border-right: 1px solid #f3f4f6;
+  padding: 8px; vertical-align: top;
+  min-width: 200px;
+}
+.gwk-table tr.gwk-band td.gwk-cell { background: #fcfcfd; }
+.gwk-table tr.gwk-band th.gwk-shift { background: #fcfcfd; }
+
+.gwk-cell-head {
+  display: flex; align-items: center;
+  margin: 0 2px 6px;
+}
+.gwk-count { font-size: 12px; color: #9ca3af; font-weight: 600; }
+
+/* Person chip */
+.gwk-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 9px; border-radius: 8px;
+  background: #fff; border: 1px solid #e5e7eb;
+  margin-bottom: 4px;
+}
+.gwk-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 9999px; }
+.gwk-name { flex: 1; font-size: 14px; font-weight: 500; color: #374151; line-height: 1.2; }
+.gwk-truck { flex-shrink: 0; width: 15px; height: 15px; color: #4f46e5; }
+
+.gwk-empty { font-size: 11px; color: #cbd5e1; padding: 6px 2px; }
