@@ -75,7 +75,9 @@ export {
   calculateMonthBilling,
   markMonthPaid,
   markMonthInvoiced,
-  unmarkMonthPaid
+  unmarkMonthPaid,
+  applyPlanDiscount,
+  removePlanDiscount
 } from './invoices/invoiceService'
 
 // ============================================
