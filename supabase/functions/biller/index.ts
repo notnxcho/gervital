@@ -1,6 +1,6 @@
 // index.ts
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { buildComprobante, buildClientePayload } from './lib/comprobante.ts'
+import { buildComprobante, buildClienteCrearPayload } from './lib/comprobante.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,10 +22,23 @@ function billerHeaders() {
 // client_addresses tiene UNIQUE(client_id) → PostgREST embebe la relación como objeto
 // (no array). Toleramos ambas formas para leer la calle de forma robusta.
 // deno-lint-ignore no-explicit-any
-function addrStreet(client: any): string {
+function addrRow(client: any) {
   const a = client?.client_addresses
-  const row = Array.isArray(a) ? a[0] : a
-  return (row?.street ?? '').trim()
+  return Array.isArray(a) ? a[0] : a
+}
+// deno-lint-ignore no-explicit-any
+function addrStreet(client: any): string {
+  return (addrRow(client)?.street ?? '').trim()
+}
+// Domicilio fiscal para Biller: calle + timbre. `street` pelado se usa solo para geocoding;
+// lo que va en la factura/receptor es la dirección completa.
+// deno-lint-ignore no-explicit-any
+function addrDireccion(client: any): string {
+  const row = addrRow(client)
+  const street = (row?.street ?? '').trim()
+  const doorbell = (row?.doorbell ?? '').trim()
+  if (!street) return ''
+  return doorbell ? `${street} - Timbre ${doorbell}` : street
 }
 
 // Resuelve la versión de plan vigente para el mes (misma lógica que calculate_month_billing).
@@ -65,7 +78,7 @@ Deno.serve(async (req) => {
       const { clientId, year, month } = body
 
       const { data: client } = await admin.from('clients')
-        .select('id, first_name, last_name, email, document_type, document_number, client_addresses(street)')
+        .select('id, first_name, last_name, email, document_type, document_number, client_addresses(street, doorbell)')
         .eq('id', clientId).single()
       if (!client) return json({ error: 'Cliente no encontrado' }, 404)
       if (!client.document_number) return json({ error: 'El cliente no tiene documento cargado' }, 422)
@@ -93,7 +106,7 @@ Deno.serve(async (req) => {
       const transNet = transGross > 0 ? Math.round(transGross / 1.10) : 0
 
       const comprobante = buildComprobante({
-        client: { ...client, street: addrStreet(client) || null },
+        client: { ...client, street: addrDireccion(client) || null },
         plan: { frequency: plan.frequency, schedule: plan.schedule, distance_range: plan.distance_range },
         billing: {
           hasTransport: billing.hasTransport,
@@ -148,7 +161,7 @@ Deno.serve(async (req) => {
       // Cualquier usuario conocido puede sincronizar (puede crear clientes)
       const { clientId, force } = body
       const { data: client } = await admin.from('clients')
-        .select('id, first_name, last_name, email, document_type, document_number, biller_client_id, client_addresses(street)')
+        .select('id, first_name, last_name, email, document_type, document_number, biller_client_id, client_addresses(street, doorbell)')
         .eq('id', clientId).single()
       if (!client) return json({ error: 'Cliente no encontrado' }, 404)
       if (!client.document_number) return json({ error: 'El cliente no tiene documento cargado' }, 422)
@@ -161,7 +174,7 @@ Deno.serve(async (req) => {
       const street = addrStreet(client)
       if (!street) return json({ error: 'El cliente no tiene dirección cargada (requerida por Biller)' }, 422)
 
-      const payload = buildClientePayload({ ...client, street })
+      const payload = buildClienteCrearPayload({ ...client, street: addrDireccion(client) })
       const resp = await fetch(`${BILLER_BASE_URL}/clientes/crear`, { method: 'POST', headers: billerHeaders(), body: JSON.stringify(payload) })
       const raw = await resp.text()
       if (!resp.ok) {

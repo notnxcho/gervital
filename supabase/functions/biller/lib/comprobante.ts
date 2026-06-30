@@ -41,6 +41,8 @@ export interface Overrides {
 const CIUDAD = 'Montevideo'
 const DEPARTAMENTO = 'Montevideo'
 
+// Receptor embebido en `comprobantes/crear`: la dirección/ciudad/depto/emails van
+// ANIDADOS bajo `cliente.sucursal` (así lo espera ese endpoint).
 export function buildClientePayload(client: BillerClient): ClientePayload {
   const fullName = `${client.first_name} ${client.last_name}`.trim().slice(0, 30)
   return {
@@ -55,6 +57,34 @@ export function buildClientePayload(client: BillerClient): ClientePayload {
       pais: 'UY',
       emails: client.email ? [client.email] : [],
     },
+  }
+}
+
+// `clientes/crear` (alta de receptor standalone vía sync_client) espera los campos de
+// dirección/ciudad/depto/emails al NIVEL RAÍZ, NO anidados en `sucursal`. Si se mandan
+// anidados, Biller los ignora y el receptor queda sin dirección/email/ciudad/depto.
+export interface ClienteCrearPayload {
+  tipo_documento: number
+  documento: string
+  nombre_fantasia: string
+  pais: string
+  direccion: string
+  ciudad: string
+  departamento: string
+  emails: string[]
+}
+
+export function buildClienteCrearPayload(client: BillerClient): ClienteCrearPayload {
+  const fullName = `${client.first_name} ${client.last_name}`.trim().slice(0, 30)
+  return {
+    tipo_documento: DOC_TYPE_MAP[client.document_type] ?? 3,
+    documento: client.document_number ?? '',
+    nombre_fantasia: fullName,
+    pais: 'UY',
+    direccion: (client.street ?? '').slice(0, 70),
+    ciudad: CIUDAD,
+    departamento: DEPARTAMENTO,
+    emails: client.email ? [client.email] : [],
   }
 }
 
