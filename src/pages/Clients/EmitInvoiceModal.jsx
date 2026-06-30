@@ -66,7 +66,8 @@ export default function EmitInvoiceModal({
     if (!isOpen || isInvoiced || !billing) return
     const freq = plan?.frequency ?? client?.plan?.frequency ?? ''
     const sched = plan?.schedule ?? client?.plan?.schedule ?? ''
-    setAttConcepto(`Plan ${freq} días x semana – ${SCHEDULE_LABEL[sched] ?? sched}`)
+    const dtoSuffix = billing.discountPercent > 0 ? ` (${billing.discountPercent}% dto)` : ''
+    setAttConcepto(`Plan ${freq} días x semana – ${SCHEDULE_LABEL[sched] ?? sched}${dtoSuffix}`)
     setAttAmount(String(Math.round(Number(billing.attendanceChargeableGross) || 0)))
     setTransConcepto(buildTransportConcepto(client?.address?.distanceRange))
     setTransAmount(String(Math.round(Number(billing.transportChargeableGross) || 0)))

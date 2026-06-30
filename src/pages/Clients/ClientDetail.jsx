@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { formatCurrency } from '../../utils/format'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Phone, MapPin, Calendar, MoreVert, Trash, Check, NavArrowDown, NavArrowRight } from 'iconoir-react'
+import { ArrowLeft, Edit, Phone, MapPin, Calendar, MoreVert, Trash, Check, NavArrowDown, NavArrowRight, Percentage } from 'iconoir-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, differenceInCalendarDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -31,10 +31,12 @@ import {
   reactivateClient,
   uploadClientAvatar,
   deleteClientAvatar,
-  getClientPlanVersions
+  getClientPlanVersions,
+  removePlanDiscount
 } from '../../services/api'
 import { useAuth, roleHasAccess } from '../../context/AuthContext'
 import EmitInvoiceModal from './EmitInvoiceModal'
+import ApplyDiscountModal from './ApplyDiscountModal'
 import Button from '../../components/ui/Button'
 import Card, { CardContent, CardHeader } from '../../components/ui/Card'
 import Tabs from '../../components/ui/Tabs'
@@ -127,6 +129,7 @@ export default function ClientDetail() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('general')
   const [showOptionsMenu, setShowOptionsMenu] = useState(false)
+  const [showDiscountModal, setShowDiscountModal] = useState(false)
   const [deactivateModal, setDeactivateModal] = useState(false)
   const [deactivating, setDeactivating] = useState(false)
   const [reactivating, setReactivating] = useState(false)
@@ -394,6 +397,15 @@ export default function ClientDetail() {
             </Button>
             {showOptionsMenu && (
               <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1">
+                {!client.deletedAt && roleHasAccess(user?.role, 'billing') && (
+                  <button
+                    onClick={() => { setShowOptionsMenu(false); setShowDiscountModal(true) }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <Percentage className="w-4 h-4" />
+                    Aplicar descuento
+                  </button>
+                )}
                 {!client.deletedAt && (
                   <button
                     onClick={() => { setShowOptionsMenu(false); setDeactivateModal(true) }}
@@ -695,6 +707,14 @@ export default function ClientDetail() {
         clientId={id}
         onChanged={refreshRecovery}
       />
+
+      <ApplyDiscountModal
+        isOpen={showDiscountModal}
+        onClose={() => setShowDiscountModal(false)}
+        client={client}
+        invoices={invoices}
+        onRefresh={loadClientData}
+      />
     </div>
   )
 }
@@ -856,6 +876,12 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     await withProcessing(() => unmarkMonthPaid(client.id, year, month))
   }
 
+  const canRemoveDiscount = invoice?.paymentStatus === 'pending' && invoice?.invoiceStatus === 'pending'
+  const handleRemoveDiscount = async () => {
+    try { await removePlanDiscount(client.id, year, month, year, month); await onRefresh() }
+    catch (e) { window.alert(e.message) }
+  }
+
   return (
     <>
       <Card className="flex-shrink-0 w-80 snap-center">
@@ -864,6 +890,20 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
           <h3 className="font-semibold text-gray-900 capitalize mb-2">
             {format(new Date(year, month, 1), 'MMMM yyyy', { locale: es })}
             {isProrated && <span className="ml-2 text-xs font-normal text-blue-600">(prorrateado)</span>}
+            {canViewBilling && invoice?.discountPercent > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200 align-middle">
+                −{invoice.discountPercent}%
+                {canRemoveDiscount && (
+                  <button
+                    onClick={handleRemoveDiscount}
+                    className="ml-0.5 text-violet-500 hover:text-violet-800"
+                    title="Quitar descuento"
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            )}
           </h3>
 
           {/* Payment + Invoice badges */}

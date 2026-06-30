@@ -30,6 +30,7 @@ export async function getClientInvoices(clientId) {
     month: inv.month,
     plannedDays: inv.plannedDays || 0,
     chargeableDays: inv.chargeableDays || 0,
+    discountPercent: Number(inv.discountPercent) || 0,
     chargeableAmount: Number(inv.chargeableAmount) || 0,
     monthlyRate: Number(inv.monthlyRate) || 0,
 
@@ -88,6 +89,7 @@ export async function calculateMonthBilling(clientId, year, month) {
     chargeableDays: data.chargeableDays,
     isProrated: data.isProrated,
     hasTransport: data.hasTransport,
+    discountPercent: Number(data.discountPercent) || 0,
 
     attendanceMonthlyRateNet: Number(data.attendanceMonthlyRateNet) || 0,
     attendanceMonthlyRateGross: Number(data.attendanceMonthlyRateGross) || 0,
@@ -178,4 +180,35 @@ export async function unmarkMonthPaid(clientId, year, month) {
     .eq('month', month)
 
   if (error) throw new Error(error.message)
+}
+
+/**
+ * Apply a plan discount to a consecutive range of uninvoiced/unpaid months.
+ * percent === 0 removes the discount.
+ * @param {string} clientId
+ * @param {number} startYear
+ * @param {number} startMonth - 0-indexed
+ * @param {number} endYear
+ * @param {number} endMonth - 0-indexed
+ * @param {number} percent - 0..100
+ */
+export async function applyPlanDiscount(clientId, startYear, startMonth, endYear, endMonth, percent) {
+  const { data, error } = await supabase.rpc('apply_plan_discount', {
+    p_client_id: clientId,
+    p_start_year: startYear,
+    p_start_month: startMonth,
+    p_end_year: endYear,
+    p_end_month: endMonth,
+    p_percent: percent
+  })
+  if (error) throw new Error(error.message)
+  if (!data.success) throw new Error(data.error || 'Error al aplicar el descuento')
+  return data
+}
+
+/**
+ * Remove a plan discount from a range (sets percent to 0).
+ */
+export async function removePlanDiscount(clientId, startYear, startMonth, endYear, endMonth) {
+  return applyPlanDiscount(clientId, startYear, startMonth, endYear, endMonth, 0)
 }
