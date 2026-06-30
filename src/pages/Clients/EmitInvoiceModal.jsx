@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency } from '../../utils/format'
-import { format, endOfMonth } from 'date-fns'
+import { format } from 'date-fns'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
 import Input, { Textarea } from '../../components/ui/Input'
+import { lastBusinessDayOfMonth } from '../../utils/date'
+import { buildTransportConcepto } from '../../services/transport/transportConstants'
 import { emitInvoice, checkDgiStatus, voidInvoice, getInvoicePdf, calculateMonthBilling } from '../../services/api'
 
 const SCHEDULE_LABEL = { morning: 'Mañana', afternoon: 'Tarde', full_day: 'Día completo' }
@@ -66,10 +68,10 @@ export default function EmitInvoiceModal({
     const sched = plan?.schedule ?? client?.plan?.schedule ?? ''
     setAttConcepto(`Plan ${freq} días x semana – ${SCHEDULE_LABEL[sched] ?? sched}`)
     setAttAmount(String(Math.round(Number(billing.attendanceChargeableGross) || 0)))
-    setTransConcepto('Transporte')
+    setTransConcepto(buildTransportConcepto(client?.address?.distanceRange))
     setTransAmount(String(Math.round(Number(billing.transportChargeableGross) || 0)))
     setAdenda(defaultAdenda(discountedDays))
-    setFechaEmision(format(endOfMonth(new Date(year, month, 1)), 'yyyy-MM-dd'))
+    setFechaEmision(format(lastBusinessDayOfMonth(year, month), 'yyyy-MM-dd'))
     setFechaVencimiento('')
     setError(null)
   }, [isOpen, isInvoiced, billing, plan, client, discountedDays, year, month])

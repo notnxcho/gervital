@@ -1,6 +1,6 @@
 // comprobante_test.ts
 import { assertEquals, assert } from 'jsr:@std/assert@1'
-import { buildComprobante, TIPO_ETICKET } from './comprobante.ts'
+import { buildComprobante, buildTransportConcepto, TIPO_ETICKET } from './comprobante.ts'
 
 const baseClient = {
   id: 'c1', first_name: 'Ana', last_name: 'Pérez',
@@ -43,7 +43,14 @@ Deno.test('con transporte: agrega línea TRANS con IVA 10%', () => {
   assertEquals(c.items[1].codigo, 'TRANS-2_to_5km-3')
   assertEquals(c.items[1].precio, 1500)
   assertEquals(c.items[1].indicador_facturacion, 2)
-  assertEquals(c.items[1].concepto, 'Transporte')
+  assertEquals(c.items[1].concepto, 'Transporte (2 a 5 km)')
+})
+
+Deno.test('concepto de transporte incluye la distancia; sin distancia cae a "Transporte"', () => {
+  assertEquals(buildTransportConcepto('0_to_2km'), 'Transporte (0 a 2 km)')
+  assertEquals(buildTransportConcepto('5_to_10km'), 'Transporte (5 a 10 km)')
+  assertEquals(buildTransportConcepto(null), 'Transporte')
+  assertEquals(buildTransportConcepto('valor_desconocido'), 'Transporte')
 })
 
 Deno.test('sin email: no rompe y emails queda vacío', () => {

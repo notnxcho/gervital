@@ -6,6 +6,19 @@ export const IVA_MINIMA = 2   // 10% — transporte
 const DOC_TYPE_MAP: Record<string, number> = { rut: 2, ci: 3, otro: 4, pasaporte: 5, dni: 6 }
 const SCHEDULE_LABEL: Record<string, string> = { morning: 'Mañana', afternoon: 'Tarde', full_day: 'Día completo' }
 
+// Espejo de DISTANCE_RANGES en src/services/transport/transportConstants.js (fuente de verdad).
+// La distancia es uno de los factores que determina el precio del transporte, por eso va en el concepto.
+const DISTANCE_LABEL: Record<string, string> = {
+  '0_to_2km': '0 a 2 km',
+  '2_to_5km': '2 a 5 km',
+  '5_to_10km': '5 a 10 km',
+}
+
+export function buildTransportConcepto(distanceRange: string | null): string {
+  const label = distanceRange ? DISTANCE_LABEL[distanceRange] : null
+  return label ? `Transporte (${label})` : 'Transporte'
+}
+
 export interface BillerClient {
   id: string; first_name: string; last_name: string; email: string | null
   document_type: string; document_number: string | null; street?: string | null
@@ -105,7 +118,7 @@ export function buildComprobante(
     items.push({
       codigo: `TRANS-${plan.distance_range ?? 'NA'}-${plan.frequency}`,
       cantidad: 1,
-      concepto: o.transportConcepto ?? 'Transporte',
+      concepto: o.transportConcepto ?? buildTransportConcepto(plan.distance_range),
       precio: transPrecio,
       indicador_facturacion: IVA_MINIMA,
     })

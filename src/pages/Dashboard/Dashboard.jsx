@@ -1,16 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { format, subMonths, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
-import Button from '../../components/ui/Button'
-import Modal from '../../components/ui/Modal'
 import MonthlyFinanceChart from './MonthlyFinanceChart'
 import KpiRow from './KpiRow'
 import PlaceholderCard from './PlaceholderCard'
 import CollectionPanel from './CollectionPanel'
+import BulkInvoiceModal from './BulkInvoiceModal'
 import { getDashboardFinanceSeries, getMonthInvoicePanel } from '../../services/dashboard/dashboardService'
 import { deriveKpis } from '../../services/dashboard/financeSeries'
-import { formatCurrency } from '../../utils/format'
-import { emitInvoice, markMonthPaid } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 
 const RANGE_MONTHS = 24 // fetch window: last 24 months ending today; the chart scrolls within it
@@ -34,9 +31,6 @@ export default function Dashboard() {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkMode, setBulkMode] = useState('emit') // 'emit' | 'pay'
   const [bulkRows, setBulkRows] = useState([])
-  const [bulkSearch, setBulkSearch] = useState('')
-  const [bulkRunning, setBulkRunning] = useState(false)
-  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, failed: [] })
 
   const load = useCallback(async () => {
     if (!showFinancials) { setLoading(false); return }
@@ -82,44 +76,22 @@ export default function Dashboard() {
 
   // --- bulk action (emit invoices / mark paid) ---
   // Rows are built from the collection panel data (live amounts already loaded), so no extra fetch.
+  // Eligibility is computed here; the modal owns the run (settings, live status, retries).
   const openBulk = (mode) => {
-    setBulkMode(mode)
-    setBulkOpen(true)
-    setBulkSearch('')
-    setBulkProgress({ done: 0, total: 0, failed: [] })
     const candidates = panelRows.filter(r =>
       mode === 'pay' ? r.paymentStatus !== 'paid' : r.invoiceStatus !== 'invoiced'
     )
     const rows = candidates.map(r => {
-      const status = (mode === 'emit' && !r.documentNumber) ? 'sin CI'
+      const eligibility = (mode === 'emit' && !r.documentNumber) ? 'sin CI'
         : r.amount <= 0 ? 'monto 0'
         : 'listo'
-      return { id: r.id, name: `${r.firstName} ${r.lastName}`, transferResponsible: r.transferResponsible, amount: r.amount, status, selected: status === 'listo' }
+      return { id: r.id, name: `${r.firstName} ${r.lastName}`, transferResponsible: r.transferResponsible, amount: r.amount, eligibility }
     })
+    setBulkMode(mode)
     setBulkRows(rows)
+    setBulkOpen(true)
   }
-  const runBulk = async () => {
-    const targets = bulkRows.filter(r => r.selected && r.status === 'listo')
-    if (!targets.length) return
-    setBulkRunning(true); setBulkProgress({ done: 0, total: targets.length, failed: [] })
-    const failed = []
-    for (let i = 0; i < targets.length; i++) {
-      try {
-        if (bulkMode === 'pay') await markMonthPaid(targets[i].id, selected.year, selected.month, targets[i].amount)
-        else await emitInvoice(targets[i].id, selected.year, selected.month)
-      }
-      catch (e) { failed.push({ name: targets[i].name, error: e.message }) }
-      setBulkProgress({ done: i + 1, total: targets.length, failed: [...failed] })
-      if (i < targets.length - 1) await new Promise(res => setTimeout(res, 1100))
-    }
-    setBulkRunning(false); load(); loadPanel()
-  }
-  const selectedCount = bulkRows.filter(r => r.selected && r.status === 'listo').length
-  const isPay = bulkMode === 'pay'
-  const bulkQuery = bulkSearch.trim().toLowerCase()
-  const visibleBulkRows = bulkQuery
-    ? bulkRows.filter(r => r.name.toLowerCase().includes(bulkQuery) || (r.transferResponsible || '').toLowerCase().includes(bulkQuery))
-    : bulkRows
+  const onBulkComplete = useCallback(() => { load(); loadPanel() }, [load, loadPanel])
 
   return (
     <div className="-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8 min-h-full bg-gray-50">
@@ -176,56 +148,16 @@ export default function Dashboard() {
       )}
 
       {/* bulk action modal (emit invoices / mark paid) */}
-      <Modal isOpen={bulkOpen} onClose={() => { if (!bulkRunning) setBulkOpen(false) }} title={`${isPay ? 'Marcar cobrado' : 'Facturar'} — ${monthLabel}`} size="xl">
-        {(
-          <div className="space-y-4">
-            {bulkProgress.total > 0 && (
-              <div className="text-sm text-gray-700">
-                {isPay ? 'Cobradas' : 'Emitidas'} {bulkProgress.done}/{bulkProgress.total}
-                {bulkProgress.failed.length > 0 && <span className="text-red-600"> · {bulkProgress.failed.length} fallidas</span>}
-              </div>
-            )}
-            <input
-              type="text"
-              value={bulkSearch}
-              onChange={(e) => setBulkSearch(e.target.value)}
-              placeholder="Buscar por nombre o responsable…"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-            <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-              {bulkRows.length === 0 ? (
-                <div className="px-3 py-6 text-center text-sm text-gray-400">No hay clientes</div>
-              ) : visibleBulkRows.length === 0 ? (
-                <div className="px-3 py-6 text-center text-sm text-gray-400">Sin resultados</div>
-              ) : visibleBulkRows.map((r) => (
-                <label key={r.id} className={`flex items-center gap-3 px-3 py-3 text-sm ${r.status === 'listo' ? 'cursor-pointer hover:bg-gray-50' : 'opacity-60'}`}>
-                  <input type="checkbox" checked={r.selected} disabled={r.status !== 'listo' || bulkRunning}
-                    onChange={(e) => setBulkRows(rows => rows.map(x => x.id === r.id ? { ...x, selected: e.target.checked } : x))} />
-                  <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                    <p className="text-gray-900 truncate">{r.name}</p>
-                    <p className={`text-xs truncate ${r.transferResponsible ? 'font-medium text-gray-600' : 'text-gray-400'}`}>
-                      {r.transferResponsible || 'Sin responsable de transferencia'}
-                    </p>
-                  </div>
-                  <span className="text-gray-600">{formatCurrency(r.amount)}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded ${r.status === 'listo' ? 'bg-green-50 text-green-700' : r.status === 'sin CI' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{r.status}</span>
-                </label>
-              ))}
-            </div>
-            {bulkProgress.failed.length > 0 && (
-              <div className="text-xs text-red-600 space-y-0.5 max-h-24 overflow-y-auto">
-                {bulkProgress.failed.map((f, i) => <div key={i}>{f.name}: {f.error}</div>)}
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setBulkOpen(false)} disabled={bulkRunning}>Cerrar</Button>
-              <Button onClick={runBulk} loading={bulkRunning} disabled={bulkRunning || selectedCount === 0}>
-                {isPay ? 'Marcar cobradas' : 'Emitir seleccionadas'} ({selectedCount})
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <BulkInvoiceModal
+        isOpen={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        mode={bulkMode}
+        rows={bulkRows}
+        year={selected.year}
+        month={selected.month}
+        monthLabel={monthLabel}
+        onComplete={onBulkComplete}
+      />
     </div>
   )
 }

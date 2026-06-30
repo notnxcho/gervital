@@ -43,3 +43,12 @@ export const DISTANCE_RANGES = [
   { id: '2_to_5km', label: '2 a 5 km' },
   { id: '5_to_10km', label: '5 a 10 km' }
 ]
+
+const DISTANCE_LABELS = Object.fromEntries(DISTANCE_RANGES.map(r => [r.id, r.label]))
+
+// Concepto de la línea de transporte: incluye la distancia, que es uno de los
+// factores que determina el precio. Espejado en supabase/functions/biller/lib/comprobante.ts
+export function buildTransportConcepto(distanceRange) {
+  const label = distanceRange ? DISTANCE_LABELS[distanceRange] : null
+  return label ? `Transporte (${label})` : 'Transporte'
+}
