@@ -413,6 +413,32 @@ export default function AddClient() {
     : { priceNet: 0, priceGross: 0 }
   const estimatedTotalGross = planPrice.priceGross + transportPrice.priceGross
 
+  // Prorrateo del primer mes según la fecha de inicio, con el modelo de precio por día
+  // determinístico: días estándar = 4 × frecuencia, se factura min(días desde el inicio, estándar).
+  const firstMonth = (() => {
+    const DOW = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+    const days = formData.assignedDays || []
+    const freq = parseInt(formData.frequency)
+    if (!formData.startDate || days.length === 0 || !freq) return null
+    const start = new Date(`${formData.startDate}T00:00:00`)
+    if (isNaN(start.getTime())) return null
+    const y = start.getFullYear()
+    const mo = start.getMonth()
+    const lastDay = new Date(y, mo + 1, 0).getDate()
+    let charged = 0
+    for (let dnum = 1; dnum <= lastDay; dnum++) {
+      const d = new Date(y, mo, dnum)
+      if (days.includes(DOW[d.getDay()]) && d >= start) charged++
+    }
+    const daysPerMonth = 4 * freq
+    const billed = Math.max(0, Math.min(charged, daysPerMonth))
+    const factor = billed / daysPerMonth
+    const attendance = Math.round(factor * planPrice.priceGross)
+    const transport = Math.round(factor * transportPrice.priceGross)
+    return { label: `${MONTHS[mo]} ${y}`, billed, daysPerMonth, prorated: billed < daysPerMonth, attendance, transport, total: attendance + transport }
+  })()
+
   if (loadingClient) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -854,6 +880,17 @@ export default function AddClient() {
                   {formData.frequency}x/semana · {SCHEDULE_OPTIONS.find(s => s.value === formData.schedule)?.label}
                   {formData.hasTransport && ' · Transporte'}
                 </p>
+
+                {firstMonth?.prorated && (
+                  <div className="pt-2 mt-2 border-t border-indigo-200">
+                    <p className="text-sm text-indigo-700">Primer mes ({firstMonth.label}) · prorrateado</p>
+                    <p className="text-xl font-bold text-indigo-900">{formatCurrency(firstMonth.total)}</p>
+                    <p className="text-xs text-indigo-600 mt-0.5">
+                      {firstMonth.billed} de {firstMonth.daysPerMonth} días desde el inicio
+                      {formData.hasTransport && transportPrice.priceGross > 0 && ` · transporte ${formatCurrency(firstMonth.transport)}`}
+                    </p>
+                  </div>
+                )}
               </div>
               )}
             </div>

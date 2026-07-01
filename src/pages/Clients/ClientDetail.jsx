@@ -772,11 +772,6 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   // Fecha de baja: desde ese día (inclusive) el cliente ya NO asiste ni se cobra (corte exclusivo).
   const deactDate = client.deactivationDate ? new Date(`${client.deactivationDate}T00:00:00`) : null
 
-  const fullMonthDays = days.filter(d => {
-    const name = DAY_INDEX_TO_NAME[getDay(d)]
-    return name && plan.assignedDays.includes(name)
-  }).length
-
   const vacationDays = days.filter(d => {
     const dateStr = format(d, 'yyyy-MM-dd')
     const rec = attendance.find(a => a.date === dateStr)
@@ -802,21 +797,26 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const transportPrice = plan.hasTransport && plan.distanceRange
     ? getTransportPriceSync(transportPricingData, plan.frequency, plan.distanceRange)
     : { priceNet: 0, priceGross: 0 }
+  // Modelo de precio por día determinístico: días estándar = 4 × frecuencia (mes = 4 semanas).
+  // Se factura min(díasCobrables, díasEstándar) → un mes completo nunca supera la mensualidad,
+  // y cada día por debajo del estándar descuenta precio/díasEstándar.
+  const daysPerMonth = 4 * plan.frequency
+  const billedDays = Math.max(0, Math.min(chargeableDays, daysPerMonth))
   // El descuento de promoción aplica SOLO a asistencia (no a transporte). Se redondea
   // cada componente por separado para coincidir exacto con calculate_month_billing (emisión).
   const discountFactor = 1 - ((invoice?.discountPercent || 0) / 100)
-  const proration = fullMonthDays > 0 ? chargeableDays / fullMonthDays : 0
-  const liveChargeableAmount = fullMonthDays > 0
-    ? Math.round(proration * planPrice.priceGross * discountFactor) + Math.round(proration * transportPrice.priceGross)
-    : 0
+  const proration = daysPerMonth > 0 ? billedDays / daysPerMonth : 0
+  const liveChargeableAmount = Math.round(proration * planPrice.priceGross * discountFactor) + Math.round(proration * transportPrice.priceGross)
 
   // If paid: use snapshot from invoice; otherwise live calculation
   const displayAmount = isPaid ? (invoice.paidAmount ?? invoice.chargeableAmount) : liveChargeableAmount
-  const vacationPct = fullMonthDays > 0 && vacationDays > 0
-    ? Math.round((vacationDays / fullMonthDays) * 100)
+  // Descuento por vacaciones sobre los días facturados (0 si el día extra del mes lo absorbe).
+  const billedWithoutVacation = Math.max(0, Math.min(plannedDays, daysPerMonth))
+  const vacationPct = billedWithoutVacation > billedDays
+    ? Math.round(((billedWithoutVacation - billedDays) / daysPerMonth) * 100)
     : 0
 
-  const isProrated = clientStart > monthStart && clientStart <= monthEnd
+  const isProrated = billedDays < daysPerMonth
 
   // --- Day status lookup ---
   const getDayStatus = (day) => {
@@ -986,7 +986,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
           {/* Stats row */}
           <div className="flex items-baseline gap-2 mt-2">
             <span className="text-sm font-medium text-gray-700">
-              {chargeableDays}/{fullMonthDays}
+              {billedDays}/{daysPerMonth}
             </span>
             {recoveryDays > 0 && (
               <span className="text-sm text-blue-600 font-medium">+{recoveryDays}</span>
@@ -1229,7 +1229,7 @@ function PaymentModal({ isOpen, onClose, clientId, year, month, liveAmount, user
         ) : billing && (
           <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
             <div className="flex justify-between text-gray-600">
-              <span>Días planificados:</span><span>{billing.plannedDays}/{billing.fullMonthDays}</span>
+              <span>Días planificados:</span><span>{billing.plannedDays}</span>
             </div>
             {billing.vacationDays > 0 && (
               <div className="flex justify-between text-orange-600">
@@ -1237,7 +1237,7 @@ function PaymentModal({ isOpen, onClose, clientId, year, month, liveAmount, user
               </div>
             )}
             <div className="flex justify-between font-medium text-gray-800 border-t border-gray-200 pt-1">
-              <span>Días a cobrar:</span><span>{billing.chargeableDays}</span>
+              <span>Días a cobrar:</span><span>{billing.chargeableDays}/{billing.daysPerMonth}</span>
             </div>
             <div className="flex justify-between text-gray-700 pt-1">
               <span>Mensualidad:</span><span>{formatCurrency(billing.attendanceChargeableGross)}</span>
