@@ -4,6 +4,9 @@
 
 .client-card {
   position: relative;
+  display: block;
+  text-decoration: none;
+  color: inherit;
   height: 340px;
   border-radius: 12px;
   overflow: hidden;
@@ -116,3 +119,60 @@
   opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 10;
 }
 .client-card .cc-schedule:hover .cc-tip { opacity: 1; }
+
+/* ===== Vista lista ===== */
+.client-list { display: flex; flex-direction: column; gap: 8px; }
+
+.client-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 16px;
+  background: #fff; border: 1px solid #eceaf1; border-radius: 12px;
+  text-decoration: none; color: inherit;
+  box-shadow: 0 1px 2px rgba(26, 22, 37, .05);
+  transition: box-shadow .2s, border-color .2s, transform .2s;
+}
+.client-row:hover {
+  border-color: #d8d2ea;
+  box-shadow: 0 6px 16px -8px rgba(26, 22, 37, .22);
+  transform: translateY(-1px);
+}
+.client-row.is-deactivated { opacity: .55; filter: grayscale(1); }
+
+.client-row .cr-avatar { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; flex: none; }
+.client-row .cr-initials {
+  width: 42px; height: 42px; border-radius: 10px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 15px; color: rgba(255, 255, 255, .95);
+  background: linear-gradient(135deg, #8b7fd1, #b39ddb 60%, #d6c8f0);
+}
+.client-row .cr-tier {
+  width: 24px; height: 24px; border-radius: 7px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 12px; color: #1a1625;
+}
+.client-row .cr-main { min-width: 0; display: flex; flex-direction: column; }
+.client-row .cr-name {
+  font-weight: 600; font-size: 15px; color: #1a1625; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.client-row .cr-sub {
+  font-size: 12px; color: #8a8598; margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.client-row .cr-spacer { flex: 1; }
+.client-row .cr-days { display: flex; gap: 4px; }
+.client-row .cr-day {
+  width: 22px; height: 22px; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; background: #f1eef8; color: #b9b2cc;
+}
+.client-row .cr-day.is-on { background: #7c3aed; color: #fff; }
+.client-row .cr-meds { display: flex; gap: 5px; }
+.client-row .cr-meddot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.client-row .cr-badge {
+  font-size: 11px; font-weight: 600; color: #514b63;
+  background: #f1eef8; padding: 3px 8px; border-radius: 7px;
+}
+.client-row .cr-tchip { display: inline-flex; align-items: center; justify-content: center; color: #7c3aed; }
+.client-row .cr-recovery { font-size: 11px; font-weight: 700; color: #7c3aed; white-space: nowrap; }
+.client-row .cr-deactivated { font-size: 12px; color: #8a8598; white-space: nowrap; }
