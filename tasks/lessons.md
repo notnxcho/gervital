@@ -16,3 +16,12 @@ Caso Biller: la doc Postman es JS y WebFetch devolvía vacío → casi afirmo "n
 endpoint de búsqueda" sin evidencia. La forma correcta: leer el JSON crudo de la
 colección vía `https://documenter.gw.postman.com/api/collections/<view>/<pubid>`.
 Confirmar contra la fuente antes de concluir, sobre todo si el usuario duda.
+
+## La fuente de verdad es la DB/código, no CLAUDE.md ni los specs
+Afirmé que frecuencia de plan era 1-4 (sale del data model y "Reglas de precios"
+del CLAUDE.md). El usuario sabía que pueden ser 5 días. La realidad: CHECK de
+client_plans permite 1-5 y plan_pricing tiene 15 combos (5 freq x 3 horarios).
+CLAUDE.md y los specs pueden estar desactualizados. Para constraints/enums/valores
+permitidos, verificar SIEMPRE contra el esquema vivo (CHECK constraints, tablas de
+catálogo como plan_pricing) antes de documentar o decidir. Corregido CLAUDE.md
+(líneas de Client, PlanPricing y Reglas de precios) para no propagar el error.

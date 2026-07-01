@@ -77,7 +77,7 @@ src/services/
   startDate: string,          // Fecha de ingreso
   
   plan: {
-    frequency: 1 | 2 | 3 | 4,           // Veces por semana
+    frequency: 1 | 2 | 3 | 4 | 5,       // Veces por semana
     schedule: 'morning' | 'afternoon' | 'full_day',
     hasTransport: boolean,
     assignedDays: ['monday', 'tuesday', ...]  // Días predefinidos
@@ -223,9 +223,10 @@ src/services/
 ### PlanPricing (Precios de planes)
 ```javascript
 {
-  frequency: 1 | 2 | 3 | 4,
+  frequency: 1 | 2 | 3 | 4 | 5,
   schedule: 'morning' | 'afternoon' | 'full_day',
-  price: number               // Precio mensual base
+  price_net: number,          // Precio mensual base sin IVA
+  price_gross: number         // Precio mensual base con IVA
 }
 ```
 
@@ -516,7 +517,7 @@ npm run build
 6. Estado de factura y pago son **independientes**
 
 ### Precios (Asistencia)
-- 8 combinaciones base: 4 frecuencias × 2 horarios (mañana/tarde tienen mismo precio)
+- 15 combinaciones base: 5 frecuencias (1–5) × 3 horarios (mañana/tarde tienen mismo precio; día completo mayor)
 - Día completo tiene precio mayor
 - `hasTransport` en el perfil del cliente indica si usa transporte (no afecta precio de asistencia)
 
