@@ -211,8 +211,13 @@ export async function getMonthInvoicePanel(year, month) {
       isDeactivated: !!c.deletedAt,
       amount: Number(row.attendance_gross || 0) + Number(row.transport_gross || 0),
       paidAmount: Number(row.paid_amount || 0),
+      paidDate: row.paid_date || null,
       paymentStatus: row.payment_status,
-      invoiceStatus: row.invoice_status
+      invoiceStatus: row.invoice_status,
+      invoiceNumber: row.invoice_number || null,
+      invoicedAt: row.invoiced_at || null,
+      invoiceDate: row.invoice_date || null,
+      invoicedAmount: Number(row.invoiced_amount || 0)
     }
   })
 }

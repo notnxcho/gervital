@@ -140,6 +140,8 @@ Deno.serve(async (req) => {
       await admin.rpc('mark_invoice_emitted', {
         p_client_id: clientId, p_year: year, p_month: month,
         p_biller_id: parsed.id ?? null, p_serie: parsed.serie ?? '', p_numero: parsed.numero ?? '', p_hash: parsed.hash ?? null,
+        // Fecha de emisión del comprobante (la que va en la factura DGI), no el timestamp del record.
+        p_invoice_date: body.fechaEmision ?? null,
         // Snapshot de lo REALMENTE facturado (override del modal o cálculo del server).
         p_chargeable_amount: totalGross,
         p_monthly_rate: Number(billing.monthlyRate) || 0,
