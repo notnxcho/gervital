@@ -75,7 +75,7 @@ const FILTERS_CONFIG = [
     label: 'Bajas',
     type: 'full',
     options: [
-      { value: true, label: 'Mostrar bajas' }
+      { value: true, label: 'Solo bajas' }
     ]
   }
 ]
@@ -219,11 +219,13 @@ export default function ClientList() {
       const matchesCognitive = filters.cognitiveLevel === null || client.cognitiveLevel === filters.cognitiveLevel
       const matchesFrequency = filters.frequency === null || client.plan.frequency === filters.frequency
       const matchesTransport = filters.hasTransport === null || client.plan.hasTransport === filters.hasTransport
+      // "Solo bajas": con el filtro activo se muestran únicamente los dados de baja
+      const matchesDeleted = filters.showDeleted === true ? !!client.deletedAt : !client.deletedAt
 
-      return matchesSearch && matchesCognitive && matchesFrequency && matchesTransport
+      return matchesSearch && matchesCognitive && matchesFrequency && matchesTransport && matchesDeleted
     })
     return sortClients(filtered, sortBy)
-  }, [clients, search, filters.cognitiveLevel, filters.frequency, filters.hasTransport, sortBy])
+  }, [clients, search, filters.cognitiveLevel, filters.frequency, filters.hasTransport, filters.showDeleted, sortBy])
 
   const activeFiltersCount = getActiveFiltersCount(filters)
 
