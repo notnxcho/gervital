@@ -41,6 +41,7 @@ export default function EmitInvoiceModal({
   const [adenda, setAdenda] = useState('')
   const [fechaEmision, setFechaEmision] = useState('')
   const [fechaVencimiento, setFechaVencimiento] = useState('')
+  const [vencTouched, setVencTouched] = useState(false)
   const [emitting, setEmitting] = useState(false)
   const [error, setError] = useState(null)
   const [dgiLoading, setDgiLoading] = useState(false)
@@ -72,8 +73,10 @@ export default function EmitInvoiceModal({
     setTransConcepto(buildTransportConcepto(client?.address?.distanceRange))
     setTransAmount(String(Math.round(Number(billing.transportChargeableGross) || 0)))
     setAdenda(defaultAdenda(discountedDays))
-    setFechaEmision(format(lastBusinessDayOfMonth(year, month), 'yyyy-MM-dd'))
-    setFechaVencimiento('')
+    const defEmision = format(lastBusinessDayOfMonth(year, month), 'yyyy-MM-dd')
+    setFechaEmision(defEmision)
+    setFechaVencimiento(defEmision) // vencimiento = emisión por defecto
+    setVencTouched(false)
     setError(null)
   }, [isOpen, isInvoiced, billing, plan, client, discountedDays, year, month])
 
@@ -221,8 +224,8 @@ export default function EmitInvoiceModal({
           <Textarea label="Adenda" value={adenda} onChange={e => setAdenda(e.target.value)} rows={2} placeholder="Días no facturados…" />
 
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Fecha de emisión" type="date" value={fechaEmision} onChange={e => setFechaEmision(e.target.value)} />
-            <Input label="Fecha de vencimiento" type="date" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)} />
+            <Input label="Fecha de emisión" type="date" value={fechaEmision} onChange={e => { setFechaEmision(e.target.value); if (!vencTouched) setFechaVencimiento(e.target.value) }} />
+            <Input label="Fecha de vencimiento" type="date" value={fechaVencimiento} onChange={e => { setFechaVencimiento(e.target.value); setVencTouched(true) }} />
           </div>
 
           <div className="flex items-center justify-between pt-3 border-t border-gray-100">

@@ -9,6 +9,12 @@ import { emitInvoice, markMonthPaid } from '../../services/api'
 
 const RATE_LIMIT_MS = 1100 // delay entre llamadas (rate-limit de Biller)
 
+// Fecha local de hoy en YYYY-MM-DD (sin líos de timezone del toISOString)
+const todayStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 // runStatus por fila: idle | queued | running | success | error | skipped
 function eligibilityBadge(eligibility) {
   if (eligibility === 'sin CI') return { label: 'sin CI', cls: 'bg-red-50 text-red-700' }
@@ -30,6 +36,7 @@ export default function BulkInvoiceModal({
   // Settings globales de la corrida (solo emit)
   const [fechaEmision, setFechaEmision] = useState('')
   const [fechaVencimiento, setFechaVencimiento] = useState('')
+  const [vencTouched, setVencTouched] = useState(false)
 
   useEffect(() => {
     if (!isOpen) return
@@ -37,13 +44,16 @@ export default function BulkInvoiceModal({
       ...r,
       runStatus: r.eligibility === 'listo' ? 'idle' : 'skipped',
       runError: null,
-      selected: r.eligibility === 'listo'
+      selected: r.eligibility === 'listo',
+      paidDate: todayStr() // fecha de cobro por fila (default: hoy)
     })))
     setSearch('')
     setRunning(false)
     setHasRun(false)
-    setFechaEmision(format(lastBusinessDayOfMonth(year, month), 'yyyy-MM-dd'))
-    setFechaVencimiento('')
+    const defEmision = format(lastBusinessDayOfMonth(year, month), 'yyyy-MM-dd')
+    setFechaEmision(defEmision)
+    setFechaVencimiento(defEmision) // vencimiento = emisión por defecto
+    setVencTouched(false)
   }, [isOpen, rows, year, month])
 
   const setItem = (id, patch) =>
@@ -60,7 +70,7 @@ export default function BulkInvoiceModal({
       setItem(id, { runStatus: 'running' })
       try {
         if (isPay) {
-          await markMonthPaid(id, year, month, target.amount)
+          await markMonthPaid(id, year, month, target.amount, null, null, target.paidDate || null)
         } else {
           await emitInvoice(id, year, month, {
             fechaEmision: fechaEmision || undefined,
@@ -92,6 +102,10 @@ export default function BulkInvoiceModal({
   }
 
   const selectedCount = items.filter(it => it.selected && it.runStatus !== 'skipped').length
+  const selectableItems = items.filter(it => it.runStatus !== 'skipped')
+  const allSelected = selectableItems.length > 0 && selectableItems.every(it => it.selected)
+  const toggleAll = (checked) =>
+    setItems(curr => curr.map(it => it.runStatus !== 'skipped' ? { ...it, selected: checked } : it))
   const failedCount = items.filter(it => it.runStatus === 'error').length
   const successCount = items.filter(it => it.runStatus === 'success').length
   const processedCount = successCount + failedCount
@@ -133,6 +147,14 @@ export default function BulkInvoiceModal({
           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-gray-50"
         />
 
+        {/* Marcar todos */}
+        <label className={`flex items-center gap-2 px-1 text-sm ${running || selectableItems.length === 0 ? 'text-gray-300' : 'text-gray-600 cursor-pointer'}`}>
+          <input type="checkbox" checked={allSelected} disabled={running || selectableItems.length === 0}
+            onChange={(e) => toggleAll(e.target.checked)} />
+          Marcar todos
+          <span className="ml-auto text-xs text-gray-400">{selectedCount} seleccionados</span>
+        </label>
+
         <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
           {items.length === 0 ? (
             <div className="px-3 py-6 text-center text-sm text-gray-400">No hay clientes</div>
@@ -153,6 +175,17 @@ export default function BulkInvoiceModal({
                     <p className="text-xs text-red-600 break-words">{it.runError}</p>
                   )}
                 </div>
+                {isPay && it.runStatus !== 'skipped' && (
+                  <input
+                    type="date"
+                    value={it.paidDate || ''}
+                    disabled={running || it.runStatus === 'success'}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setItem(it.id, { paidDate: e.target.value })}
+                    title="Fecha de cobro"
+                    className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-gray-50 flex-shrink-0"
+                  />
+                )}
                 <span className="text-gray-600 whitespace-nowrap">{formatCurrency(it.amount)}</span>
                 <RowStatus item={it} isPay={isPay} />
               </label>
@@ -164,9 +197,9 @@ export default function BulkInvoiceModal({
         {!isPay && (
           <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
             <Input label="Fecha de emisión" type="date" value={fechaEmision}
-              onChange={e => setFechaEmision(e.target.value)} disabled={running} />
+              onChange={e => { setFechaEmision(e.target.value); if (!vencTouched) setFechaVencimiento(e.target.value) }} disabled={running} />
             <Input label="Fecha de vencimiento" type="date" value={fechaVencimiento}
-              onChange={e => setFechaVencimiento(e.target.value)} disabled={running} />
+              onChange={e => { setFechaVencimiento(e.target.value); setVencTouched(true) }} disabled={running} />
           </div>
         )}
 
