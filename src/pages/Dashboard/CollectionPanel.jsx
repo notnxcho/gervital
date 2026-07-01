@@ -1,14 +1,27 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { NavArrowRight } from 'iconoir-react'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import Card from '../../components/ui/Card'
 import SemiCircleGauge from './SemiCircleGauge'
 import { formatCurrency, formatCompact } from '../../utils/format'
 
-const TABS = [
-  { id: 'pagos', label: 'Pagos' },
-  { id: 'facturas', label: 'Facturas' }
+const DOMAINS = [
+  { id: 'cobranza', label: 'Cobranza' },
+  { id: 'facturacion', label: 'Facturación' }
 ]
+
+// Vistas de solo lectura (histórico, sin acción masiva)
+const READONLY_TABS = ['cobrados', 'emitidas']
+
+const formatInvoiceDate = (d) => {
+  if (!d) return '—'
+  const s = String(d)
+  // date-only ('YYYY-MM-DD') se parsea en local para no correrse un día por timezone
+  const dt = s.length === 10 ? new Date(`${s}T00:00:00`) : new Date(s)
+  return format(dt, "d MMM yyyy", { locale: es })
+}
 
 function Avatar({ firstName, lastName, avatarUrl }) {
   if (avatarUrl) {
@@ -28,18 +41,35 @@ function Avatar({ firstName, lastName, avatarUrl }) {
   )
 }
 
-export default function CollectionPanel({ rows, loading, kpis, monthLabel, onBulkAction, canAct }) {
-  const [tab, setTab] = useState('pagos')
+export default function CollectionPanel({ rows, loading, kpis, onBulkAction, canAct }) {
+  const [domain, setDomain] = useState('cobranza')
+  const [pending, setPending] = useState(true)
+  // Dominio (Cobranza/Facturación) × estado (Pendientes/Hechas) → las 4 combinaciones
+  const tab = domain === 'cobranza'
+    ? (pending ? 'pagos' : 'cobrados')
+    : (pending ? 'facturas' : 'emitidas')
+  const doneLabel = domain === 'cobranza' ? 'Cobrados' : 'Emitidas'
   const navigate = useNavigate()
 
   const list = useMemo(() => {
+    if (tab === 'emitidas') {
+      return (rows || [])
+        .filter(r => r.invoiceStatus === 'invoiced')
+        .sort((a, b) => String(b.invoiceDate || b.invoicedAt || '').localeCompare(String(a.invoiceDate || a.invoicedAt || '')))
+    }
+    if (tab === 'cobrados') {
+      return (rows || [])
+        .filter(r => r.paymentStatus === 'paid')
+        .sort((a, b) => String(b.paidDate || '').localeCompare(String(a.paidDate || '')))
+    }
     const filtered = (rows || []).filter(r =>
       tab === 'pagos' ? r.paymentStatus !== 'paid' : r.invoiceStatus !== 'invoiced'
     )
     return filtered.sort((a, b) => b.amount - a.amount)
   }, [rows, tab])
 
-  const totalPending = list.reduce((s, r) => s + r.amount, 0)
+  const rowAmount = (r) => (tab === 'emitidas' ? r.invoicedAmount : tab === 'cobrados' ? r.paidAmount : r.amount)
+  const totalPending = list.reduce((s, r) => s + rowAmount(r), 0)
 
   const pct = kpis && kpis.ingresoPrevisto > 0 ? (kpis.cobrado / kpis.ingresoPrevisto) * 100 : 0
 
@@ -47,29 +77,45 @@ export default function CollectionPanel({ rows, loading, kpis, monthLabel, onBul
     <Card className="rounded-2xl border-gray-100 shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex flex-col xl:h-full overflow-hidden">
       {/* header */}
       <div className="px-5 pt-5 pb-3 border-b border-gray-100">
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-bold text-gray-900">Cobranza</h2>
-          <span className="text-[11px] text-gray-400 capitalize">{monthLabel}</span>
+          <button
+            type="button"
+            onClick={() => setPending(p => !p)}
+            className="flex items-center gap-2"
+            title="Alternar pendientes / hechas"
+          >
+            <span className={`text-[11px] font-semibold ${pending ? 'text-amber-600' : 'text-emerald-600'}`}>
+              {pending ? 'Pendientes' : doneLabel}
+            </span>
+            <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${pending ? 'bg-gray-300' : 'bg-emerald-500'}`}>
+              <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${pending ? 'translate-x-0.5' : 'translate-x-3.5'}`} />
+            </span>
+          </button>
         </div>
 
         {/* segmented tabs */}
         <div className="mt-3 inline-flex w-full bg-gray-100 rounded-xl p-0.5">
-          {TABS.map(t => (
+          {DOMAINS.map(d => (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
+              key={d.id}
+              onClick={() => setDomain(d.id)}
               className={`flex-1 text-xs font-semibold py-1.5 rounded-lg transition-colors ${
-                tab === t.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                domain === d.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t.id === 'pagos' ? 'Pagos pendientes' : 'Facturas pendientes'}
+              {d.label}
             </button>
           ))}
         </div>
 
         <div className="flex items-center justify-between mt-3">
           <span className="text-[11px] text-gray-400">
-            {list.length} {list.length === 1 ? 'cliente' : 'clientes'}
+            {tab === 'emitidas'
+              ? `${list.length} ${list.length === 1 ? 'factura' : 'facturas'}`
+              : tab === 'cobrados'
+                ? `${list.length} ${list.length === 1 ? 'cobro' : 'cobros'}`
+                : `${list.length} ${list.length === 1 ? 'cliente' : 'clientes'}`}
           </span>
           <span className="text-xs font-semibold tabular-nums text-gray-700">
             {formatCurrency(totalPending)}
@@ -85,9 +131,17 @@ export default function CollectionPanel({ rows, loading, kpis, monthLabel, onBul
         ) : list.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-5 py-12 text-center">
             <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2 text-lg">✓</div>
-            <p className="text-sm font-medium text-gray-600">Todo al día</p>
+            <p className="text-sm font-medium text-gray-600">
+              {tab === 'emitidas' ? 'Sin facturas emitidas' : tab === 'cobrados' ? 'Sin cobros' : 'Todo al día'}
+            </p>
             <p className="text-xs text-gray-400 mt-0.5">
-              {tab === 'pagos' ? 'Sin pagos pendientes este mes' : 'Todas las facturas emitidas'}
+              {tab === 'pagos'
+                ? 'Sin pagos pendientes este mes'
+                : tab === 'cobrados'
+                  ? 'Ningún cobro registrado este mes'
+                  : tab === 'facturas'
+                    ? 'Todas las facturas emitidas'
+                    : 'Ninguna factura emitida este mes'}
             </p>
           </div>
         ) : (
@@ -104,10 +158,16 @@ export default function CollectionPanel({ rows, loading, kpis, monthLabel, onBul
                   {r.isDeactivated && <span className="ml-1.5 text-[10px] font-normal text-gray-400">(baja)</span>}
                 </p>
                 <p className="text-[11px] text-gray-400">
-                  {tab === 'pagos' ? 'Pago pendiente' : 'Sin factura electrónica'}
+                  {tab === 'pagos'
+                    ? 'Pago pendiente'
+                    : tab === 'cobrados'
+                      ? `Cobrado · ${formatInvoiceDate(r.paidDate)}`
+                      : tab === 'facturas'
+                        ? 'Sin factura electrónica'
+                        : `${r.invoiceNumber || 's/n'} · ${formatInvoiceDate(r.invoiceDate || r.invoicedAt)}`}
                 </p>
               </div>
-              <span className="text-sm font-semibold tabular-nums text-gray-900">{formatCurrency(r.amount)}</span>
+              <span className="text-sm font-semibold tabular-nums text-gray-900">{formatCurrency(rowAmount(r))}</span>
               <NavArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
             </button>
           ))
@@ -116,7 +176,7 @@ export default function CollectionPanel({ rows, loading, kpis, monthLabel, onBul
 
       {/* fixed footer: bulk CTA + gauge */}
       <div className="border-t border-gray-100 bg-gray-50/60 px-5 py-4 flex-shrink-0">
-        {canAct && onBulkAction && (
+        {canAct && onBulkAction && !READONLY_TABS.includes(tab) && (
           <button
             type="button"
             onClick={() => onBulkAction(tab === 'pagos' ? 'pay' : 'emit')}
