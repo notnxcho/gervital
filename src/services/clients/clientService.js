@@ -116,12 +116,13 @@ export async function updateClientAddressCoords(clientId, latitude, longitude) {
  * @param {string} payload.userId - UUID of the system user performing the action
  * @returns {Promise<object>} The updated client
  */
-export async function deactivateClient(id, { reason, notes, userId }) {
+export async function deactivateClient(id, { reason, notes, userId, deactivationDate }) {
   const { error } = await supabase.rpc('deactivate_client', {
     p_client_id: id,
     p_reason: reason,
     p_notes: notes || null,
-    p_user_id: userId
+    p_user_id: userId,
+    p_deactivation_date: deactivationDate || null
   })
 
   if (error) {

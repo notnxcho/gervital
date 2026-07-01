@@ -204,11 +204,11 @@ export default function ClientDetail() {
     }
   }
 
-  const handleDeactivate = async ({ reason, notes }) => {
+  const handleDeactivate = async ({ reason, notes, deactivationDate }) => {
     if (!user?.id) return
     setDeactivating(true)
     try {
-      const updated = await deactivateClient(id, { reason, notes, userId: user.id })
+      const updated = await deactivateClient(id, { reason, notes, userId: user.id, deactivationDate })
       setClient(prev => ({ ...updated, planVersions: prev?.planVersions }))
       setDeactivateModal(false)
     } catch (error) {
@@ -425,7 +425,7 @@ export default function ClientDetail() {
         <div className="mb-4 p-4 rounded-xl border border-amber-300 bg-amber-50 flex items-start justify-between gap-4">
           <div>
             <p className="text-amber-900 font-semibold">
-              Cliente dado de baja el {format(new Date(client.deletedAt), "d 'de' MMMM, yyyy", { locale: es })}
+              Cliente dado de baja el {format(client.deactivationDate ? new Date(`${client.deactivationDate}T00:00:00`) : new Date(client.deletedAt), "d 'de' MMMM, yyyy", { locale: es })}
             </p>
             <p className="text-sm text-amber-800 mt-1">
               Motivo: {REASON_LABEL[client.deactivationReason] || '—'}
@@ -769,6 +769,8 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   // --- Billing calculation (local, for unpaid months) ---
   const clientStart = new Date(client.startDate)
   const effectiveStart = clientStart > monthStart ? clientStart : monthStart
+  // Fecha de baja: desde ese día (inclusive) el cliente ya NO asiste ni se cobra (corte exclusivo).
+  const deactDate = client.deactivationDate ? new Date(`${client.deactivationDate}T00:00:00`) : null
 
   const fullMonthDays = days.filter(d => {
     const name = DAY_INDEX_TO_NAME[getDay(d)]
@@ -779,13 +781,14 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     const dateStr = format(d, 'yyyy-MM-dd')
     const rec = attendance.find(a => a.date === dateStr)
     const name = DAY_INDEX_TO_NAME[getDay(d)]
-    return name && plan.assignedDays.includes(name) && d >= effectiveStart && rec?.status === 'vacation'
+    return name && plan.assignedDays.includes(name) && d >= effectiveStart && (!deactDate || d < deactDate) && rec?.status === 'vacation'
   }).length
 
   const plannedDays = days.filter(d => {
     const name = DAY_INDEX_TO_NAME[getDay(d)]
     if (!name || !plan.assignedDays.includes(name)) return false
     if (d < effectiveStart) return false
+    if (deactDate && d >= deactDate) return false
     return true
   }).length
 
@@ -799,9 +802,12 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const transportPrice = plan.hasTransport && plan.distanceRange
     ? getTransportPriceSync(transportPricingData, plan.frequency, plan.distanceRange)
     : { priceNet: 0, priceGross: 0 }
-  const monthlyTotalGross = planPrice.priceGross + transportPrice.priceGross
+  // El descuento de promoción aplica SOLO a asistencia (no a transporte). Se redondea
+  // cada componente por separado para coincidir exacto con calculate_month_billing (emisión).
+  const discountFactor = 1 - ((invoice?.discountPercent || 0) / 100)
+  const proration = fullMonthDays > 0 ? chargeableDays / fullMonthDays : 0
   const liveChargeableAmount = fullMonthDays > 0
-    ? Math.round((chargeableDays / fullMonthDays) * monthlyTotalGross)
+    ? Math.round(proration * planPrice.priceGross * discountFactor) + Math.round(proration * transportPrice.priceGross)
     : 0
 
   // If paid: use snapshot from invoice; otherwise live calculation
@@ -822,6 +828,8 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     if (rec?.status === 'recovery') return { status: 'recovery', isJustified: false, isAssigned: false }
     if (!isAssigned) return { status: 'not_scheduled', isJustified: false, isAssigned: false }
     if (day < clientStart) return { status: 'not_scheduled', isJustified: false, isAssigned: false }
+    // Baja: desde la fecha de baja (inclusive) el día ya no cuenta como asistencia ni es cobrable.
+    if (deactDate && day >= deactDate) return { status: 'not_scheduled', isJustified: false, isAssigned: false }
     if (rec) return { status: rec.status, isJustified: rec.isJustified ?? false, isAssigned: true }
     if (day > today) return { status: 'scheduled', isJustified: false, isAssigned: true }
     return { status: 'attended', isJustified: false, isAssigned: true }
@@ -912,21 +920,20 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
             {/* Payment badge */}
             <div className="relative flex-1" ref={paymentDropRef}>
               <button
-                onClick={isDeactivated ? undefined : () => setPaymentDropOpen(!paymentDropOpen)}
-                disabled={isDeactivated}
+                onClick={() => setPaymentDropOpen(!paymentDropOpen)}
                 className={`w-full flex items-center justify-between gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
                   isPaid
                     ? 'bg-green-50 text-green-700 border-green-200'
                     : isOverdue
                       ? 'bg-red-50 text-red-700 border-red-200'
                       : 'bg-amber-50 text-amber-700 border-amber-200'
-                } ${isDeactivated ? 'cursor-default' : isPaid ? 'hover:bg-green-100' : isOverdue ? 'hover:bg-red-100' : 'hover:bg-amber-100'}`}
+                } ${isPaid ? 'hover:bg-green-100' : isOverdue ? 'hover:bg-red-100' : 'hover:bg-amber-100'}`}
               >
                 <span className="flex items-center gap-1">
                   {isPaid ? 'Cobrado' : 'Pendiente'}
                   {isOverdue && <span className="px-1 py-0.5 bg-red-600 text-white rounded text-[10px] leading-none">Vencido</span>}
                 </span>
-                {!isDeactivated && <NavArrowDown className="w-3 h-3" />}
+                <NavArrowDown className="w-3 h-3" />
               </button>
               {paymentDropOpen && (
                 <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1">
@@ -959,15 +966,14 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
             {/* Invoice badge → abre el modal de emisión/info */}
             <div className="flex-1">
               <button
-                onClick={isDeactivated ? undefined : () => setEmitModalOpen(true)}
-                disabled={isDeactivated}
+                onClick={() => setEmitModalOpen(true)}
                 className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
                   isInvoiced
                     ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                     : invoice?.emitError
                       ? 'bg-red-50 text-red-700 border-red-200'
                       : 'bg-gray-50 text-gray-500 border-gray-200'
-                } ${isDeactivated ? 'cursor-default' : isInvoiced ? 'hover:bg-indigo-100' : invoice?.emitError ? 'hover:bg-red-100' : 'hover:bg-gray-100'}`}
+                } ${isInvoiced ? 'hover:bg-indigo-100' : invoice?.emitError ? 'hover:bg-red-100' : 'hover:bg-gray-100'}`}
               >
                 {isInvoiced
                   ? `Facturado${invoice.invoiceNumber ? ` · ${invoice.invoiceNumber}` : ''}`

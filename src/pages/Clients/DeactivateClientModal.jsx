@@ -20,23 +20,31 @@ const NOTES_PLACEHOLDERS = {
   default: 'Información adicional (opcional).'
 }
 
+// Fecha local de hoy en YYYY-MM-DD (sin líos de timezone del toISOString)
+const todayStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export default function DeactivateClientModal({ isOpen, onClose, client, onConfirm, loading }) {
   const [reason, setReason] = useState(null)
   const [notes, setNotes] = useState('')
+  const [deactivationDate, setDeactivationDate] = useState(todayStr())
 
   useEffect(() => {
     if (isOpen) {
       setReason(null)
       setNotes('')
+      setDeactivationDate(todayStr())
     }
   }, [isOpen])
 
   const requiresNotes = reason === 'other'
-  const canConfirm = reason !== null && (!requiresNotes || notes.trim().length > 0)
+  const canConfirm = reason !== null && !!deactivationDate && (!requiresNotes || notes.trim().length > 0)
 
   const handleConfirm = () => {
     if (!canConfirm) return
-    onConfirm({ reason, notes: notes.trim() })
+    onConfirm({ reason, notes: notes.trim(), deactivationDate })
   }
 
   const placeholder = NOTES_PLACEHOLDERS[reason] || NOTES_PLACEHOLDERS.default
@@ -56,6 +64,19 @@ export default function DeactivateClientModal({ isOpen, onClose, client, onConfi
           </p>
         </div>
       </div>
+
+      <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de baja</label>
+      <input
+        type="date"
+        value={deactivationDate}
+        onChange={e => setDeactivationDate(e.target.value)}
+        max={todayStr()}
+        min={client?.startDate || undefined}
+        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+      />
+      <p className="text-xs text-gray-500 mt-1 mb-4">
+        Desde esta fecha (inclusive) el cliente ya no asiste ni se cobra.
+      </p>
 
       <p className="text-sm font-medium text-gray-700 mb-2">Motivo</p>
       <div className="grid grid-cols-2 gap-2 mb-4">
