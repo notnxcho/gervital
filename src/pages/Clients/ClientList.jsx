@@ -109,8 +109,9 @@ const bajaDate = (client) =>
 // Ordena una copia de la lista según el criterio. Los vacíos (edad/tier sin dato) van al final.
 const sortClients = (list, sortBy) => {
   const arr = [...list]
+  const fullName = (c) => `${c.firstName} ${c.lastName}`.trim().replace(/\s+/g, ' ')
   const cmpName = (a, b) =>
-    `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, 'es', { sensitivity: 'base' })
+    fullName(a).localeCompare(fullName(b), 'es', { sensitivity: 'base' })
   const nullsLast = (aEmpty, bEmpty, cmp) => {
     if (aEmpty && bEmpty) return 0
     if (aEmpty) return 1
