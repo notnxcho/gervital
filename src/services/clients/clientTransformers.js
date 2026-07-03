@@ -1,3 +1,7 @@
+// Normaliza nombres: quita espacios sobrantes al inicio/fin y colapsa dobles.
+// Evita que un espacio inicial rompa el orden alfabético.
+const cleanName = (v) => typeof v === 'string' ? v.trim().replace(/\s+/g, ' ') : v
+
 /**
  * Transform client data from frontend format to database format
  * @param {object} clientData - Frontend client object
@@ -5,8 +9,8 @@
  */
 export function transformClientToDb(clientData) {
   return {
-    p_first_name: clientData.firstName,
-    p_last_name: clientData.lastName,
+    p_first_name: cleanName(clientData.firstName),
+    p_last_name: cleanName(clientData.lastName),
     p_email: clientData.email || null,
     p_phone: clientData.phone || null,
     p_birth_date: clientData.birthDate || null,
@@ -110,8 +114,8 @@ export function transformUpdateToDb(clientId, updateData) {
   }
 
   // Basic fields
-  if (updateData.firstName !== undefined) params.p_first_name = updateData.firstName
-  if (updateData.lastName !== undefined) params.p_last_name = updateData.lastName
+  if (updateData.firstName !== undefined) params.p_first_name = cleanName(updateData.firstName)
+  if (updateData.lastName !== undefined) params.p_last_name = cleanName(updateData.lastName)
   if (updateData.email !== undefined) params.p_email = updateData.email
   if (updateData.phone !== undefined) params.p_phone = updateData.phone
   if (updateData.birthDate !== undefined) params.p_birth_date = updateData.birthDate
