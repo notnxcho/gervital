@@ -3096,12 +3096,20 @@ video {
   color: rgb(209 213 219 / var(--tw-text-opacity, 1));
 }
 
+.disabled\:opacity-30:disabled {
+  opacity: 0.3;
+}
+
 .disabled\:opacity-40:disabled {
   opacity: 0.4;
 }
 
 .disabled\:opacity-50:disabled {
   opacity: 0.5;
+}
+
+.disabled\:hover\:bg-transparent:hover:disabled {
+  background-color: transparent;
 }
 
 .group:hover .group-hover\:text-gray-500 {

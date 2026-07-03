@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { format, subMonths, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { NavArrowLeft, NavArrowRight } from 'iconoir-react'
 import MonthlyFinanceChart from './MonthlyFinanceChart'
 import KpiRow from './KpiRow'
 import PlaceholderCard from './PlaceholderCard'
@@ -12,6 +13,54 @@ import { useAuth } from '../../context/AuthContext'
 
 const RANGE_MONTHS = 24 // fetch window: last 24 months ending today; the chart scrolls within it
 const TODAY = startOfMonth(new Date())
+const WINDOW_START = subMonths(TODAY, RANGE_MONTHS - 1) // earliest month with data in the series
+
+// Navegación de mes en el header: chevrons (secuencial) + chip clickeable (mes exacto).
+// Solo mueve el mes seleccionado dentro de la ventana de datos, sin refetch de la serie.
+function MonthNavigator({ selected, onChange }) {
+  const current = new Date(selected.year, selected.month, 1)
+  const atMin = current <= WINDOW_START
+  const atMax = current >= TODAY
+  const shift = (delta) => {
+    const d = new Date(selected.year, selected.month + delta, 1)
+    const clamped = d < WINDOW_START ? WINDOW_START : d > TODAY ? TODAY : d
+    onChange({ year: clamped.getFullYear(), month: clamped.getMonth() })
+  }
+  const onPick = (e) => {
+    const v = e.target.value // 'yyyy-MM'
+    if (!v) return
+    const [y, m] = v.split('-').map(Number)
+    const d = new Date(y, m - 1, 1)
+    const clamped = d < WINDOW_START ? WINDOW_START : d > TODAY ? TODAY : d
+    onChange({ year: clamped.getFullYear(), month: clamped.getMonth() })
+  }
+  const label = format(current, 'MMMM yyyy', { locale: es })
+  const inputValue = format(current, 'yyyy-MM')
+
+  const chevronCls = 'flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent'
+
+  return (
+    <div className="flex items-center gap-1">
+      <button type="button" onClick={() => shift(-1)} disabled={atMin} title="Mes anterior" className={chevronCls}>
+        <NavArrowLeft className="w-5 h-5" />
+      </button>
+      <label className="relative flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-700 capitalize cursor-pointer transition-colors hover:bg-gray-100" title="Elegir mes">
+        {label}
+        <input
+          type="month"
+          value={inputValue}
+          min={format(WINDOW_START, 'yyyy-MM')}
+          max={format(TODAY, 'yyyy-MM')}
+          onChange={onPick}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </label>
+      <button type="button" onClick={() => shift(1)} disabled={atMax} title="Mes siguiente" className={chevronCls}>
+        <NavArrowRight className="w-5 h-5" />
+      </button>
+    </div>
+  )
+}
 
 export default function Dashboard() {
   const { hasAccess } = useAuth()
@@ -98,7 +147,7 @@ export default function Dashboard() {
       {/* header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <span className="text-sm font-medium text-gray-500 capitalize">{monthLabel}</span>
+        {showFinancials && <MonthNavigator selected={selected} onChange={setSelected} />}
       </div>
 
       {error && (
