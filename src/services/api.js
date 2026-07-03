@@ -47,6 +47,8 @@ export {
 // ============================================
 export {
   getClientAttendance,
+  getAttendanceForDate,
+  getAttendanceForDateRange,
   advanceScheduledAttendance,
   markDayAbsent,
   unmarkDayAbsent,

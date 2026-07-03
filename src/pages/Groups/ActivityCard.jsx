@@ -10,7 +10,8 @@ export default function ActivityCard({
   onUpdateActivity,
   onDeleteActivity,
   readOnly,
-  isInvalidDrop
+  isInvalidDrop,
+  recoveryIds
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `activity-${activity.id}`,
@@ -78,6 +79,7 @@ export default function ActivityCard({
             client={client}
             readOnly={readOnly}
             onRemove={() => onRemoveClient(activity.id, client.id)}
+            isRecovery={recoveryIds?.has(client.id)}
           />
         ))}
         {assignedClients.length === 0 && (

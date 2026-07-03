@@ -11,13 +11,13 @@ import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 import { Plus, MagicWand } from 'iconoir-react'
 import CarCard from './CarCard'
-import { SortableClientChip, DragOverlayChip } from './ClientChip'
+import { SortableClientChip, DragOverlayChip, AbsenceChip } from './ClientChip'
 import { UNASSIGNED_COLOR } from '../../services/transport/transportConstants'
 import { getNextCarColor, autoAssignByZone } from '../../services/transport/transportService'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
 
-function UnassignedPool({ clientIds, clients, onAutoAssign, autoAssigning }) {
+function UnassignedPool({ clientIds, clients, onAutoAssign, autoAssigning, recoveryIds }) {
   const { setNodeRef, isOver } = useDroppable({
     id: 'unassigned',
     data: { type: 'unassigned' }
@@ -59,6 +59,7 @@ function UnassignedPool({ clientIds, clients, onAutoAssign, autoAssigning }) {
               client={client}
               color={UNASSIGNED_COLOR}
               noAddress={!client.latitude && !client.longitude}
+              isRecovery={recoveryIds?.has(client.id)}
             />
           ))}
         </div>
@@ -70,10 +71,47 @@ function UnassignedPool({ clientIds, clients, onAutoAssign, autoAssigning }) {
   )
 }
 
+function AbsencesSection({ absentClients, vacationClients }) {
+  if (absentClients.length === 0 && vacationClients.length === 0) return null
+
+  return (
+    <div className="p-3 border-b border-gray-200">
+      {absentClients.length > 0 && (
+        <>
+          <p className="text-xs font-semibold text-red-500 uppercase tracking-wider mb-2">
+            Faltas del día ({absentClients.length})
+          </p>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {absentClients.map(client => (
+              <AbsenceChip key={client.id} client={client} variant="absent" />
+            ))}
+          </div>
+        </>
+      )}
+      {vacationClients.length > 0 && (
+        <>
+          <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-2">
+            Vacaciones ({vacationClients.length})
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {vacationClients.map(client => (
+              <AbsenceChip key={client.id} client={client} variant="vacation" />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function CarAssignmentPanel({
   shiftState,
   onStateChange,
-  clientsById
+  clientsById,
+  recoveryIds,
+  absentClients = [],
+  vacationClients = [],
+  showAbsences = false
 }) {
   const [activeClient, setActiveClient] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
@@ -226,7 +264,12 @@ export default function CarAssignmentPanel({
           clients={clientsById}
           onAutoAssign={handleAutoAssign}
           autoAssigning={autoAssigning}
+          recoveryIds={recoveryIds}
         />
+
+        {showAbsences && (
+          <AbsencesSection absentClients={absentClients} vacationClients={vacationClients} />
+        )}
 
         <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
           {shiftState.cars.map(car => (
@@ -237,6 +280,7 @@ export default function CarAssignmentPanel({
               onNameChange={handleCarNameChange}
               onSeatCountChange={handleSeatCountChange}
               onDelete={handleDeleteCar}
+              recoveryIds={recoveryIds}
             />
           ))}
 

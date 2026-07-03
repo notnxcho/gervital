@@ -24,6 +24,38 @@ export async function getClientAttendance(clientId) {
 }
 
 /**
+ * Get all attendance records for a single date (across all clients)
+ * @param {string} date - YYYY-MM-DD
+ * @returns {Promise<Array>}
+ */
+export async function getAttendanceForDate(date) {
+  const { data, error } = await supabase
+    .from('attendance_view')
+    .select('*')
+    .eq('date', date)
+
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/**
+ * Get all attendance records in a date range (inclusive), across all clients
+ * @param {string} fromDate - YYYY-MM-DD
+ * @param {string} toDate - YYYY-MM-DD
+ * @returns {Promise<Array>}
+ */
+export async function getAttendanceForDateRange(fromDate, toDate) {
+  const { data, error } = await supabase
+    .from('attendance_view')
+    .select('*')
+    .gte('date', fromDate)
+    .lte('date', toDate)
+
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/**
  * Flip 'scheduled' → 'attended' for all past days
  * @returns {Promise<number>} rows updated
  */

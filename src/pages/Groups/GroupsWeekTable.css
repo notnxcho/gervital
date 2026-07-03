@@ -152,5 +152,16 @@
 .gwk-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 9999px; }
 .gwk-name { flex: 1; font-size: 14px; font-weight: 500; color: #374151; line-height: 1.2; }
 .gwk-truck { flex-shrink: 0; width: 15px; height: 15px; color: #4f46e5; }
+.gwk-recovery { flex-shrink: 0; width: 15px; height: 15px; color: #3b82f6; }
+
+/* Absence chips (shown when "Mostrar faltas" is on) */
+.gwk-chip-absent { background: #fef2f2; border-color: #fecaca; }
+.gwk-chip-vacation { background: #fffbeb; border-color: #fde68a; }
+.gwk-tag {
+  flex-shrink: 0; font-size: 10px; font-weight: 700;
+  padding: 1px 6px; border-radius: 6px; text-transform: uppercase;
+}
+.gwk-tag-absent { background: #fee2e2; color: #b91c1c; }
+.gwk-tag-vacation { background: #fef3c7; color: #b45309; }
 
 .gwk-empty { font-size: 11px; color: #cbd5e1; padding: 6px 2px; }

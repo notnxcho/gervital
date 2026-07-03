@@ -1,18 +1,23 @@
 import { useState } from 'react'
-import { PoolClientChip } from './ClientChip'
+import { PoolClientChip, AbsenceClientChip } from './ClientChip'
 
-export default function ClientPool({ clients, clientsInAllSlots }) {
+const matchName = (c, term) =>
+  c.firstName?.toLowerCase().includes(term) || c.lastName?.toLowerCase().includes(term)
+
+export default function ClientPool({
+  clients,
+  clientsInAllSlots,
+  recoveryIds,
+  absentClients = [],
+  vacationClients = [],
+  showAbsences = false
+}) {
   const [search, setSearch] = useState('')
 
-  const filtered = search
-    ? clients.filter(c => {
-        const term = search.toLowerCase()
-        return (
-          c.firstName?.toLowerCase().includes(term) ||
-          c.lastName?.toLowerCase().includes(term)
-        )
-      })
-    : clients
+  const term = search.toLowerCase()
+  const filtered = search ? clients.filter(c => matchName(c, term)) : clients
+  const filteredAbsent = search ? absentClients.filter(c => matchName(c, term)) : absentClients
+  const filteredVacation = search ? vacationClients.filter(c => matchName(c, term)) : vacationClients
 
   return (
     <div className="w-60 flex-shrink-0 border-l border-gray-200 bg-gray-50 p-4 overflow-y-auto">
@@ -32,12 +37,39 @@ export default function ClientPool({ clients, clientsInAllSlots }) {
             key={client.id}
             client={client}
             assignedToAll={clientsInAllSlots?.has(client.id)}
+            isRecovery={recoveryIds?.has(client.id)}
           />
         ))}
         {filtered.length === 0 && (
           <p className="text-xs text-gray-400 text-center py-4">Sin resultados</p>
         )}
       </div>
+
+      {showAbsences && filteredAbsent.length > 0 && (
+        <div className="mt-5">
+          <div className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">
+            Faltas del día ({filteredAbsent.length})
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {filteredAbsent.map(client => (
+              <AbsenceClientChip key={client.id} client={client} variant="absent" />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showAbsences && filteredVacation.length > 0 && (
+        <div className="mt-5">
+          <div className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-2">
+            Vacaciones ({filteredVacation.length})
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {filteredVacation.map(client => (
+              <AbsenceClientChip key={client.id} client={client} variant="vacation" />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

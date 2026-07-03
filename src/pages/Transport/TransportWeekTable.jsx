@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useState } from 'react'
-import { Search, Xmark } from 'iconoir-react'
+import { Search, Xmark, RefreshDouble } from 'iconoir-react'
 import { SHIFTS } from '../../services/transport/transportConstants'
-import { filterClientsForShift } from '../../services/transport/transportService'
+import { shiftMatchesSchedule } from '../../services/transport/transportService'
+import { classifyDay, isRecoveryAttendee } from '../../services/attendance/dayRoster'
 import './TransportWeekTable.css'
 
 const TIER_HEX = { A: '#34d399', B: '#38bdf8', C: '#fbbf24', D: '#fb7185' }
@@ -15,24 +16,45 @@ const WEEK_DAYS = [
   { key: 'friday', label: 'Viernes' }
 ]
 
-function Cell({ people }) {
-  if (people.length === 0) return <div className="wk-empty">—</div>
+function classifyForDayShift(clients, shiftId, dayKey, attMap) {
+  const matchesShift = c => shiftMatchesSchedule(shiftId, c.plan?.schedule)
+  return classifyDay({ clients, dayName: dayKey, matchesShift, attendanceByClientId: attMap })
+}
 
-  const cars = Math.ceil(people.length / SEAT_CAP)
+function Cell({ present, absent, vacation, attMap, showAbsences }) {
+  const extra = showAbsences ? absent.length + vacation.length : 0
+  if (present.length === 0 && extra === 0) return <div className="wk-empty">—</div>
+
+  const cars = Math.ceil(present.length / SEAT_CAP)
   return (
     <>
       <div className="wk-cell-head">
-        <span className="wk-count">{people.length} pers.</span>
-        <span className="wk-cars">🚐 {cars}</span>
+        <span className="wk-count">{present.length} pers.</span>
+        {present.length > 0 && <span className="wk-cars">🚐 {cars}</span>}
       </div>
-      {people.map((c, i) => (
+      {present.map((c, i) => (
         <Fragment key={c.id}>
           {i > 0 && i % SEAT_CAP === 0 && <div className="wk-sep"><div className="wk-line" /></div>}
           <div className="wk-chip">
             <span className="wk-dot" style={{ background: TIER_HEX[c.cognitiveLevel] || '#cbd5e1' }} />
             <span className="wk-name">{c.firstName} {c.lastName}</span>
+            {isRecoveryAttendee(c, attMap) && <RefreshDouble className="wk-recovery" title="Día de recupero" />}
           </div>
         </Fragment>
+      ))}
+      {showAbsences && absent.map(c => (
+        <div key={c.id} className="wk-chip wk-chip-absent" title={c.isJustified ? 'Falta justificada' : 'Falta no justificada'}>
+          <span className="wk-dot" style={{ background: '#ef4444' }} />
+          <span className="wk-name">{c.firstName} {c.lastName}</span>
+          <span className="wk-chip-tag wk-chip-tag-absent">falta</span>
+        </div>
+      ))}
+      {showAbsences && vacation.map(c => (
+        <div key={c.id} className="wk-chip wk-chip-vacation" title="Vacaciones">
+          <span className="wk-dot" style={{ background: '#f59e0b' }} />
+          <span className="wk-name">{c.firstName} {c.lastName}</span>
+          <span className="wk-chip-tag wk-chip-tag-vacation">vac.</span>
+        </div>
       ))}
     </>
   )
@@ -41,7 +63,7 @@ function Cell({ people }) {
 const normalize = (str) =>
   (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
-export default function TransportWeekTable({ isOpen, onClose, clients }) {
+export default function TransportWeekTable({ isOpen, onClose, clients, weekDates, attendanceByDate, showAbsences = false }) {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -63,11 +85,14 @@ export default function TransportWeekTable({ isOpen, onClose, clients }) {
     ? clients.filter(c => normalize(`${c.firstName} ${c.lastName}`).includes(query))
     : clients
 
+  // Attendance map (clientId → record) for a given weekday, if this week's data is loaded
+  const attFor = (dayKey) => attendanceByDate?.get(weekDates?.[dayKey])
+
   // Unique attendees per day (a person shows up in two shifts, count once)
   const dayUnique = {}
   WEEK_DAYS.forEach(d => {
     const ids = new Set()
-    SHIFTS.forEach(s => filterClientsForShift(visibleClients, s.id, d.key).forEach(c => ids.add(c.id)))
+    SHIFTS.forEach(s => classifyForDayShift(visibleClients, s.id, d.key, attFor(d.key)).present.forEach(c => ids.add(c.id)))
     dayUnique[d.key] = ids.size
   })
 
@@ -133,11 +158,20 @@ export default function TransportWeekTable({ isOpen, onClose, clients }) {
                       {s.type === 'arrive' ? 'Llegada' : 'Salida'}
                     </span>
                   </th>
-                  {WEEK_DAYS.map(d => (
-                    <td key={d.key} className="wk-cell">
-                      <Cell people={filterClientsForShift(visibleClients, s.id, d.key)} />
-                    </td>
-                  ))}
+                  {WEEK_DAYS.map(d => {
+                    const cls = classifyForDayShift(visibleClients, s.id, d.key, attFor(d.key))
+                    return (
+                      <td key={d.key} className="wk-cell">
+                        <Cell
+                          present={cls.present}
+                          absent={cls.absent}
+                          vacation={cls.vacation}
+                          attMap={attFor(d.key)}
+                          showAbsences={showAbsences}
+                        />
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>

@@ -6,10 +6,11 @@ import {
   useSensor,
   useSensors
 } from '@dnd-kit/core'
-import { format, addDays, subDays, isToday, differenceInCalendarDays, startOfDay } from 'date-fns'
+import { format, addDays, subDays, isToday, differenceInCalendarDays, startOfDay, startOfWeek } from 'date-fns'
 import { es } from 'date-fns/locale/es'
 import { NavArrowLeft, NavArrowRight, Calendar } from 'iconoir-react'
-import { getClients } from '../../services/api'
+import { getClients, getAttendanceForDate, getAttendanceForDateRange } from '../../services/api'
+import { classifyDay, indexAttendanceByClientId, RECOVERY_STATUS } from '../../services/attendance/dayRoster'
 import {
   getTimeSlotsForDate,
   createTimeSlot,
@@ -28,6 +29,7 @@ import { PoolClientChip } from './ClientChip'
 import TemplateModal from './TemplateModal'
 import GroupsWeekTable from './GroupsWeekTable'
 import Button from '../../components/ui/Button'
+import Toggle from '../../components/ui/Toggle'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -47,9 +49,12 @@ export default function DailyGroups() {
   const [activeShift, setActiveShift] = useState('morning')
   const [loading, setLoading] = useState(true)
   const [allClients, setAllClients] = useState([])
+  const [attendanceByClientId, setAttendanceByClientId] = useState(new Map())
+  const [weekAttendanceByDate, setWeekAttendanceByDate] = useState(new Map())
   const [timeSlots, setTimeSlots] = useState([])
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [showWeek, setShowWeek] = useState(false)
+  const [showAbsences, setShowAbsences] = useState(true)
 
   // DnD state
   const [draggedClient, setDraggedClient] = useState(null)
@@ -64,6 +69,13 @@ export default function DailyGroups() {
   const dayName = DAY_NAMES[selectedDate.getDay()]
   const isWeekend = dayName === 'saturday' || dayName === 'sunday'
 
+  // Mon–Fri dates of the selected date's week (for the weekly review)
+  const weekDates = useMemo(() => {
+    const monday = startOfWeek(selectedDate, { weekStartsOn: 1 })
+    const keys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+    return keys.reduce((acc, k, i) => ({ ...acc, [k]: dateToStr(addDays(monday, i)) }), {})
+  }, [selectedDate])
+
   // ── Derived data ──────────────────────────────────────────────────────────
 
   const clientsById = useMemo(() => {
@@ -72,14 +84,20 @@ export default function DailyGroups() {
     return map
   }, [allClients])
 
-  const shiftClients = useMemo(() => {
-    return allClients.filter(c =>
-      c.plan?.assignedDays?.includes(dayName) &&
-      (activeShift === 'morning'
-        ? (c.plan?.schedule === 'morning' || c.plan?.schedule === 'full_day')
-        : (c.plan?.schedule === 'afternoon' || c.plan?.schedule === 'full_day'))
-    )
-  }, [allClients, dayName, activeShift])
+  const dayClassified = useMemo(() => {
+    const matchesShift = c => activeShift === 'morning'
+      ? (c.plan?.schedule === 'morning' || c.plan?.schedule === 'full_day')
+      : (c.plan?.schedule === 'afternoon' || c.plan?.schedule === 'full_day')
+    return classifyDay({ clients: allClients, dayName, matchesShift, attendanceByClientId })
+  }, [allClients, dayName, activeShift, attendanceByClientId])
+
+  const shiftClients = dayClassified.present
+
+  const recoveryIds = useMemo(() => {
+    const ids = new Set()
+    attendanceByClientId.forEach((rec, id) => { if (rec.status === RECOVERY_STATUS) ids.add(id) })
+    return ids
+  }, [attendanceByClientId])
 
   // Clients assigned to every time slot of the active shift
   const clientsInAllSlots = useMemo(() => {
@@ -144,6 +162,39 @@ export default function DailyGroups() {
     }
     init()
   }, [today])
+
+  // Load actual attendance for the selected date (to reflect absences/recoveries)
+  useEffect(() => {
+    let cancelled = false
+    getAttendanceForDate(dateStr)
+      .then(records => { if (!cancelled) setAttendanceByClientId(indexAttendanceByClientId(records)) })
+      .catch(err => {
+        console.error('Error loading attendance:', err)
+        if (!cancelled) setAttendanceByClientId(new Map())
+      })
+    return () => { cancelled = true }
+  }, [dateStr])
+
+  // Load the week's attendance when the weekly review is open (indexed by date → clientId)
+  useEffect(() => {
+    if (!showWeek) return
+    let cancelled = false
+    getAttendanceForDateRange(weekDates.monday, weekDates.friday)
+      .then(records => {
+        if (cancelled) return
+        const byDate = new Map()
+        for (const r of records) {
+          if (!byDate.has(r.date)) byDate.set(r.date, new Map())
+          byDate.get(r.date).set(r.clientId, r)
+        }
+        setWeekAttendanceByDate(byDate)
+      })
+      .catch(err => {
+        console.error('Error loading week attendance:', err)
+        if (!cancelled) setWeekAttendanceByDate(new Map())
+      })
+    return () => { cancelled = true }
+  }, [showWeek, weekDates])
 
   // Load slots when date or shift changes
   useEffect(() => {
@@ -316,6 +367,12 @@ export default function DailyGroups() {
           <p className="text-sm text-gray-500 mt-0.5 capitalize">{formattedDate}</p>
         </div>
         <div className="flex items-center gap-3">
+          <Toggle
+            id="toggle-absences-groups"
+            checked={showAbsences}
+            onChange={setShowAbsences}
+            label="Mostrar faltas"
+          />
           <Button
             variant="secondary"
             onClick={() => setShowWeek(true)}
@@ -444,6 +501,7 @@ export default function DailyGroups() {
                       readOnly={readOnly}
                       invalidDropSlotIds={invalidDropSlotIds}
                       draggedClientId={draggedClient?.id || null}
+                      recoveryIds={recoveryIds}
                     />
                   ))}
                 </div>
@@ -451,7 +509,14 @@ export default function DailyGroups() {
             </div>
 
             {/* Client pool sidebar */}
-            <ClientPool clients={shiftClients} clientsInAllSlots={clientsInAllSlots} />
+            <ClientPool
+              clients={shiftClients}
+              clientsInAllSlots={clientsInAllSlots}
+              recoveryIds={recoveryIds}
+              absentClients={dayClassified.absent}
+              vacationClients={dayClassified.vacation}
+              showAbsences={showAbsences}
+            />
           </div>
 
           {/* Drag overlay */}
@@ -479,6 +544,9 @@ export default function DailyGroups() {
         isOpen={showWeek}
         onClose={() => setShowWeek(false)}
         clients={allClients}
+        weekDates={weekDates}
+        attendanceByDate={weekAttendanceByDate}
+        showAbsences={showAbsences}
       />
     </div>
   )

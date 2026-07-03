@@ -12,7 +12,8 @@ export default function TimeSlotCard({
   onDeleteActivity,
   readOnly,
   invalidDropSlotIds,
-  draggedClientId
+  draggedClientId,
+  recoveryIds
 }) {
 
   function isInvalidDropForActivity(activity) {
@@ -90,6 +91,7 @@ export default function TimeSlotCard({
             onDeleteActivity={onDeleteActivity}
             readOnly={readOnly}
             isInvalidDrop={isInvalidDropForActivity(activity)}
+            recoveryIds={recoveryIds}
           />
         ))}
         {slot.activities.length === 0 && (

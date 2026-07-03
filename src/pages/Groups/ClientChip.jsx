@@ -1,5 +1,5 @@
 import { useDraggable } from '@dnd-kit/core'
-import { Xmark, Check } from 'iconoir-react'
+import { Xmark, Check, RefreshDouble } from 'iconoir-react'
 
 const COGNITIVE_LEVEL_COLORS = {
   A: 'bg-green-100 text-green-700',
@@ -8,7 +8,21 @@ const COGNITIVE_LEVEL_COLORS = {
   D: 'bg-red-100 text-red-700'
 }
 
-export function PoolClientChip({ client, assignedToAll }) {
+// Absence variants shown when "Mostrar faltas" is on (read-only, not draggable)
+const ABSENCE_VARIANTS = {
+  absent: { chip: 'bg-red-50 border-red-200', tag: 'bg-red-100 text-red-700', dot: 'bg-red-500', label: 'falta' },
+  vacation: { chip: 'bg-amber-50 border-amber-200', tag: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500', label: 'vacación' }
+}
+
+function RecoveryBadge() {
+  return (
+    <span title="Día de recupero" className="flex-shrink-0 text-blue-500">
+      <RefreshDouble className="w-3.5 h-3.5" strokeWidth={2} />
+    </span>
+  )
+}
+
+export function PoolClientChip({ client, assignedToAll, isRecovery }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `pool-${client.id}`,
     data: { type: 'pool-client', client }
@@ -42,6 +56,7 @@ export function PoolClientChip({ client, assignedToAll }) {
       <span className="text-sm text-gray-800 font-medium flex-1 truncate">
         {client.firstName} {client.lastName}
       </span>
+      {isRecovery && <RecoveryBadge />}
       <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${COGNITIVE_LEVEL_COLORS[client.cognitiveLevel] || 'bg-gray-100 text-gray-600'}`}>
         {client.cognitiveLevel}
       </span>
@@ -49,7 +64,30 @@ export function PoolClientChip({ client, assignedToAll }) {
   )
 }
 
-export function AssignedClientChip({ client, onRemove, readOnly }) {
+// Read-only chip for an absent / vacationing client (not draggable)
+export function AbsenceClientChip({ client, variant = 'absent' }) {
+  const v = ABSENCE_VARIANTS[variant] || ABSENCE_VARIANTS.absent
+  const tooltip = variant === 'vacation'
+    ? 'Vacaciones'
+    : client.isJustified ? 'Falta justificada' : 'Falta no justificada'
+
+  return (
+    <div
+      title={tooltip}
+      className={`flex items-center gap-2 px-3 py-2 border rounded-lg select-none ${v.chip}`}
+    >
+      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${v.dot}`} />
+      <span className="text-sm text-gray-700 font-medium flex-1 truncate">
+        {client.firstName} {client.lastName}
+      </span>
+      <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${v.tag}`}>
+        {v.label}
+      </span>
+    </div>
+  )
+}
+
+export function AssignedClientChip({ client, onRemove, readOnly, isRecovery }) {
   const initials = `${client.firstName?.[0] || ''}${client.lastName?.[0] || ''}`
 
   return (
@@ -64,6 +102,7 @@ export function AssignedClientChip({ client, onRemove, readOnly }) {
       <span className="text-gray-800 font-medium truncate">
         {client.firstName} {client.lastName?.[0]}.
       </span>
+      {isRecovery && <RecoveryBadge />}
       <span className={`px-1 py-0.5 text-[9px] font-semibold rounded ${COGNITIVE_LEVEL_COLORS[client.cognitiveLevel] || 'bg-gray-100 text-gray-600'}`}>
         {client.cognitiveLevel}
       </span>

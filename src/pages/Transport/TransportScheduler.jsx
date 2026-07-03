@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { format, addDays, subDays, isWeekend, nextMonday, previousFriday } from 'date-fns'
+import { format, addDays, subDays, isWeekend, nextMonday, previousFriday, startOfWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { NavArrowLeft, NavArrowRight, Refresh, Check, Calendar } from 'iconoir-react'
 import {
   getTransportClients,
   filterClientsForShift,
+  shiftMatchesSchedule,
   getArrangementForDate,
   saveTransportDay,
   findLastWeekdayArrangement,
@@ -12,11 +13,14 @@ import {
   buildDefaultFleet
 } from '../../services/transport/transportService'
 import { SHIFTS, DAY_NAMES, DAY_LABELS_ES } from '../../services/transport/transportConstants'
+import { getAttendanceForDate, getAttendanceForDateRange } from '../../services/api'
+import { classifyDay, indexAttendanceByClientId, RECOVERY_STATUS } from '../../services/attendance/dayRoster'
 import TransportMap from './TransportMap'
 import CarAssignmentPanel from './CarAssignmentPanel'
 import TransportWeekTable from './TransportWeekTable'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
+import Toggle from '../../components/ui/Toggle'
 
 function getDateStr(date) {
   return format(date, 'yyyy-MM-dd')
@@ -50,11 +54,14 @@ export default function TransportScheduler() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [allClients, setAllClients] = useState([])
+  const [attendanceByClientId, setAttendanceByClientId] = useState(new Map())
+  const [weekAttendanceByDate, setWeekAttendanceByDate] = useState(new Map())
   const [lastWeekdayAvailable, setLastWeekdayAvailable] = useState(false)
   const [showRepeatConfirm, setShowRepeatConfirm] = useState(false)
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(null)
   const [showSaveWarning, setShowSaveWarning] = useState(false)
   const [showWeek, setShowWeek] = useState(false)
+  const [showAbsences, setShowAbsences] = useState(true)
   const [error, setError] = useState(null)
   const [toast, setToast] = useState(null)
 
@@ -69,31 +76,47 @@ export default function TransportScheduler() {
   const dayName = DAY_NAMES[currentDate.getDay()]
   const dayLabelEs = DAY_LABELS_ES[dayName] || dayName
 
+  // Mon–Fri dates of the current week (for the weekly review)
+  const weekDates = useMemo(() => {
+    const monday = startOfWeek(currentDate, { weekStartsOn: 1 })
+    const keys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+    return keys.reduce((acc, k, i) => ({ ...acc, [k]: getDateStr(addDays(monday, i)) }), {})
+  }, [currentDate])
+
   const clientsById = useMemo(() => {
     const map = new Map()
     allClients.forEach(c => map.set(c.id, c))
     return map
   }, [allClients])
 
-  const shiftClients = useMemo(() => {
-    return filterClientsForShift(allClients, activeShift, dayName)
-  }, [allClients, activeShift, dayName])
+  const shiftClassified = useMemo(() => {
+    const matchesShift = c => shiftMatchesSchedule(activeShift, c.plan?.schedule)
+    return classifyDay({ clients: allClients, dayName, matchesShift, attendanceByClientId })
+  }, [allClients, activeShift, dayName, attendanceByClientId])
+
+  const shiftClients = shiftClassified.present
+
+  const recoveryIds = useMemo(() => {
+    const ids = new Set()
+    attendanceByClientId.forEach((rec, id) => { if (rec.status === RECOVERY_STATUS) ids.add(id) })
+    return ids
+  }, [attendanceByClientId])
 
   const totalDayClients = useMemo(() => {
     const ids = new Set()
     SHIFTS.forEach(s => {
-      filterClientsForShift(allClients, s.id, dayName).forEach(c => ids.add(c.id))
+      filterClientsForShift(allClients, s.id, dayName, attendanceByClientId).forEach(c => ids.add(c.id))
     })
     return ids.size
-  }, [allClients, dayName])
+  }, [allClients, dayName, attendanceByClientId])
 
   const shiftCounts = useMemo(() => {
     const counts = {}
     SHIFTS.forEach(s => {
-      counts[s.id] = filterClientsForShift(allClients, s.id, dayName).length
+      counts[s.id] = filterClientsForShift(allClients, s.id, dayName, attendanceByClientId).length
     })
     return counts
-  }, [allClients, dayName])
+  }, [allClients, dayName, attendanceByClientId])
 
   // A shift is "complete" when it has attendees and none are left unassigned
   const shiftComplete = useMemo(() => {
@@ -115,19 +138,22 @@ export default function TransportScheduler() {
       const dStr = getDateStr(date)
       const dName = DAY_NAMES[date.getDay()]
 
-      const [clients, arrangement, lastWeekday] = await Promise.all([
+      const [clients, arrangement, lastWeekday, attendance] = await Promise.all([
         getTransportClients(),
         getArrangementForDate(dStr),
-        findLastWeekdayArrangement(dStr)
+        findLastWeekdayArrangement(dStr),
+        getAttendanceForDate(dStr)
       ])
 
+      const attMap = indexAttendanceByClientId(attendance)
       setAllClients(clients)
+      setAttendanceByClientId(attMap)
       setLastWeekdayAvailable(!!lastWeekday)
 
       if (arrangement) {
         const newShifts = {}
         for (const shift of SHIFTS) {
-          const shiftClients = filterClientsForShift(clients, shift.id, dName)
+          const shiftClients = filterClientsForShift(clients, shift.id, dName, attMap)
           const shiftClientIds = new Set(shiftClients.map(c => c.id))
           const savedShift = arrangement.shifts[shift.id] || { cars: [] }
 
@@ -147,7 +173,7 @@ export default function TransportScheduler() {
       } else {
         const newShifts = {}
         for (const shift of SHIFTS) {
-          const eligible = filterClientsForShift(clients, shift.id, dName)
+          const eligible = filterClientsForShift(clients, shift.id, dName, attMap)
           newShifts[shift.id] = {
             cars: buildDefaultFleet(),
             unassigned: eligible.map(c => c.id)
@@ -168,6 +194,27 @@ export default function TransportScheduler() {
   useEffect(() => {
     loadDay(currentDate)
   }, [currentDate, loadDay])
+
+  // Load the week's attendance when the weekly review is open (indexed by date → clientId)
+  useEffect(() => {
+    if (!showWeek) return
+    let cancelled = false
+    getAttendanceForDateRange(weekDates.monday, weekDates.friday)
+      .then(records => {
+        if (cancelled) return
+        const byDate = new Map()
+        for (const r of records) {
+          if (!byDate.has(r.date)) byDate.set(r.date, new Map())
+          byDate.get(r.date).set(r.clientId, r)
+        }
+        setWeekAttendanceByDate(byDate)
+      })
+      .catch(err => {
+        console.error('Error loading week attendance:', err)
+        if (!cancelled) setWeekAttendanceByDate(new Map())
+      })
+    return () => { cancelled = true }
+  }, [showWeek, weekDates])
 
   // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -249,7 +296,7 @@ export default function TransportScheduler() {
 
       const newShifts = {}
       for (const shift of SHIFTS) {
-        const eligible = filterClientsForShift(allClients, shift.id, dayName)
+        const eligible = filterClientsForShift(allClients, shift.id, dayName, attendanceByClientId)
         const eligibleIds = new Set(eligible.map(c => c.id))
         const savedShift = sourceData.shifts[shift.id] || { cars: [] }
 
@@ -365,13 +412,21 @@ export default function TransportScheduler() {
         })}
         </div>
 
-        <button
-          onClick={() => setShowWeek(true)}
-          className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
-        >
-          <Calendar className="w-4 h-4" />
-          Ver semana
-        </button>
+        <div className="flex items-center gap-4">
+          <Toggle
+            id="toggle-absences-transport"
+            checked={showAbsences}
+            onChange={setShowAbsences}
+            label="Mostrar faltas"
+          />
+          <button
+            onClick={() => setShowWeek(true)}
+            className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+          >
+            <Calendar className="w-4 h-4" />
+            Ver semana
+          </button>
+        </div>
       </div>
 
       {/* Main content */}
@@ -386,7 +441,7 @@ export default function TransportScheduler() {
             Reintentar
           </Button>
         </div>
-      ) : shiftClients.length === 0 ? (
+      ) : shiftClients.length === 0 && !(showAbsences && (shiftClassified.absent.length + shiftClassified.vacation.length > 0)) ? (
         <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
           No hay asistentes con transporte para este turno
         </div>
@@ -400,6 +455,10 @@ export default function TransportScheduler() {
             shiftState={shifts[activeShift]}
             onStateChange={handleShiftStateChange}
             clientsById={clientsById}
+            recoveryIds={recoveryIds}
+            absentClients={shiftClassified.absent}
+            vacationClients={shiftClassified.vacation}
+            showAbsences={showAbsences}
           />
         </div>
       )}
@@ -429,6 +488,9 @@ export default function TransportScheduler() {
         isOpen={showWeek}
         onClose={() => setShowWeek(false)}
         clients={allClients}
+        weekDates={weekDates}
+        attendanceByDate={weekAttendanceByDate}
+        showAbsences={showAbsences}
       />
 
       {/* Save with unassigned warning */}

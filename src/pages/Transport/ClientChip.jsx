@@ -1,5 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { RefreshDouble } from 'iconoir-react'
 
 const COLOR_SCHEMES = {
   '#ef4444': { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800' },
@@ -14,7 +15,7 @@ const COLOR_SCHEMES = {
 
 const UNASSIGNED_SCHEME = { bg: 'bg-gray-100', border: 'border-gray-200', text: 'text-gray-700' }
 
-function ChipContent({ client, color, isOverlay, noAddress }) {
+function ChipContent({ client, color, isOverlay, noAddress, isRecovery }) {
   const scheme = COLOR_SCHEMES[color] || UNASSIGNED_SCHEME
 
   return (
@@ -24,6 +25,9 @@ function ChipContent({ client, color, isOverlay, noAddress }) {
         ${isOverlay ? 'shadow-lg ring-2 ring-indigo-300 rotate-1' : 'hover:shadow-sm'}`}
     >
       <span>{client.firstName} {client.lastName}</span>
+      {isRecovery && (
+        <RefreshDouble className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" strokeWidth={2} title="Día de recupero" />
+      )}
       {noAddress && (
         <span className="text-amber-500" title="Sin dirección">⚠</span>
       )}
@@ -31,7 +35,30 @@ function ChipContent({ client, color, isOverlay, noAddress }) {
   )
 }
 
-export function SortableClientChip({ client, color, noAddress }) {
+// Read-only chip for an absent / vacationing client (not draggable)
+const ABSENCE_CHIP = {
+  absent: { cls: 'bg-red-50 border-red-200 text-red-700', label: 'falta' },
+  vacation: { cls: 'bg-amber-50 border-amber-200 text-amber-700', label: 'vac.' }
+}
+
+export function AbsenceChip({ client, variant = 'absent' }) {
+  const v = ABSENCE_CHIP[variant] || ABSENCE_CHIP.absent
+  const tooltip = variant === 'vacation'
+    ? 'Vacaciones'
+    : client.isJustified ? 'Falta justificada' : 'Falta no justificada'
+
+  return (
+    <div
+      title={tooltip}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium select-none ${v.cls}`}
+    >
+      <span>{client.firstName} {client.lastName}</span>
+      <span className="text-[9px] font-bold uppercase opacity-80">{v.label}</span>
+    </div>
+  )
+}
+
+export function SortableClientChip({ client, color, noAddress, isRecovery }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: client.id,
     data: { type: 'client' }
@@ -45,7 +72,7 @@ export function SortableClientChip({ client, color, noAddress }) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <ChipContent client={client} color={color} noAddress={noAddress} />
+      <ChipContent client={client} color={color} noAddress={noAddress} isRecovery={isRecovery} />
     </div>
   )
 }

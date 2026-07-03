@@ -1,5 +1,6 @@
 import { supabase } from '../supabase/client'
 import { CAR_COLORS, DEFAULT_FLEET, CLUB_LOCATION } from './transportConstants'
+import { buildDayRoster } from '../attendance/dayRoster'
 
 export async function getTransportClients() {
   const { data, error } = await supabase
@@ -16,18 +17,21 @@ export async function getTransportClients() {
     }))
 }
 
-export function filterClientsForShift(clients, shiftId, dayName) {
-  return clients.filter(c => {
-    if (!c.plan?.assignedDays?.includes(dayName)) return false
-    const schedule = c.plan?.schedule
-    switch (shiftId) {
-      case 'morning_arrive': return schedule === 'morning' || schedule === 'full_day'
-      case 'morning_leave': return schedule === 'morning'
-      case 'afternoon_arrive': return schedule === 'afternoon'
-      case 'afternoon_leave': return schedule === 'afternoon' || schedule === 'full_day'
-      default: return false
-    }
-  })
+export function shiftMatchesSchedule(shiftId, schedule) {
+  switch (shiftId) {
+    case 'morning_arrive': return schedule === 'morning' || schedule === 'full_day'
+    case 'morning_leave': return schedule === 'morning'
+    case 'afternoon_arrive': return schedule === 'afternoon'
+    case 'afternoon_leave': return schedule === 'afternoon' || schedule === 'full_day'
+    default: return false
+  }
+}
+
+// Roster for a shift on a day. When attendanceByClientId (records for that date)
+// is provided, absences are excluded and recovery-day attendees are included.
+export function filterClientsForShift(clients, shiftId, dayName, attendanceByClientId) {
+  const matchesShift = c => shiftMatchesSchedule(shiftId, c.plan?.schedule)
+  return buildDayRoster({ clients, dayName, matchesShift, attendanceByClientId })
 }
 
 export async function getArrangementForDate(dateStr) {

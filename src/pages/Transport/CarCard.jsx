@@ -9,7 +9,8 @@ export default function CarCard({
   clients,       // Map<id, client>
   onNameChange,
   onSeatCountChange,
-  onDelete
+  onDelete,
+  recoveryIds
 }) {
   const [editingName, setEditingName] = useState(false)
   const [localName, setLocalName] = useState(car.name)
@@ -108,6 +109,7 @@ export default function CarCard({
                 client={client}
                 color={car.color}
                 noAddress={!client.latitude && !client.longitude}
+                isRecovery={recoveryIds?.has(client.id)}
               />
             ))}
           </div>
