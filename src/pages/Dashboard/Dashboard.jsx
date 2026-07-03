@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { format, subMonths, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { NavArrowLeft, NavArrowRight } from 'iconoir-react'
@@ -15,9 +15,25 @@ const RANGE_MONTHS = 24 // fetch window: last 24 months ending today; the chart 
 const TODAY = startOfMonth(new Date())
 const WINDOW_START = subMonths(TODAY, RANGE_MONTHS - 1) // earliest month with data in the series
 
-// Navegación de mes en el header: chevrons (secuencial) + chip clickeable (mes exacto).
-// Solo mueve el mes seleccionado dentro de la ventana de datos, sin refetch de la serie.
+// Navegación de mes en el header: chevrons (secuencial) + chip clickeable que abre
+// un selector de mes/año. Solo mueve el mes seleccionado dentro de la ventana de datos.
+const inWindow = (y, m) => {
+  const d = new Date(y, m, 1)
+  return d >= WINDOW_START && d <= TODAY
+}
+
 function MonthNavigator({ selected, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [viewYear, setViewYear] = useState(selected.year)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
   const current = new Date(selected.year, selected.month, 1)
   const atMin = current <= WINDOW_START
   const atMax = current >= TODAY
@@ -26,35 +42,73 @@ function MonthNavigator({ selected, onChange }) {
     const clamped = d < WINDOW_START ? WINDOW_START : d > TODAY ? TODAY : d
     onChange({ year: clamped.getFullYear(), month: clamped.getMonth() })
   }
-  const onPick = (e) => {
-    const v = e.target.value // 'yyyy-MM'
-    if (!v) return
-    const [y, m] = v.split('-').map(Number)
-    const d = new Date(y, m - 1, 1)
-    const clamped = d < WINDOW_START ? WINDOW_START : d > TODAY ? TODAY : d
-    onChange({ year: clamped.getFullYear(), month: clamped.getMonth() })
-  }
-  const label = format(current, 'MMMM yyyy', { locale: es })
-  const inputValue = format(current, 'yyyy-MM')
 
+  const toggle = () => { setViewYear(selected.year); setOpen(o => !o) }
+  const pick = (m) => {
+    if (!inWindow(viewYear, m)) return
+    onChange({ year: viewYear, month: m })
+    setOpen(false)
+  }
+
+  const minYear = WINDOW_START.getFullYear()
+  const maxYear = TODAY.getFullYear()
+  const label = format(current, 'MMMM yyyy', { locale: es })
   const chevronCls = 'flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent'
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1" ref={ref}>
       <button type="button" onClick={() => shift(-1)} disabled={atMin} title="Mes anterior" className={chevronCls}>
         <NavArrowLeft className="w-5 h-5" />
       </button>
-      <label className="relative flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-700 capitalize cursor-pointer transition-colors hover:bg-gray-100" title="Elegir mes">
-        {label}
-        <input
-          type="month"
-          value={inputValue}
-          min={format(WINDOW_START, 'yyyy-MM')}
-          max={format(TODAY, 'yyyy-MM')}
-          onChange={onPick}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-      </label>
+
+      <div className="relative">
+        <button
+          type="button"
+          onClick={toggle}
+          title="Elegir mes"
+          className="flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-700 capitalize transition-colors hover:bg-gray-100"
+        >
+          {label}
+        </button>
+
+        {open && (
+          <div className="absolute right-0 mt-2 z-20 w-64 rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
+            {/* año */}
+            <div className="flex items-center justify-between mb-2">
+              <button type="button" onClick={() => setViewYear(y => y - 1)} disabled={viewYear <= minYear} className={chevronCls}>
+                <NavArrowLeft className="w-5 h-5" />
+              </button>
+              <span className="text-sm font-bold text-gray-800 tabular-nums">{viewYear}</span>
+              <button type="button" onClick={() => setViewYear(y => y + 1)} disabled={viewYear >= maxYear} className={chevronCls}>
+                <NavArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+            {/* meses */}
+            <div className="grid grid-cols-3 gap-1">
+              {Array.from({ length: 12 }, (_, m) => {
+                const enabled = inWindow(viewYear, m)
+                const isSel = selected.year === viewYear && selected.month === m
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => pick(m)}
+                    disabled={!enabled}
+                    className={`px-2 py-1.5 text-xs font-medium rounded-lg capitalize transition-colors ${
+                      isSel ? 'bg-emerald-600 text-white'
+                        : enabled ? 'text-gray-700 hover:bg-gray-100'
+                        : 'text-gray-300 cursor-not-allowed'
+                    }`}
+                  >
+                    {format(new Date(viewYear, m, 1), 'LLL', { locale: es })}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
       <button type="button" onClick={() => shift(1)} disabled={atMax} title="Mes siguiente" className={chevronCls}>
         <NavArrowRight className="w-5 h-5" />
       </button>
