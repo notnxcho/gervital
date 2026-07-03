@@ -175,7 +175,7 @@ export default function BulkInvoiceModal({
                     <p className="text-xs text-red-600 break-words">{it.runError}</p>
                   )}
                 </div>
-                {isPay && it.runStatus !== 'skipped' && (
+                {isPay && it.runStatus !== 'skipped' && it.selected && (
                   <input
                     type="date"
                     value={it.paidDate || ''}
