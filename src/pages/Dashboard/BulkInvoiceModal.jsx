@@ -241,6 +241,6 @@ function RowStatus({ item, isPay }) {
     const b = eligibilityBadge(item.eligibility)
     return <span className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${b.cls}`}>{b.label}</span>
   }
-  // idle
-  return <span className="text-xs px-2 py-0.5 rounded bg-green-50 text-green-700 whitespace-nowrap">listo</span>
+  // idle: sin badge, el estado "listo" confunde
+  return null
 }
