@@ -137,6 +137,7 @@ export default function ClientDetail() {
   const [recoveryCredits, setRecoveryCredits] = useState([])
   const [recoveryModalOpen, setRecoveryModalOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [planHistoryOpen, setPlanHistoryOpen] = useState(false)
 
   const optionsMenuRef = useRef(null)
   const avatarInputRef = useRef(null)
@@ -494,23 +495,38 @@ export default function ClientDetail() {
       {client.planVersions && client.planVersions.length > 1 && (
         <Card className="mb-6">
           <CardContent className="p-4">
-            <h3 className="mb-3 text-sm font-semibold text-gray-900">Historial de plan</h3>
-            <ul className="space-y-2">
-              {[...client.planVersions].reverse().map(v => (
-                <li key={v.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                  <span className="font-medium text-gray-700">
-                    {MONTH_NAMES_ES[Number(v.effectiveFrom.split('-')[1]) - 1]} {v.effectiveFrom.split('-')[0]}
-                  </span>
-                  <span className="text-gray-500">
-                    {v.frequency}×/sem · {SCHEDULE_LABELS[v.schedule]}
-                    {v.hasTransport ? ` · transporte (${DISTANCE_LABELS[v.distanceRange] || 's/d'})` : ''}
-                  </span>
-                  <span className="text-gray-400">
-                    {v.assignedDays.map(d => DAY_LABELS[d]).join(', ')}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <button
+              type="button"
+              onClick={() => setPlanHistoryOpen(o => !o)}
+              className="flex w-full items-center justify-between text-left"
+            >
+              <h3 className="text-sm font-semibold text-gray-900">Historial de plan</h3>
+              <NavArrowDown
+                className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${planHistoryOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+            <div
+              className={`grid transition-[grid-template-rows] duration-300 ease-out ${planHistoryOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+            >
+              <div className="overflow-hidden">
+                <ul className="space-y-2 pt-3">
+                  {[...client.planVersions].reverse().map(v => (
+                    <li key={v.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                      <span className="font-medium text-gray-700">
+                        {MONTH_NAMES_ES[Number(v.effectiveFrom.split('-')[1]) - 1]} {v.effectiveFrom.split('-')[0]}
+                      </span>
+                      <span className="text-gray-500">
+                        {v.frequency}×/sem · {SCHEDULE_LABELS[v.schedule]}
+                        {v.hasTransport ? ` · transporte (${DISTANCE_LABELS[v.distanceRange] || 's/d'})` : ''}
+                      </span>
+                      <span className="text-gray-400">
+                        {v.assignedDays.map(d => DAY_LABELS[d]).join(', ')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
