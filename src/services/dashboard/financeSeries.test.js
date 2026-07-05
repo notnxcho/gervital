@@ -51,7 +51,8 @@ import {
   selectExpensesTotal,
   selectMargin,
   deriveKpis,
-  transportKpis
+  transportKpis,
+  extendedFinanceKpis
 } from './financeSeries'
 
 const rpcRow = (over = {}) => ({
@@ -190,5 +191,34 @@ describe('transportKpis', () => {
     expect(k.share).toBe(0)
     expect(k.arpu).toBe(0)
     expect(k.collectionRate).toBe(0)
+  })
+})
+
+describe('extendedFinanceKpis', () => {
+  const row = {
+    attendanceNet: 800, attendanceGross: 976,
+    transportNet: 200, transportGross: 244,
+    salaries: 300, fixedMonthly: 100, variableExpenses: 0
+  }
+  const kpis = { ingresoPrevisto: 1000, cobrado: 600, margen: 600 } // net basis
+
+  test('null when row or kpis missing', () => {
+    expect(extendedFinanceKpis(null, kpis, {})).toBeNull()
+    expect(extendedFinanceKpis(row, null, {})).toBeNull()
+  })
+  test('computes margin %, labor %, pending, split, IVA, ARR', () => {
+    const e = extendedFinanceKpis(row, kpis, { withIva: false })
+    expect(e.marginPct).toBeCloseTo(60)        // 600/1000
+    expect(e.laborPct).toBeCloseTo(30)         // 300/1000
+    expect(e.pendingCollection).toBe(400)      // 1000-600
+    expect(e.attendanceRevenue).toBe(800)      // net attendance
+    expect(e.attendanceShare).toBeCloseTo(80)  // 800/1000
+    expect(e.ivaToRemit).toBe(976 + 244 - (800 + 200)) // 220
+    expect(e.arr).toBe((800 + 200) * 12)       // 12000
+  })
+  test('attendance uses gross when IVA toggle on', () => {
+    const e = extendedFinanceKpis(row, { ingresoPrevisto: 1220, cobrado: 0, margen: 820 }, { withIva: true })
+    expect(e.attendanceRevenue).toBe(976)
+    expect(e.arr).toBe((800 + 200) * 12) // ARR always net
   })
 })

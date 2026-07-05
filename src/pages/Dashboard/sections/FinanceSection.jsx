@@ -8,8 +8,9 @@ import CollectionPanel from '../CollectionPanel'
 import BulkInvoiceModal from '../BulkInvoiceModal'
 import BreakevenCard from '../BreakevenCard'
 import TransportFinanceCard from '../TransportFinanceCard'
+import FinanceKpisExtra from '../FinanceKpisExtra'
 import { getDashboardFinanceSeries, getMonthInvoicePanel } from '../../../services/dashboard/dashboardService'
-import { deriveKpis, breakevenAnalysis, transportKpis } from '../../../services/dashboard/financeSeries'
+import { deriveKpis, breakevenAnalysis, transportKpis, extendedFinanceKpis } from '../../../services/dashboard/financeSeries'
 import { getClients } from '../../../services/clients/clientService'
 import { activeClientsInMonth, transportClientsInMonth } from '../../../services/dashboard/commercialStats'
 import { useAuth } from '../../../context/AuthContext'
@@ -99,6 +100,11 @@ export default function FinanceSection({ selected, onSelectMonth }) {
     [selectedRow, clients, selected, kpiOpts]
   )
 
+  const extraKpis = useMemo(
+    () => extendedFinanceKpis(selectedRow, kpis, kpiOpts),
+    [selectedRow, kpis, kpiOpts]
+  )
+
   const monthLabel = format(new Date(selected.year, selected.month, 1), 'MMMM yyyy', { locale: es })
 
   const openBulk = (mode) => {
@@ -139,6 +145,7 @@ export default function FinanceSection({ selected, onSelectMonth }) {
           onOptionsChange={setKpiOpts}
         />
         <KpiRow kpis={kpis} />
+        <FinanceKpisExtra data={extraKpis} />
         <TransportFinanceCard kpis={transport} activeClients={activeClients} monthLabel={monthLabel} withIva={kpiOpts.withIva} />
         <BreakevenCard analysis={breakeven} monthLabel={monthLabel} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

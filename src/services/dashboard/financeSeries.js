@@ -71,6 +71,25 @@ export function selectMargin(row, opts) {
   return selectIncome(row, opts) - selectExpensesTotal(row, opts)
 }
 
+// Indicadores financieros derivados del mes seleccionado. `kpis` = deriveKpis() (misma
+// base/IVA para consistencia con lo mostrado). Devuelve null si falta el mes.
+export function extendedFinanceKpis(row, kpis, { withIva = false } = {}) {
+  if (!row || !kpis) return null
+  const income = kpis.ingresoPrevisto // honra base previsto + toggle IVA
+  const attendance = withIva ? (row.attendanceGross || 0) : (row.attendanceNet || 0)
+  const netIncome = (row.attendanceNet || 0) + (row.transportNet || 0)
+  const grossIncome = (row.attendanceGross || 0) + (row.transportGross || 0)
+  return {
+    marginPct: income > 0 ? (kpis.margen / income) * 100 : null,
+    laborPct: income > 0 ? ((row.salaries || 0) / income) * 100 : null,
+    pendingCollection: kpis.ingresoPrevisto - kpis.cobrado,
+    attendanceRevenue: attendance,
+    attendanceShare: income > 0 ? (attendance / income) * 100 : 0,
+    ivaToRemit: grossIncome - netIncome,
+    arr: netIncome * 12 // ingreso recurrente anualizado (sobre neto)
+  }
+}
+
 // KPIs financieros de transporte para un mes (track de facturación separado de asistencia).
 // Honra el toggle de IVA (net/gross). `transportClients` = activos con transporte ese mes.
 export function transportKpis(row, transportClients, { withIva = false } = {}) {
