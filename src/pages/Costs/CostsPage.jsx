@@ -3,27 +3,37 @@ import { formatCurrency } from '../../utils/format'
 import { format, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useAuth } from '../../context/AuthContext'
-import { 
-  Plus, 
-  NavArrowLeft, 
-  NavArrowRight, 
-  Check, 
-  Clock, 
+import {
+  Plus,
+  NavArrowLeft,
+  NavArrowRight,
   Trash,
-  Edit,
-  Building
+  Edit
 } from 'iconoir-react'
 import {
   getSuppliers,
-  getExpensesByMonth,
   createSupplier,
-  createExpense,
-  markExpenseAsPaid,
-  deleteExpense,
-  deleteSupplier,
   updateSupplier,
-  updateExpense,
+  deleteSupplier,
   SUPPLIER_CATEGORIES,
+  getExpensesByMonth,
+  createExpense,
+  updateExpense,
+  deleteExpense,
+  getFixedExpenses,
+  createFixedExpense,
+  updateFixedExpense,
+  deleteFixedExpense,
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  PERIODICITY_OPTIONS,
+  periodicityLabel,
+  hitsMonth,
+  nextPayment,
+  fixedCashForMonth,
+  fixedMonthlyForMonth,
   getEmployees,
   getStandaloneExtraCosts,
   createEmployee,
@@ -42,10 +52,12 @@ import Card from '../../components/ui/Card'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 
-export default function SupplierList() {
+export default function CostsPage() {
   const { hasAccess } = useAuth()
   const [suppliers, setSuppliers] = useState([])
   const [expenses, setExpenses] = useState([])
+  const [fixedExpenses, setFixedExpenses] = useState([])
+  const [categories, setCategories] = useState([])
   const [employees, setEmployees] = useState([])
   const [standaloneCosts, setStandaloneCosts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -53,12 +65,14 @@ export default function SupplierList() {
 
   // Modals
   const [supplierModal, setSupplierModal] = useState({ open: false, supplier: null })
-  const [expenseModal, setExpenseModal] = useState({ open: false, expense: null })
   const [deleteModal, setDeleteModal] = useState({ open: false, type: null, item: null })
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
+  const [fixedModal, setFixedModal] = useState({ open: false, item: null })
+  const [variableModal, setVariableModal] = useState({ open: false, item: null })
   const [employeeModal, setEmployeeModal] = useState({ open: false, employee: null })
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false)
   const [standaloneModalOpen, setStandaloneModalOpen] = useState(false)
-  
+
   const year = selectedDate.getFullYear()
   const month = selectedDate.getMonth()
 
@@ -70,12 +84,16 @@ export default function SupplierList() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [suppliersData, expensesData] = await Promise.all([
+      const [suppliersData, expensesData, fixedData, categoriesData] = await Promise.all([
         getSuppliers(),
-        getExpensesByMonth(year, month)
+        getExpensesByMonth(year, month),
+        getFixedExpenses(),
+        getCategories()
       ])
       setSuppliers(suppliersData)
       setExpenses(expensesData)
+      setFixedExpenses(fixedData)
+      setCategories(categoriesData)
       if (hasAccess('salaries')) {
         const [employeesData, standaloneData] = await Promise.all([
           getEmployees(),
@@ -91,35 +109,16 @@ export default function SupplierList() {
     }
   }
 
-  // Navegación de meses
   const goToPreviousMonth = () => setSelectedDate(subMonths(selectedDate, 1))
   const goToNextMonth = () => setSelectedDate(addMonths(selectedDate, 1))
 
-  // Separar gastos por tipo
-  const recurringExpenses = expenses.filter(e => e.type === 'recurring')
-  const extraordinaryExpenses = expenses.filter(e => e.type === 'extraordinary')
-
-  // Calcular totales
-  const totalRecurring = recurringExpenses.reduce((sum, e) => sum + e.amount, 0)
-  const totalExtraordinary = extraordinaryExpenses.reduce((sum, e) => sum + e.amount, 0)
-  const totalMonth = totalRecurring + totalExtraordinary
-  const totalPending = expenses.filter(e => e.status === 'pending').reduce((sum, e) => sum + e.amount, 0)
-
-  // Obtener nombre de proveedor
-  const getSupplierName = (supplierId) => {
-    return suppliers.find(s => s.id === supplierId)?.name || 'Proveedor desconocido'
-  }
+  // Month totals for summary cards.
+  const variableTotal = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
+  const fixedCashThisMonth = fixedCashForMonth(fixedExpenses, year, month)
+  const fixedMonthlyThisMonth = fixedMonthlyForMonth(fixedExpenses, year, month)
+  const totalCashMonth = variableTotal + fixedCashThisMonth
 
   // Handlers
-  const handleMarkPaid = async (expenseId) => {
-    try {
-      await markExpenseAsPaid(expenseId)
-      loadData()
-    } catch (error) {
-      console.error('Error marcando como pagado:', error)
-    }
-  }
-
   const handleDeleteExpense = async () => {
     if (!deleteModal.item) return
     try {
@@ -139,6 +138,16 @@ export default function SupplierList() {
       loadData()
     } catch (error) {
       console.error('Error eliminando proveedor:', error)
+    }
+  }
+
+  const handleDeleteFixed = async (id) => {
+    if (!window.confirm('¿Eliminar este gasto fijo? Dejará de impactar en el dashboard.')) return
+    try {
+      await deleteFixedExpense(id)
+      await loadData()
+    } catch (e) {
+      alert('Error al eliminar: ' + e.message)
     }
   }
 
@@ -163,6 +172,8 @@ export default function SupplierList() {
     }
   }
 
+  const getSupplierName = (supplierId) => suppliers.find(s => s.id === supplierId)?.name
+
   const selectedEmployee = employeeModal.employee
     ? employees.find(e => e.id === employeeModal.employee.id) || null
     : null
@@ -172,24 +183,21 @@ export default function SupplierList() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Proveedores y Gastos</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Costos</h1>
           <p className="text-gray-500 text-sm mt-1">Gestión de costos operativos</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
-          <Button 
-            variant="secondary"
-            onClick={() => setSupplierModal({ open: true, supplier: null })}
-          >
-            <Building className="w-4 h-4" />
-            Nuevo proveedor
+          <Button variant="secondary" onClick={() => setCategoryModalOpen(true)}>
+            Categorías
           </Button>
-          <Button 
-            onClick={() => setExpenseModal({ open: true, expense: null })}
-            className="bg-purple-600 hover:bg-purple-700"
-          >
+          <Button variant="secondary" onClick={() => setFixedModal({ open: true, item: null })}>
             <Plus className="w-4 h-4" />
-            Registrar gasto
+            Gasto fijo
+          </Button>
+          <Button onClick={() => setVariableModal({ open: true, item: null })} className="bg-purple-600 hover:bg-purple-700">
+            <Plus className="w-4 h-4" />
+            Gasto variable
           </Button>
         </div>
       </div>
@@ -197,18 +205,18 @@ export default function SupplierList() {
       {/* Month selector */}
       <Card className="mb-6">
         <div className="p-4 flex items-center justify-between">
-          <button 
+          <button
             onClick={goToPreviousMonth}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <NavArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
-          
+
           <h2 className="text-xl font-semibold text-gray-900 capitalize">
             {format(selectedDate, 'MMMM yyyy', { locale: es })}
           </h2>
-          
-          <button 
+
+          <button
             onClick={goToNextMonth}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
@@ -220,30 +228,21 @@ export default function SupplierList() {
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">
-          <p className="text-sm text-gray-500">Total del mes</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {formatCurrency(totalMonth)}
-          </p>
+          <p className="text-sm text-gray-500">Total del mes (caja)</p>
+          <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalCashMonth)}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-sm text-gray-500">Gastos recurrentes</p>
-          <p className="text-2xl font-bold text-blue-600">
-            {formatCurrency(totalRecurring)}
-          </p>
-          <p className="text-xs text-gray-400">{recurringExpenses.length} servicios</p>
+          <p className="text-sm text-gray-500">Gastos fijos (impacto este mes)</p>
+          <p className="text-2xl font-bold text-blue-600">{formatCurrency(fixedCashThisMonth)}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-sm text-gray-500">Gastos extraordinarios</p>
-          <p className="text-2xl font-bold text-amber-600">
-            {formatCurrency(totalExtraordinary)}
-          </p>
-          <p className="text-xs text-gray-400">{extraordinaryExpenses.length} gastos</p>
+          <p className="text-sm text-gray-500">Gastos variables</p>
+          <p className="text-2xl font-bold text-amber-600">{formatCurrency(variableTotal)}</p>
+          <p className="text-xs text-gray-400">{expenses.length} gastos</p>
         </Card>
         <Card className="p-4">
-          <p className="text-sm text-gray-500">Pendiente de pago</p>
-          <p className="text-2xl font-bold text-red-600">
-            {formatCurrency(totalPending)}
-          </p>
+          <p className="text-sm text-gray-500">Fijos mensualizado (ref.)</p>
+          <p className="text-2xl font-bold text-gray-700">{formatCurrency(fixedMonthlyThisMonth)}</p>
         </Card>
       </div>
 
@@ -253,53 +252,46 @@ export default function SupplierList() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Gastos recurrentes */}
+          {/* Gastos fijos (plantillas) */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-              Gastos recurrentes
+              Gastos fijos
             </h3>
-            
-            {recurringExpenses.length === 0 ? (
-              <Card className="p-6 text-center">
-                <p className="text-gray-500">No hay gastos recurrentes este mes</p>
-              </Card>
+            {fixedExpenses.length === 0 ? (
+              <Card className="p-6 text-center"><p className="text-gray-500">Sin gastos fijos</p></Card>
             ) : (
               <div className="space-y-3">
-                {recurringExpenses.map(expense => (
-                  <ExpenseCard
-                    key={expense.id}
-                    expense={expense}
-                    supplierName={getSupplierName(expense.supplierId)}
-                    onMarkPaid={() => handleMarkPaid(expense.id)}
-                    onEdit={() => setExpenseModal({ open: true, expense })}
-                    onDelete={() => setDeleteModal({ open: true, type: 'expense', item: expense })}
+                {fixedExpenses.map(f => (
+                  <FixedExpenseCard
+                    key={f.id}
+                    fixed={f}
+                    year={year}
+                    month={month}
+                    onEdit={() => setFixedModal({ open: true, item: f })}
+                    onDelete={() => handleDeleteFixed(f.id)}
                   />
                 ))}
               </div>
             )}
           </div>
 
-          {/* Gastos extraordinarios */}
+          {/* Gastos variables (mes) */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-              Gastos extraordinarios
+              Gastos variables
             </h3>
-            
-            {extraordinaryExpenses.length === 0 ? (
-              <Card className="p-6 text-center">
-                <p className="text-gray-500">No hay gastos extraordinarios este mes</p>
-              </Card>
+            {expenses.length === 0 ? (
+              <Card className="p-6 text-center"><p className="text-gray-500">No hay gastos variables este mes</p></Card>
             ) : (
               <div className="space-y-3">
-                {extraordinaryExpenses.map(expense => (
-                  <ExpenseCard
+                {expenses.map(expense => (
+                  <VariableExpenseCard
                     key={expense.id}
                     expense={expense}
                     supplierName={getSupplierName(expense.supplierId)}
-                    onMarkPaid={() => handleMarkPaid(expense.id)}
-                    onEdit={() => setExpenseModal({ open: true, expense })}
+                    onEdit={() => setVariableModal({ open: true, item: expense })}
                     onDelete={() => setDeleteModal({ open: true, type: 'expense', item: expense })}
                   />
                 ))}
@@ -309,12 +301,18 @@ export default function SupplierList() {
         </div>
       )}
 
-      {/* Suppliers section */}
+      {/* Suppliers directory */}
       <div className="mt-8">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Proveedores registrados ({suppliers.length})
-        </h3>
-        
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Proveedores (directorio) ({suppliers.length})
+          </h3>
+          <Button variant="secondary" onClick={() => setSupplierModal({ open: true, supplier: null })}>
+            <Plus className="w-4 h-4" />
+            Nuevo proveedor
+          </Button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {suppliers.map(supplier => (
             <Card key={supplier.id} className="p-4">
@@ -433,22 +431,41 @@ export default function SupplierList() {
         </div>
       )}
 
+      {/* Category manager */}
+      <CategoryManagerModal
+        isOpen={categoryModalOpen}
+        onClose={() => setCategoryModalOpen(false)}
+        categories={categories}
+        onChanged={loadData}
+      />
+
+      {/* Fixed expense modal */}
+      <FixedExpenseModal
+        isOpen={fixedModal.open}
+        onClose={() => setFixedModal({ open: false, item: null })}
+        fixed={fixedModal.item}
+        categories={categories}
+        suppliers={suppliers}
+        onSave={loadData}
+      />
+
+      {/* Variable expense modal */}
+      <VariableExpenseModal
+        isOpen={variableModal.open}
+        onClose={() => setVariableModal({ open: false, item: null })}
+        expense={variableModal.item}
+        categories={categories}
+        suppliers={suppliers}
+        selectedYear={year}
+        selectedMonth={month}
+        onSave={loadData}
+      />
+
       {/* Supplier Modal */}
       <SupplierModal
         isOpen={supplierModal.open}
         onClose={() => setSupplierModal({ open: false, supplier: null })}
         supplier={supplierModal.supplier}
-        onSave={loadData}
-      />
-
-      {/* Expense Modal */}
-      <ExpenseModal
-        isOpen={expenseModal.open}
-        onClose={() => setExpenseModal({ open: false, expense: null })}
-        expense={expenseModal.expense}
-        suppliers={suppliers}
-        selectedYear={year}
-        selectedMonth={month}
         onSave={loadData}
       />
 
@@ -482,7 +499,7 @@ export default function SupplierList() {
         title={deleteModal.type === 'supplier' ? 'Eliminar proveedor' : 'Eliminar gasto'}
       >
         <p className="text-gray-600 mb-6">
-          ¿Estás seguro de que deseas eliminar {deleteModal.type === 'supplier' ? 'este proveedor' : 'este gasto'}? 
+          ¿Estás seguro de que deseas eliminar {deleteModal.type === 'supplier' ? 'este proveedor' : 'este gasto'}?
           Esta acción no se puede deshacer.
         </p>
         <div className="flex gap-3 justify-end">
@@ -504,73 +521,355 @@ export default function SupplierList() {
   )
 }
 
-// Componente de tarjeta de gasto
-function ExpenseCard({ expense, supplierName, onMarkPaid, onEdit, onDelete }) {
-  const isPaid = expense.status === 'paid'
-  
+// Category CRUD manager
+function CategoryManagerModal({ isOpen, onClose, categories, onChanged }) {
+  const [form, setForm] = useState({ id: null, name: '', description: '' })
+  const [busy, setBusy] = useState(false)
+
+  const reset = () => setForm({ id: null, name: '', description: '' })
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      if (form.id) {
+        await updateCategory(form.id, { name: form.name, description: form.description })
+      } else {
+        await createCategory({ name: form.name, description: form.description })
+      }
+      reset()
+      onChanged()
+    } catch (err) {
+      alert('Error al guardar categoría: ' + err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (id) => {
+    if (!window.confirm('¿Eliminar esta categoría? Los gastos asociados quedarán sin categoría.')) return
+    setBusy(true)
+    try {
+      await deleteCategory(id)
+      if (form.id === id) reset()
+      onChanged()
+    } catch (err) {
+      alert('Error al eliminar: ' + err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Categorías de gasto">
+      <form onSubmit={submit} className="bg-gray-50 rounded-lg p-3 space-y-3 mb-4">
+        <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+        <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Qué incluye" />
+        <div className="flex justify-end gap-2">
+          {form.id && <Button type="button" variant="secondary" onClick={reset}>Cancelar edición</Button>}
+          <Button type="submit" disabled={busy}>{form.id ? 'Guardar' : 'Agregar'}</Button>
+        </div>
+      </form>
+      <div className="space-y-2 max-h-80 overflow-y-auto">
+        {categories.map(c => (
+          <div key={c.id} className="flex items-start justify-between border border-gray-100 rounded-lg px-3 py-2">
+            <div className="flex-1 pr-2">
+              <p className="font-medium text-gray-900">{c.name}</p>
+              {c.description && <p className="text-xs text-gray-400">{c.description}</p>}
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setForm({ id: c.id, name: c.name, description: c.description || '' })} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                <Edit className="w-4 h-4" />
+              </button>
+              <button onClick={() => remove(c.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                <Trash className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  )
+}
+
+// Fixed expense card (template)
+function FixedExpenseCard({ fixed, year, month, onEdit, onDelete }) {
+  const hitsThis = hitsMonth(fixed, year, month)
+  const next = nextPayment(fixed, year, month)
+  const monthly = Number(fixed.amount) / fixed.periodMonths
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h4 className="font-medium text-gray-900">{expense.description}</h4>
-            {isPaid ? (
-              <span className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-                <Check className="w-3 h-3" />
-                Pagado
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
-                <Clock className="w-3 h-3" />
-                Pendiente
-              </span>
-            )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="font-medium text-gray-900">{fixed.description}</h4>
+            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">{periodicityLabel(fixed.periodMonths)}</span>
+            {fixed.categoryName && <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">{fixed.categoryName}</span>}
+            {hitsThis && <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Impacta este mes</span>}
           </div>
-          <p className="text-sm text-gray-500 mt-1">{supplierName}</p>
-          {expense.notes && (
-            <p className="text-xs text-gray-400 mt-1">{expense.notes}</p>
-          )}
+          {fixed.supplierName && <p className="text-sm text-gray-500 mt-1">{fixed.supplierName}</p>}
+          {fixed.notes && <p className="text-xs text-gray-400 mt-1">{fixed.notes}</p>}
         </div>
         <div className="text-right">
-          <p className="text-lg font-semibold text-gray-900">
-            {formatCurrency(expense.amount)}
-          </p>
-          <p className="text-xs text-gray-400">
-            {format(new Date(expense.date), 'd MMM', { locale: es })}
-          </p>
+          <p className="text-lg font-semibold text-gray-900">{formatCurrency(Number(fixed.amount))}</p>
+          <p className="text-xs text-gray-400">{formatCurrency(monthly)}/mes</p>
         </div>
       </div>
-      
-      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-        {!isPaid && (
-          <Button
-            size="sm"
-            variant="success"
-            className="flex-1"
-            onClick={onMarkPaid}
-          >
-            <Check className="w-4 h-4" />
-            Marcar pagado
-          </Button>
-        )}
-        <button
-          onClick={onEdit}
-          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <Edit className="w-4 h-4" />
-        </button>
-        <button
-          onClick={onDelete}
-          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-        >
-          <Trash className="w-4 h-4" />
-        </button>
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+        <p className="text-xs text-gray-400">
+          {next ? `Próximo pago: ${format(new Date(next.year, next.month, 1), 'MMM yyyy', { locale: es })}` : 'Finalizado'}
+        </p>
+        <div className="flex gap-2">
+          <button onClick={onEdit} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"><Edit className="w-4 h-4" /></button>
+          <button onClick={onDelete} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash className="w-4 h-4" /></button>
+        </div>
       </div>
     </Card>
   )
 }
 
-// Modal de proveedor
+// Variable expense card (one-off)
+function VariableExpenseCard({ expense, supplierName, onEdit, onDelete }) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="font-medium text-gray-900">{expense.description}</h4>
+            {expense.categoryName && <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">{expense.categoryName}</span>}
+          </div>
+          {supplierName && <p className="text-sm text-gray-500 mt-1">{supplierName}</p>}
+          {expense.notes && <p className="text-xs text-gray-400 mt-1">{expense.notes}</p>}
+        </div>
+        <div className="text-right">
+          <p className="text-lg font-semibold text-gray-900">{formatCurrency(Number(expense.amount))}</p>
+          <p className="text-xs text-gray-400">{format(new Date(expense.date), 'd MMM', { locale: es })}</p>
+        </div>
+      </div>
+      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100 justify-end">
+        <button onClick={onEdit} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"><Edit className="w-4 h-4" /></button>
+        <button onClick={onDelete} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash className="w-4 h-4" /></button>
+      </div>
+    </Card>
+  )
+}
+
+function CategorySelect({ value, onChange, categories }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+      <select
+        value={value}
+        onChange={onChange}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+      >
+        <option value="">Sin categoría</option>
+        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+    </div>
+  )
+}
+
+function SupplierSelect({ value, onChange, suppliers }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor (opcional)</label>
+      <select
+        value={value}
+        onChange={onChange}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+      >
+        <option value="">Sin proveedor</option>
+        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+    </div>
+  )
+}
+
+const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+// Fixed expense modal (template)
+function FixedExpenseModal({ isOpen, onClose, fixed, categories, suppliers, onSave }) {
+  const now = new Date()
+  const empty = {
+    description: '', categoryId: '', supplierId: '', amount: '',
+    periodMonths: 1, startYear: now.getFullYear(), startMonth: now.getMonth(),
+    hasEnd: false, endYear: now.getFullYear(), endMonth: now.getMonth(), notes: ''
+  }
+  const [form, setForm] = useState(empty)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (fixed) {
+      setForm({
+        description: fixed.description || '',
+        categoryId: fixed.categoryId || '',
+        supplierId: fixed.supplierId || '',
+        amount: String(fixed.amount ?? ''),
+        periodMonths: fixed.periodMonths || 1,
+        startYear: fixed.startYear,
+        startMonth: fixed.startMonth,
+        hasEnd: fixed.endYear != null && fixed.endMonth != null,
+        endYear: fixed.endYear ?? now.getFullYear(),
+        endMonth: fixed.endMonth ?? now.getMonth(),
+        notes: fixed.notes || ''
+      })
+    } else {
+      setForm(empty)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fixed, isOpen])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    const payload = {
+      description: form.description,
+      categoryId: form.categoryId || null,
+      supplierId: form.supplierId || null,
+      amount: parseFloat(form.amount),
+      periodMonths: Number(form.periodMonths),
+      startYear: Number(form.startYear),
+      startMonth: Number(form.startMonth),
+      endYear: form.hasEnd ? Number(form.endYear) : null,
+      endMonth: form.hasEnd ? Number(form.endMonth) : null,
+      notes: form.notes
+    }
+    try {
+      if (fixed) await updateFixedExpense(fixed.id, payload)
+      else await createFixedExpense(payload)
+      onSave()
+      onClose()
+    } catch (err) {
+      alert('Error al guardar gasto fijo: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={fixed ? 'Editar gasto fijo' : 'Nuevo gasto fijo'}>
+      <form onSubmit={submit} className="space-y-4">
+        <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ej: Alquiler del local" required />
+        <CategorySelect value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} categories={categories} />
+        <SupplierSelect value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} suppliers={suppliers} />
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Monto por pago" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Periodicidad</label>
+            <select value={form.periodMonths} onChange={(e) => setForm({ ...form, periodMonths: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+              {PERIODICITY_OPTIONS.map(o => <option key={o.months} value={o.months}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Primer pago (mes)</label>
+            <select value={form.startMonth} onChange={(e) => setForm({ ...form, startMonth: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+              {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+            </select>
+          </div>
+          <Input label="Primer pago (año)" type="number" value={form.startYear} onChange={(e) => setForm({ ...form, startYear: e.target.value })} required />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" checked={form.hasEnd} onChange={(e) => setForm({ ...form, hasEnd: e.target.checked })} />
+          Tiene fecha de fin
+        </label>
+        {form.hasEnd && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fin (mes)</label>
+              <select value={form.endMonth} onChange={(e) => setForm({ ...form, endMonth: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+              </select>
+            </div>
+            <Input label="Fin (año)" type="number" value={form.endYear} onChange={(e) => setForm({ ...form, endYear: e.target.value })} />
+          </div>
+        )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+          <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+        </div>
+        <div className="flex gap-3 justify-end pt-4">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" loading={loading}>{fixed ? 'Guardar cambios' : 'Crear gasto fijo'}</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+// Variable expense modal (one-off)
+function VariableExpenseModal({ isOpen, onClose, expense, categories, suppliers, selectedYear, selectedMonth, onSave }) {
+  const [loading, setLoading] = useState(false)
+  const [form, setForm] = useState({ supplierId: '', categoryId: '', description: '', amount: '', date: '', notes: '' })
+
+  useEffect(() => {
+    if (expense) {
+      setForm({
+        supplierId: expense.supplierId || '',
+        categoryId: expense.categoryId || '',
+        description: expense.description || '',
+        amount: expense.amount?.toString() || '',
+        date: expense.date || '',
+        notes: expense.notes || ''
+      })
+    } else {
+      const defaultDate = new Date(selectedYear, selectedMonth, 1)
+      setForm({ supplierId: '', categoryId: '', description: '', amount: '', date: format(defaultDate, 'yyyy-MM-dd'), notes: '' })
+    }
+  }, [expense, isOpen, selectedYear, selectedMonth])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    const expenseDate = new Date(form.date)
+    const payload = {
+      supplierId: form.supplierId || null,
+      categoryId: form.categoryId || null,
+      description: form.description,
+      amount: parseFloat(form.amount),
+      date: form.date,
+      notes: form.notes,
+      year: expenseDate.getFullYear(),
+      month: expenseDate.getMonth()
+    }
+    try {
+      if (expense) await updateExpense(expense.id, payload)
+      else await createExpense(payload)
+      onSave()
+      onClose()
+    } catch (err) {
+      alert('Error al guardar gasto: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={expense ? 'Editar gasto variable' : 'Registrar gasto variable'}>
+      <form onSubmit={submit} className="space-y-4">
+        <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ej: Reparación de heladera" required />
+        <CategorySelect value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} categories={categories} />
+        <SupplierSelect value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} suppliers={suppliers} />
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Monto" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+          <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+          <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+        </div>
+        <div className="flex gap-3 justify-end pt-4">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" loading={loading}>{expense ? 'Guardar cambios' : 'Registrar gasto'}</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+// Supplier modal (directory)
 function SupplierModal({ isOpen, onClose, supplier, onSave }) {
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
@@ -607,7 +906,7 @@ function SupplierModal({ isOpen, onClose, supplier, onSave }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    
+
     try {
       if (supplier) {
         await updateSupplier(supplier.id, form)
@@ -624,9 +923,9 @@ function SupplierModal({ isOpen, onClose, supplier, onSave }) {
   }
 
   return (
-    <Modal 
-      isOpen={isOpen} 
-      onClose={onClose} 
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
       title={supplier ? 'Editar proveedor' : 'Nuevo proveedor'}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -636,7 +935,7 @@ function SupplierModal({ isOpen, onClose, supplier, onSave }) {
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           required
         />
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Categoría
@@ -1047,177 +1346,6 @@ function EmployeeFichaModal({ isOpen, employee, onClose, onChanged, onDelete }) 
           </button>
         </div>
       </div>
-    </Modal>
-  )
-}
-
-// Modal de gasto
-function ExpenseModal({ isOpen, onClose, expense, suppliers, selectedYear, selectedMonth, onSave }) {
-  const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({
-    supplierId: '',
-    description: '',
-    amount: '',
-    type: 'recurring',
-    date: '',
-    notes: ''
-  })
-
-  useEffect(() => {
-    if (expense) {
-      setForm({
-        supplierId: expense.supplierId || '',
-        description: expense.description || '',
-        amount: expense.amount?.toString() || '',
-        type: expense.type || 'recurring',
-        date: expense.date || '',
-        notes: expense.notes || ''
-      })
-    } else {
-      // Default date for new expense
-      const defaultDate = new Date(selectedYear, selectedMonth, 1)
-      setForm({
-        supplierId: '',
-        description: '',
-        amount: '',
-        type: 'recurring',
-        date: format(defaultDate, 'yyyy-MM-dd'),
-        notes: ''
-      })
-    }
-  }, [expense, isOpen, selectedYear, selectedMonth])
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    
-    const expenseDate = new Date(form.date)
-    const expenseData = {
-      ...form,
-      amount: parseFloat(form.amount),
-      year: expenseDate.getFullYear(),
-      month: expenseDate.getMonth()
-    }
-    
-    try {
-      if (expense) {
-        await updateExpense(expense.id, expenseData)
-      } else {
-        await createExpense(expenseData)
-      }
-      onSave()
-      onClose()
-    } catch (error) {
-      console.error('Error guardando gasto:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <Modal 
-      isOpen={isOpen} 
-      onClose={onClose} 
-      title={expense ? 'Editar gasto' : 'Registrar gasto'}
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Proveedor
-          </label>
-          <select
-            value={form.supplierId}
-            onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            required
-          >
-            <option value="">Seleccionar proveedor</option>
-            {suppliers.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <Input
-          label="Descripción"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-          placeholder="Ej: Servicio de almuerzos mensual"
-          required
-        />
-
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="Monto"
-            type="number"
-            value={form.amount}
-            onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            placeholder="0"
-            required
-          />
-          <Input
-            label="Fecha"
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tipo de gasto
-          </label>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setForm({ ...form, type: 'recurring' })}
-              className={`
-                flex-1 px-4 py-3 rounded-lg font-medium text-sm transition-colors border
-                ${form.type === 'recurring'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}
-              `}
-            >
-              Recurrente
-            </button>
-            <button
-              type="button"
-              onClick={() => setForm({ ...form, type: 'extraordinary' })}
-              className={`
-                flex-1 px-4 py-3 rounded-lg font-medium text-sm transition-colors border
-                ${form.type === 'extraordinary'
-                  ? 'bg-amber-600 text-white border-amber-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}
-              `}
-            >
-              Extraordinario
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Notas
-          </label>
-          <textarea
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            rows={2}
-            placeholder="Detalles adicionales..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-        </div>
-
-        <div className="flex gap-3 justify-end pt-4">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" loading={loading}>
-            {expense ? 'Guardar cambios' : 'Registrar gasto'}
-          </Button>
-        </div>
-      </form>
     </Modal>
   )
 }
