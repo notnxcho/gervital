@@ -21,7 +21,7 @@ const ROLE_LABELS = {
 }
 
 const ROLE_DESCRIPTIONS = {
-  operador: 'Clientes, grupos, transporte, proveedores y gastos (sin información financiera)',
+  operador: 'Clientes, grupos, transporte y costos (sin información financiera)',
   admin: 'Todo lo del operador + precios, facturación y cobranza',
   superadmin: 'Acceso completo: usuarios, dashboard financiero y sueldos'
 }

@@ -25,7 +25,7 @@ export default function Navbar() {
     { to: '/clientes', label: 'Clientes', icon: Group, access: 'clients' },
     { to: '/grupos', label: 'Grupos', icon: Calendar, access: 'clients' },
     { to: '/transporte', label: 'Transporte', icon: Bus, access: 'clients' },
-    { to: '/proveedores', label: 'Proveedores', icon: Shop, access: 'suppliers' },
+    { to: '/costos', label: 'Costos', icon: Shop, access: 'suppliers' },
     { to: '/accesos', label: 'Accesos', icon: Settings, access: 'users' }
   ]
 

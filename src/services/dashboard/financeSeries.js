@@ -1,4 +1,5 @@
 import { currentSalary, costoAnualMensualizado } from '../salaries/salaryCalc'
+import { fixedCashForMonth, fixedMonthlyForMonth } from '../expenses/fixedExpenseCalc'
 
 // Last calendar day of a 0-indexed month as 'YYYY-MM-DD' (UTC-safe).
 function lastDayOfMonth(year, month) {
@@ -23,8 +24,8 @@ export function salaryCostForMonth(employees, year, month) {
   return total
 }
 
-// Raw RPC rows + employees → UI-ready month objects (salaries computed per month).
-export function mergeFinanceSeries(rpcRows, employees) {
+// Raw RPC rows + employees + fixed-expense templates → UI-ready month objects.
+export function mergeFinanceSeries(rpcRows, employees, fixedExpenses = []) {
   return (rpcRows || []).map(r => ({
     year: r.year,
     month: r.month,
@@ -36,7 +37,9 @@ export function mergeFinanceSeries(rpcRows, employees) {
     paidAttendanceGross: Number(r.paid_att_gross) || 0,
     paidTransportNet: Number(r.paid_trans_net) || 0,
     paidTransportGross: Number(r.paid_trans_gross) || 0,
-    expenses: Number(r.expenses_total) || 0,
+    variableExpenses: Number(r.expenses_total) || 0,
+    fixedCash: fixedCashForMonth(fixedExpenses, r.year, r.month),
+    fixedMonthly: fixedMonthlyForMonth(fixedExpenses, r.year, r.month),
     salaries: salaryCostForMonth(employees, r.year, r.month)
   }))
 }
@@ -53,13 +56,19 @@ export function selectIncome(row, { basis = 'previsto', withIva = false } = {}) 
     : row.attendanceNet + row.transportNet
 }
 
-// Total monthly expenses = devengado expenses + monthlyized salaries.
-export function selectExpensesTotal(row) {
-  return (row.expenses || 0) + (row.salaries || 0)
+// Variable + fixed (basis-dependent), WITHOUT salaries.
+export function selectExpensesOnly(row, { fixedBasis = 'cash' } = {}) {
+  const fixed = fixedBasis === 'monthly' ? (row.fixedMonthly || 0) : (row.fixedCash || 0)
+  return (row.variableExpenses || 0) + fixed
+}
+
+// Total monthly expenses = variable + fixed (basis) + monthlyized salaries.
+export function selectExpensesTotal(row, opts = {}) {
+  return selectExpensesOnly(row, opts) + (row.salaries || 0)
 }
 
 export function selectMargin(row, opts) {
-  return selectIncome(row, opts) - selectExpensesTotal(row)
+  return selectIncome(row, opts) - selectExpensesTotal(row, opts)
 }
 
 // KPIs for the selected (year, month) + deltas vs the previous month in the series.
@@ -71,12 +80,12 @@ export function deriveKpis(series, year, month, opts = {}) {
 
   const ingresoPrevisto = selectIncome(cur, { ...opts, basis: 'previsto' })
   const cobrado = selectIncome(cur, { ...opts, basis: 'cobrado' })
-  const gastos = selectExpensesTotal(cur)
+  const gastos = selectExpensesTotal(cur, { ...opts, fixedBasis: 'monthly' })
   const margen = ingresoPrevisto - gastos
   const tasaCobro = ingresoPrevisto > 0 ? (cobrado / ingresoPrevisto) * 100 : 0
 
   const prevPrevisto = prev ? selectIncome(prev, { ...opts, basis: 'previsto' }) : null
-  const prevGastos = prev ? selectExpensesTotal(prev) : null
+  const prevGastos = prev ? selectExpensesTotal(prev, { ...opts, fixedBasis: 'monthly' }) : null
 
   return {
     ingresoPrevisto,

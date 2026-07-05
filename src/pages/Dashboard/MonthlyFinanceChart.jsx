@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import Card from '../../components/ui/Card'
 import { formatCurrency, formatCompact } from '../../utils/format'
-import { selectIncome, selectExpensesTotal, selectMargin } from '../../services/dashboard/financeSeries'
+import { selectIncome, selectExpensesTotal, selectExpensesOnly, selectMargin } from '../../services/dashboard/financeSeries'
 
 const MONTH_LABELS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 const RANGES = [{ id: 6, label: '6M' }, { id: 12, label: '12M' }, { id: 24, label: '24M' }]
@@ -65,7 +65,8 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
     onOptionsChange?.({ basis, withIva })
   }, [basis, withIva, onOptionsChange])
 
-  const opts = useMemo(() => ({ basis, withIva }), [basis, withIva])
+  // Chart is entirely cash-basis for expenses (fixed expenses land on their payment month).
+  const opts = useMemo(() => ({ basis, withIva, fixedBasis: 'cash' }), [basis, withIva])
   // All fetched months render in a horizontally scrollable track; `range` sets how many
   // are visible at once (the band width = viewport / range), the rest scroll into view.
   const data = useMemo(() => series || [], [series])
@@ -124,7 +125,7 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
       (active.asistencia ? incomePart(row, 'asistencia', withIva, basis) : 0) +
       (active.transporte ? incomePart(row, 'transporte', withIva, basis) : 0)
     const ve = row =>
-      (active.gastos ? row.expenses : 0) + (active.sueldos ? row.salaries : 0)
+      (active.gastos ? selectExpensesOnly(row, { fixedBasis: 'cash' }) : 0) + (active.sueldos ? row.salaries : 0)
     let m = 1
     for (const row of data) m = Math.max(m, vi(row), ve(row))
     return m
@@ -246,7 +247,7 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
                 const isHover = hover === i
                 const asis = active.asistencia ? incomePart(row, 'asistencia', withIva, basis) : 0
                 const trans = active.transporte ? incomePart(row, 'transporte', withIva, basis) : 0
-                const exp = active.gastos ? row.expenses : 0
+                const exp = active.gastos ? selectExpensesOnly(row, { fixedBasis: 'cash' }) : 0
                 const sue = active.sueldos ? row.salaries : 0
                 const opacity = isSel ? 1 : isHover ? 0.85 : 0.4
                 return (
@@ -304,7 +305,7 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
                     {MONTH_LABELS[tipRow.month]} {tipRow.year}
                   </p>
                   <TipRow color={COLORS.asistencia} label="Ingreso" value={formatCurrency(selectIncome(tipRow, opts))} />
-                  <TipRow color={COLORS.gastos} label="Gastos" value={formatCurrency(selectExpensesTotal(tipRow))} />
+                  <TipRow color={COLORS.gastos} label="Gastos" value={formatCurrency(selectExpensesTotal(tipRow, opts))} />
                   <TipRow color={COLORS.margen} label="Margen" value={formatCurrency(selectMargin(tipRow, opts))} />
                 </div>
               </div>

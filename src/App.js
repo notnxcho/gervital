@@ -7,7 +7,7 @@ import ClientList from './pages/Clients/ClientList'
 import ClientDetail from './pages/Clients/ClientDetail'
 import AddClient from './pages/Clients/AddClient'
 import AccessList from './pages/Access/AccessList'
-import SupplierList from './pages/Suppliers/SupplierList'
+import CostsPage from './pages/Costs/CostsPage'
 import DailyGroups from './pages/Groups/DailyGroups'
 import TransportScheduler from './pages/Transport/TransportScheduler'
 import RequireRole from './components/Layout/RequireRole'
@@ -34,7 +34,7 @@ function App() {
             <Route element={<RequireRole feature="users" />}>
               <Route path="accesos" element={<AccessList />} />
             </Route>
-            <Route path="proveedores" element={<SupplierList />} />
+            <Route path="costos" element={<CostsPage />} />
           </Route>
 
           {/* Catch all */}

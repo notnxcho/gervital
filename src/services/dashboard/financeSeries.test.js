@@ -63,6 +63,9 @@ const rpcRow = (over = {}) => ({
   ...over
 })
 
+// Semestral $6000 starting Jan 2026 (month 0) → $1000/mo monthlyized.
+const semestral = { amount: 6000, periodMonths: 6, startYear: 2026, startMonth: 0, endYear: null, endMonth: null }
+
 describe('mergeFinanceSeries', () => {
   test('coerces numbers and adds salaries per month', () => {
     const out = mergeFinanceSeries([rpcRow()], []) // no employees → salaries 0
@@ -72,13 +75,23 @@ describe('mergeFinanceSeries', () => {
       attendanceNet: 1000, attendanceGross: 1220,
       transportNet: 200, transportGross: 244,
       paidAttendanceNet: 500, paidTransportNet: 100,
-      expenses: 300, salaries: 0
+      variableExpenses: 300, salaries: 0
     })
+  })
+  test('maps fixed expenses to cash/monthly per month', () => {
+    // month 5 (Jun) is not a semestral hit → cash 0, monthly 1000
+    const jun = mergeFinanceSeries([rpcRow()], [], [semestral])[0]
+    expect(jun.fixedCash).toBe(0)
+    expect(jun.fixedMonthly).toBe(1000)
+    // month 0 (Jan) is a payment month → cash 6000, monthly 1000
+    const jan = mergeFinanceSeries([rpcRow({ month: 0 })], [], [semestral])[0]
+    expect(jan.fixedCash).toBe(6000)
+    expect(jan.fixedMonthly).toBe(1000)
   })
 })
 
 describe('selectors', () => {
-  const row = mergeFinanceSeries([rpcRow()], [])[0]
+  const row = mergeFinanceSeries([rpcRow({ month: 0 })], [], [semestral])[0] // fixedCash 6000, fixedMonthly 1000
   test('previsto net = attendance+transport net', () => {
     expect(selectIncome(row, { basis: 'previsto', withIva: false })).toBe(1200)
   })
@@ -88,11 +101,15 @@ describe('selectors', () => {
   test('cobrado net = paid attendance+transport net', () => {
     expect(selectIncome(row, { basis: 'cobrado', withIva: false })).toBe(600)
   })
-  test('expenses total = expenses + salaries', () => {
-    expect(selectExpensesTotal({ ...row, salaries: 50 })).toBe(350)
+  test('cash basis (default) = variable + fixedCash + salaries', () => {
+    expect(selectExpensesTotal({ ...row, salaries: 50 })).toBe(300 + 6000 + 50)
   })
-  test('margin = income − (expenses+salaries)', () => {
-    expect(selectMargin({ ...row, salaries: 50 }, { basis: 'previsto', withIva: false })).toBe(1200 - 350)
+  test('monthly basis = variable + fixedMonthly + salaries', () => {
+    expect(selectExpensesTotal({ ...row, salaries: 50 }, { fixedBasis: 'monthly' })).toBe(300 + 1000 + 50)
+  })
+  test('margin uses the same fixed basis', () => {
+    expect(selectMargin({ ...row, salaries: 50 }, { basis: 'previsto', withIva: false, fixedBasis: 'monthly' }))
+      .toBe(1200 - (300 + 1000 + 50))
   })
 })
 

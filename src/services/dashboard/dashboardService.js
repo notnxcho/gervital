@@ -1,6 +1,7 @@
 import { supabase } from '../supabase/client'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { getEmployees } from '../salaries/salaryService'
+import { getFixedExpenses } from '../expenses/fixedExpenseService'
 import { mergeFinanceSeries } from './financeSeries'
 
 /**
@@ -163,18 +164,19 @@ export async function getDashboardMetrics(year, month) {
  * @returns {Promise<Array>} merged month objects (see mergeFinanceSeries)
  */
 export async function getDashboardFinanceSeries(fromYear, fromMonth, toYear, toMonth) {
-  const [seriesRes, employees] = await Promise.all([
+  const [seriesRes, employees, fixedExpenses] = await Promise.all([
     supabase.rpc('get_dashboard_finance_series', {
       p_from_year: fromYear,
       p_from_month: fromMonth,
       p_to_year: toYear,
       p_to_month: toMonth
     }),
-    getEmployees().catch(() => []) // operador lacks salary access → empty, never throws
+    getEmployees().catch(() => []), // operador lacks salary access → empty, never throws
+    getFixedExpenses().catch(() => []) // never throw the whole dashboard
   ])
 
   if (seriesRes.error) throw new Error(seriesRes.error.message)
-  return mergeFinanceSeries(seriesRes.data || [], employees)
+  return mergeFinanceSeries(seriesRes.data || [], employees, fixedExpenses)
 }
 
 /**

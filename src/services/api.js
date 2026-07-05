@@ -127,10 +127,31 @@ export {
   getExpensesByMonth,
   createExpense,
   updateExpense,
-  markExpenseAsPaid,
-  deleteExpense,
-  getExpensesSummary
+  deleteExpense
 } from './expenses/expenseService'
+
+export {
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory
+} from './expenseCategories/expenseCategoryService'
+
+export {
+  getFixedExpenses,
+  createFixedExpense,
+  updateFixedExpense,
+  deleteFixedExpense
+} from './expenses/fixedExpenseService'
+
+export {
+  PERIODICITY_OPTIONS,
+  periodicityLabel,
+  hitsMonth,
+  fixedCashForMonth,
+  fixedMonthlyForMonth,
+  nextPayment
+} from './expenses/fixedExpenseCalc'
 
 // ============================================
 // SALARIES API (Sueldos)
