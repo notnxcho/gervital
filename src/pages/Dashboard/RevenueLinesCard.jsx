@@ -6,11 +6,11 @@ import { formatCurrency } from '../../utils/format'
 // separados), lado a lado. `attendance` y `transport` vienen de lineRevenueKpis().
 function Line({ icon: Icon, title, data }) {
   if (!data) return null
-  const { revenue, clients, share, arpu, collectionRate } = data
+  const { revenue, clients, share, arpu } = data
   return (
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-3">
-        <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600">
+        <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-100 text-gray-500">
           <Icon className="w-4 h-4" />
         </span>
         <span className="text-[13px] font-semibold text-gray-700">{title}</span>
@@ -18,8 +18,8 @@ function Line({ icon: Icon, title, data }) {
           {share.toFixed(0)}% del ingreso
         </span>
       </div>
-      <p className="text-[22px] leading-tight font-semibold tracking-tight tabular-nums text-emerald-700">{formatCurrency(revenue)}</p>
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <p className="text-[22px] leading-tight font-semibold tracking-tight tabular-nums text-gray-900">{formatCurrency(revenue)}</p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <div>
           <p className="text-[16px] font-semibold text-gray-900 tabular-nums leading-none">{clients}</p>
           <p className="text-[11px] text-gray-400 mt-1">clientes</p>
@@ -27,10 +27,6 @@ function Line({ icon: Icon, title, data }) {
         <div>
           <p className="text-[16px] font-semibold text-gray-900 tabular-nums leading-none">{formatCurrency(arpu)}</p>
           <p className="text-[11px] text-gray-400 mt-1">por cliente</p>
-        </div>
-        <div>
-          <p className={`text-[16px] font-semibold tabular-nums leading-none ${collectionRate >= 80 ? 'text-emerald-700' : collectionRate >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{collectionRate.toFixed(0)}%</p>
-          <p className="text-[11px] text-gray-400 mt-1">cobrado</p>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { currentSalary, costoAnualMensualizado } from '../salaries/salaryCalc'
-import { fixedCashForMonth, fixedMonthlyForMonth } from '../expenses/fixedExpenseCalc'
+import { fixedCashForMonth, fixedMonthlyForMonth, isActive, monthlyAmount } from '../expenses/fixedExpenseCalc'
 
 // Last calendar day of a 0-indexed month as 'YYYY-MM-DD' (UTC-safe).
 function lastDayOfMonth(year, month) {
@@ -110,6 +110,25 @@ export function lineRevenueKpis(row, line, clients, { withIva = false } = {}) {
     arpu: n > 0 ? revenue / n : 0,
     collectionRate: revenue > 0 ? (paid / revenue) * 100 : 0
   }
+}
+
+// Gasto del mes desglosado por categoría: variables (mes) + fijos mensualizados (activos)
+// + sueldos como categoría propia. Devuelve [{ label, value }] ordenado desc.
+export function expensesByCategory({ variableRows = [], fixedTemplates = [], salaries = 0 } = {}, year, month) {
+  const totals = new Map()
+  const add = (name, amount) => {
+    if (!amount) return
+    const key = name || 'Sin categoría'
+    totals.set(key, (totals.get(key) || 0) + amount)
+  }
+  for (const e of variableRows) add(e.categoryName, Number(e.amount) || 0)
+  for (const t of fixedTemplates) {
+    if (isActive(t, year, month)) add(t.categoryName, monthlyAmount(t))
+  }
+  add('Sueldos', salaries || 0)
+  return [...totals.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value)
 }
 
 // Costo por cliente + punto de equilibrio (modelo de margen de contribución).

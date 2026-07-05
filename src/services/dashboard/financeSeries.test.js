@@ -52,7 +52,8 @@ import {
   selectMargin,
   deriveKpis,
   lineRevenueKpis,
-  extendedFinanceKpis
+  extendedFinanceKpis,
+  expensesByCategory
 } from './financeSeries'
 
 const rpcRow = (over = {}) => ({
@@ -232,5 +233,34 @@ describe('extendedFinanceKpis', () => {
     const e = extendedFinanceKpis(row, { ingresoPrevisto: 1220, cobrado: 0, margen: 820 }, { withIva: true })
     expect(e.attendanceRevenue).toBe(976)
     expect(e.arr).toBe((800 + 200) * 12) // ARR always net
+  })
+})
+
+describe('expensesByCategory', () => {
+  const variableRows = [
+    { categoryName: 'Alimentación', amount: 500 },
+    { categoryName: 'Alimentación', amount: 300 },
+    { categoryName: 'Limpieza', amount: 200 },
+    { categoryName: null, amount: 100 }
+  ]
+  const fixedTemplates = [
+    { categoryName: 'Alquiler', amount: 6000, periodMonths: 1, startYear: 2026, startMonth: 0 },
+    { categoryName: 'Seguros', amount: 1200, periodMonths: 12, startYear: 2026, startMonth: 0 },
+    { categoryName: 'Vieja', amount: 999, periodMonths: 1, startYear: 2020, startMonth: 0, endYear: 2020, endMonth: 11 }
+  ]
+  test('agrupa variables + fijos mensualizados + sueldos, ordenado desc', () => {
+    const out = expensesByCategory({ variableRows, fixedTemplates, salaries: 800 }, 2026, 5)
+    const map = Object.fromEntries(out.map(r => [r.label, r.value]))
+    expect(map['Alimentación']).toBe(800)
+    expect(map['Limpieza']).toBe(200)
+    expect(map['Sin categoría']).toBe(100)
+    expect(map['Alquiler']).toBe(6000)
+    expect(map['Seguros']).toBe(100) // 1200/12
+    expect(map['Sueldos']).toBe(800)
+    expect(map['Vieja']).toBeUndefined() // inactiva ese mes
+    expect(out[0].value).toBeGreaterThanOrEqual(out[out.length - 1].value)
+  })
+  test('sin datos → []', () => {
+    expect(expensesByCategory({ variableRows: [], fixedTemplates: [], salaries: 0 }, 2026, 5)).toEqual([])
   })
 })

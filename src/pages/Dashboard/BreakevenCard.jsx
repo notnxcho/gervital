@@ -43,9 +43,9 @@ export default function BreakevenCard({ analysis, monthLabel }) {
       </div>
 
       <div className="px-5 pb-2 grid grid-cols-3 gap-4">
-        <Stat label="Costo por cliente" value={formatCurrency(costPerClient)} valueClass="text-rose-600" />
-        <Stat label="Ingreso por cliente" value={formatCurrency(revenuePerClient)} valueClass="text-emerald-700" />
-        <Stat label="Margen por cliente" value={formatCurrency(marginPerClient)} valueClass={marginPerClient >= 0 ? 'text-emerald-700' : 'text-rose-600'} />
+        <Stat label="Costo por cliente" value={formatCurrency(costPerClient)} />
+        <Stat label="Ingreso por cliente" value={formatCurrency(revenuePerClient)} />
+        <Stat label="Margen por cliente" value={formatCurrency(marginPerClient)} valueClass={marginPerClient < 0 ? 'text-rose-600' : 'text-gray-900'} />
       </div>
 
       <div className="px-5 pb-5 pt-4">

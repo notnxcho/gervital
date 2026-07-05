@@ -8,9 +8,12 @@ import BulkInvoiceModal from '../BulkInvoiceModal'
 import BreakevenCard from '../BreakevenCard'
 import FinanceKpis from '../FinanceKpis'
 import RevenueLinesCard from '../RevenueLinesCard'
+import ExpensesByCategoryCard from '../ExpensesByCategoryCard'
 import { getDashboardFinanceSeries, getMonthInvoicePanel } from '../../../services/dashboard/dashboardService'
-import { deriveKpis, breakevenAnalysis, lineRevenueKpis, extendedFinanceKpis } from '../../../services/dashboard/financeSeries'
+import { deriveKpis, breakevenAnalysis, lineRevenueKpis, extendedFinanceKpis, expensesByCategory } from '../../../services/dashboard/financeSeries'
 import { getClients } from '../../../services/clients/clientService'
+import { getExpensesByMonth } from '../../../services/expenses/expenseService'
+import { getFixedExpenses } from '../../../services/expenses/fixedExpenseService'
 import { activeClientsInMonth, transportClientsInMonth } from '../../../services/dashboard/commercialStats'
 import { useAuth } from '../../../context/AuthContext'
 import { RANGE_MONTHS, TODAY } from '../monthWindow'
@@ -31,6 +34,9 @@ export default function FinanceSection({ selected, onSelectMonth }) {
 
   // Clientes (incl. bajas) para el conteo de activos por mes del análisis de equilibrio.
   const [clients, setClients] = useState([])
+  // Gastos: fijos (plantillas, una vez) y variables del mes seleccionado.
+  const [fixedTemplates, setFixedTemplates] = useState([])
+  const [monthExpenses, setMonthExpenses] = useState([])
 
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkMode, setBulkMode] = useState('emit')
@@ -72,8 +78,19 @@ export default function FinanceSection({ selected, onSelectMonth }) {
     getClients({ includeDeleted: true })
       .then(cs => { if (alive) setClients(cs) })
       .catch(() => { if (alive) setClients([]) })
+    getFixedExpenses()
+      .then(fs => { if (alive) setFixedTemplates(fs) })
+      .catch(() => { if (alive) setFixedTemplates([]) })
     return () => { alive = false }
   }, [])
+
+  useEffect(() => {
+    let alive = true
+    getExpensesByMonth(selected.year, selected.month)
+      .then(rows => { if (alive) setMonthExpenses(rows) })
+      .catch(() => { if (alive) setMonthExpenses([]) })
+    return () => { alive = false }
+  }, [selected])
 
   const kpis = useMemo(
     () => deriveKpis(series, selected.year, selected.month, kpiOpts),
@@ -106,6 +123,14 @@ export default function FinanceSection({ selected, onSelectMonth }) {
   const extraKpis = useMemo(
     () => extendedFinanceKpis(selectedRow, kpis, kpiOpts),
     [selectedRow, kpis, kpiOpts]
+  )
+
+  const expenseCategories = useMemo(
+    () => expensesByCategory(
+      { variableRows: monthExpenses, fixedTemplates, salaries: selectedRow?.salaries || 0 },
+      selected.year, selected.month
+    ),
+    [monthExpenses, fixedTemplates, selectedRow, selected]
   )
 
   const monthLabel = format(new Date(selected.year, selected.month, 1), 'MMMM yyyy', { locale: es })
@@ -155,6 +180,7 @@ export default function FinanceSection({ selected, onSelectMonth }) {
           monthLabel={monthLabel}
           withIva={kpiOpts.withIva}
         />
+        <ExpensesByCategoryCard rows={expenseCategories} monthLabel={monthLabel} />
         <BreakevenCard analysis={breakeven} monthLabel={monthLabel} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <PlaceholderCard title="Turnos de hoy" hint="Resumen de asistencia del día." minHeight={130} />

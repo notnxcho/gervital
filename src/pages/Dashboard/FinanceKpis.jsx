@@ -2,7 +2,7 @@ import StatCard from './charts/StatCard'
 import { formatCurrency, formatCompact } from '../../utils/format'
 
 // Pill direccional a partir de un delta en $. `invert` invierte la semántica de color
-// (Gastos: subir es malo). Muestra % cuando se conoce el valor previo.
+// (Gastos: subir es malo). Único lugar con color en los KPIs (señal, no decoración).
 function DeltaPill({ current, delta, invert = false }) {
   if (delta == null) return null
   const up = delta >= 0
@@ -19,11 +19,12 @@ function DeltaPill({ current, delta, invert = false }) {
   )
 }
 
-function Group({ label, children }) {
+// Métrica secundaria: label + valor en una línea, discreta (sin card propia).
+function MiniStat({ label, value }) {
   return (
-    <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">{label}</p>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{children}</div>
+    <div className="flex items-baseline gap-2">
+      <span className="text-[12px] text-gray-500">{label}</span>
+      <span className="text-[14px] font-semibold text-gray-900 tabular-nums">{value}</span>
     </div>
   )
 }
@@ -41,61 +42,45 @@ function Skeleton() {
   )
 }
 
-// KPIs financieros del mes, agrupados: Resultado (P&L) y Cobranza/costos.
-// `kpis` = deriveKpis(); `extra` = extendedFinanceKpis().
+// KPIs financieros del mes con jerarquía: Resultado (P&L, primario) + una tira
+// secundaria de apoyo. Valores en neutro; color reservado a los deltas y al margen
+// negativo. `kpis` = deriveKpis(); `extra` = extendedFinanceKpis().
 export default function FinanceKpis({ kpis, extra }) {
   if (!kpis) return <Skeleton />
 
   const collectionPct = kpis.ingresoPrevisto > 0 ? Math.round((kpis.cobrado / kpis.ingresoPrevisto) * 100) : 0
   const laborPct = extra?.laborPct
-  const pending = extra?.pendingCollection ?? 0
 
   return (
-    <div className="flex flex-col gap-5">
-      <Group label="Resultado del mes">
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           label="Ingreso previsto"
           value={formatCurrency(kpis.ingresoPrevisto)}
           pill={<DeltaPill current={kpis.ingresoPrevisto} delta={kpis.deltas.ingresoPrevisto} />}
           sub="vs mes anterior"
         />
-        <StatCard label="Cobrado" value={formatCurrency(kpis.cobrado)} valueClass="text-emerald-700" sub={`${collectionPct}% del previsto`} />
+        <StatCard label="Cobrado" value={formatCurrency(kpis.cobrado)} sub={`${collectionPct}% del previsto`} />
         <StatCard
           label="Gastos"
           value={formatCurrency(kpis.gastos)}
-          valueClass="text-rose-600"
           pill={<DeltaPill current={kpis.gastos} delta={kpis.deltas.gastos} invert />}
           sub="vs mes anterior"
         />
         <StatCard
           label="Margen"
           value={formatCurrency(kpis.margen)}
-          valueClass={kpis.margen >= 0 ? 'text-emerald-700' : 'text-rose-600'}
+          valueClass={kpis.margen < 0 ? 'text-rose-600' : 'text-gray-900'}
           sub={extra?.marginPct != null ? `${extra.marginPct.toFixed(0)}% del ingreso` : 'Ingreso − Gastos'}
         />
-      </Group>
+      </div>
 
-      <Group label="Cobranza y costos">
-        <StatCard
-          label="Tasa de cobro"
-          value={`${kpis.tasaCobro.toFixed(0)}%`}
-          valueClass={kpis.tasaCobro >= 80 ? 'text-emerald-700' : kpis.tasaCobro >= 50 ? 'text-amber-600' : 'text-rose-600'}
-          sub="cobrado / previsto"
-        />
-        <StatCard
-          label="Pendiente de cobro"
-          value={formatCurrency(pending)}
-          valueClass={pending > 0 ? 'text-rose-600' : 'text-emerald-700'}
-          sub="previsto − cobrado"
-        />
-        <StatCard
-          label="Costo laboral"
-          value={laborPct == null ? '—' : `${laborPct.toFixed(0)}%`}
-          valueClass={laborPct == null ? 'text-gray-400' : laborPct <= 40 ? 'text-emerald-700' : laborPct <= 60 ? 'text-amber-600' : 'text-rose-600'}
-          sub="sueldos / ingreso"
-        />
-        <StatCard label="IVA a remitir" value={formatCurrency(extra?.ivaToRemit ?? 0)} sub="bruto − neto" />
-      </Group>
+      {/* tira secundaria de apoyo — discreta, sin competir con el P&L */}
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-2 rounded-2xl border border-gray-100 bg-white px-5 py-3">
+        <MiniStat label="Pendiente de cobro" value={formatCurrency(extra?.pendingCollection ?? 0)} />
+        <MiniStat label="Costo laboral" value={laborPct == null ? '—' : `${laborPct.toFixed(0)}%`} />
+        <MiniStat label="IVA a remitir" value={formatCurrency(extra?.ivaToRemit ?? 0)} />
+      </div>
     </div>
   )
 }
