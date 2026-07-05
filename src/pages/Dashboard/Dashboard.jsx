@@ -136,29 +136,29 @@ export default function Dashboard() {
 
   return (
     <div className="-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8 min-h-full bg-gray-50">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <MonthNavigator selected={selected} onChange={setSelected} />
-      </div>
-
-      {/* pestañas de sección */}
-      <div className="flex gap-1 border-b border-gray-200 mb-6 overflow-x-auto">
-        {available.map(s => {
-          const active = s.id === activeTab
-          return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setTab(s.id)}
-              className={`relative px-4 py-3 text-sm font-semibold whitespace-nowrap transition-colors ${
-                active ? 'text-indigo-700' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {s.label}
-              {active && <span className="absolute left-3 right-3 -bottom-px h-0.5 rounded bg-indigo-600" />}
-            </button>
-          )
-        })}
+      {/* pestañas de sección + navegador de mes en una sola fila (sin título redundante) */}
+      <div className="flex items-end justify-between gap-4 border-b border-gray-200 mb-6">
+        <div className="flex gap-1 overflow-x-auto">
+          {available.map(s => {
+            const active = s.id === activeTab
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setTab(s.id)}
+                className={`relative px-4 py-3 text-sm font-semibold whitespace-nowrap transition-colors ${
+                  active ? 'text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {s.label}
+                {active && <span className="absolute left-3 right-3 -bottom-px h-0.5 rounded bg-indigo-600" />}
+              </button>
+            )
+          })}
+        </div>
+        <div className="pb-1.5 shrink-0">
+          <MonthNavigator selected={selected} onChange={setSelected} />
+        </div>
       </div>
 
       <ActiveComponent selected={selected} onSelectMonth={setSelected} />
