@@ -7,10 +7,11 @@ import PlaceholderCard from '../PlaceholderCard'
 import CollectionPanel from '../CollectionPanel'
 import BulkInvoiceModal from '../BulkInvoiceModal'
 import BreakevenCard from '../BreakevenCard'
+import TransportFinanceCard from '../TransportFinanceCard'
 import { getDashboardFinanceSeries, getMonthInvoicePanel } from '../../../services/dashboard/dashboardService'
-import { deriveKpis, breakevenAnalysis } from '../../../services/dashboard/financeSeries'
+import { deriveKpis, breakevenAnalysis, transportKpis } from '../../../services/dashboard/financeSeries'
 import { getClients } from '../../../services/clients/clientService'
-import { activeClientsInMonth } from '../../../services/dashboard/commercialStats'
+import { activeClientsInMonth, transportClientsInMonth } from '../../../services/dashboard/commercialStats'
 import { useAuth } from '../../../context/AuthContext'
 import { RANGE_MONTHS, TODAY } from '../monthWindow'
 
@@ -79,11 +80,24 @@ export default function FinanceSection({ selected, onSelectMonth }) {
     [series, selected, kpiOpts]
   )
 
-  const breakeven = useMemo(() => {
-    const row = series.find(r => r.year === selected.year && r.month === selected.month)
-    if (!row) return null
-    return breakevenAnalysis(row, activeClientsInMonth(clients, selected.year, selected.month))
-  }, [series, clients, selected])
+  const selectedRow = useMemo(
+    () => series.find(r => r.year === selected.year && r.month === selected.month) || null,
+    [series, selected]
+  )
+  const activeClients = useMemo(
+    () => activeClientsInMonth(clients, selected.year, selected.month),
+    [clients, selected]
+  )
+
+  const breakeven = useMemo(
+    () => (selectedRow ? breakevenAnalysis(selectedRow, activeClients) : null),
+    [selectedRow, activeClients]
+  )
+
+  const transport = useMemo(
+    () => (selectedRow ? transportKpis(selectedRow, transportClientsInMonth(clients, selected.year, selected.month), kpiOpts) : null),
+    [selectedRow, clients, selected, kpiOpts]
+  )
 
   const monthLabel = format(new Date(selected.year, selected.month, 1), 'MMMM yyyy', { locale: es })
 
@@ -125,6 +139,7 @@ export default function FinanceSection({ selected, onSelectMonth }) {
           onOptionsChange={setKpiOpts}
         />
         <KpiRow kpis={kpis} />
+        <TransportFinanceCard kpis={transport} activeClients={activeClients} monthLabel={monthLabel} withIva={kpiOpts.withIva} />
         <BreakevenCard analysis={breakeven} monthLabel={monthLabel} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <PlaceholderCard title="Turnos de hoy" hint="Resumen de asistencia del día." minHeight={130} />

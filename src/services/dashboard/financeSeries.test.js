@@ -50,7 +50,8 @@ import {
   selectIncome,
   selectExpensesTotal,
   selectMargin,
-  deriveKpis
+  deriveKpis,
+  transportKpis
 } from './financeSeries'
 
 const rpcRow = (over = {}) => ({
@@ -162,5 +163,32 @@ describe('breakevenAnalysis', () => {
     expect(a.contributionPerClient).toBeLessThanOrEqual(0)
     expect(a.breakevenClients).toBeNull()
     expect(a.breakevenRevenue).toBeNull()
+  })
+})
+
+describe('transportKpis', () => {
+  const row = {
+    attendanceNet: 800, attendanceGross: 976,
+    transportNet: 200, transportGross: 244,
+    paidTransportNet: 150, paidTransportGross: 183
+  }
+  test('net basis: share, arpu, collection rate', () => {
+    const k = transportKpis(row, 4, { withIva: false })
+    expect(k.revenue).toBe(200)
+    expect(k.transportClients).toBe(4)
+    expect(k.share).toBeCloseTo(200 / 1000 * 100) // 20%
+    expect(k.arpu).toBeCloseTo(50)                 // 200/4
+    expect(k.collectionRate).toBeCloseTo(75)       // 150/200
+  })
+  test('gross basis honors IVA toggle', () => {
+    const k = transportKpis(row, 4, { withIva: true })
+    expect(k.revenue).toBe(244)
+    expect(k.collectionRate).toBeCloseTo(183 / 244 * 100)
+  })
+  test('no transport clients / no revenue → zeros, no divide-by-zero', () => {
+    const k = transportKpis({ attendanceNet: 0, transportNet: 0, paidTransportNet: 0 }, 0, {})
+    expect(k.share).toBe(0)
+    expect(k.arpu).toBe(0)
+    expect(k.collectionRate).toBe(0)
   })
 })

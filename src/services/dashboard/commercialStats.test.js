@@ -1,5 +1,6 @@
 import {
   activeClientsInMonth,
+  transportClientsInMonth,
   baseComposition,
   mrrForClient,
   mrrTotal,
@@ -154,5 +155,21 @@ describe('activeClientsInMonth', () => {
   })
   test('mes anterior a cualquier alta = 0', () => {
     expect(activeClientsInMonth(clients, 2025, 11)).toBe(0)
+  })
+})
+
+describe('transportClientsInMonth', () => {
+  const clients = [
+    { startDate: '2026-01-10', deactivationDate: null, plan: { hasTransport: true } },
+    { startDate: '2026-01-10', deactivationDate: null, plan: { hasTransport: false } },
+    { startDate: '2026-06-05', deactivationDate: null, plan: { hasTransport: true } },
+    { startDate: '2026-02-01', deactivationDate: '2026-05-20', plan: { hasTransport: true } } // baja mayo
+  ]
+  test('cuenta solo activos con transporte (junio 2026)', () => {
+    expect(transportClientsInMonth(clients, 2026, 5)).toBe(2) // cliente1 y cliente3
+  })
+  test('excluye a los que no tienen transporte', () => {
+    const soloSinTransporte = [{ startDate: '2026-01-01', plan: { hasTransport: false } }]
+    expect(transportClientsInMonth(soloSinTransporte, 2026, 5)).toBe(0)
   })
 })

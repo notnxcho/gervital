@@ -71,6 +71,24 @@ export function selectMargin(row, opts) {
   return selectIncome(row, opts) - selectExpensesTotal(row, opts)
 }
 
+// KPIs financieros de transporte para un mes (track de facturación separado de asistencia).
+// Honra el toggle de IVA (net/gross). `transportClients` = activos con transporte ese mes.
+export function transportKpis(row, transportClients, { withIva = false } = {}) {
+  const revenue = withIva ? (row?.transportGross || 0) : (row?.transportNet || 0)
+  const paid = withIva ? (row?.paidTransportGross || 0) : (row?.paidTransportNet || 0)
+  const attendance = withIva ? (row?.attendanceGross || 0) : (row?.attendanceNet || 0)
+  const totalRevenue = attendance + revenue
+  const n = transportClients || 0
+  return {
+    revenue,
+    paid,
+    transportClients: n,
+    share: totalRevenue > 0 ? (revenue / totalRevenue) * 100 : 0,
+    arpu: n > 0 ? revenue / n : 0,
+    collectionRate: revenue > 0 ? (paid / revenue) * 100 : 0
+  }
+}
+
 // Costo por cliente + punto de equilibrio (modelo de margen de contribución).
 // - Fijos = sueldos mensualizados + gastos fijos mensualizados (no escalan con clientes)
 // - Variables = gastos variables (escalan con clientes)

@@ -175,10 +175,12 @@ export function churnKpis(clients, year, month, pricing) {
 
 // Headcount of clients active during (year, month): started on/before the month and not
 // deactivated before it (a baja within the month still counts — was active part of it).
-export function activeClientsInMonth(clients, year, month) {
+// `pred` optionally narrows the set (e.g. only clients with transport).
+function countActiveInMonth(clients, year, month, pred) {
   const ref = year * 12 + month
   let count = 0
   for (const c of (clients || [])) {
+    if (pred && !pred(c)) continue
     const start = parseYearMonth(c.startDate)
     if (!start || start.year * 12 + start.month > ref) continue
     const deact = parseYearMonth(c.deactivationDate)
@@ -186,6 +188,15 @@ export function activeClientsInMonth(clients, year, month) {
     count++
   }
   return count
+}
+
+export function activeClientsInMonth(clients, year, month) {
+  return countActiveInMonth(clients, year, month)
+}
+
+// Clientes con transporte activos en el mes (usa el plan vigente/actual del cliente).
+export function transportClientsInMonth(clients, year, month) {
+  return countActiveInMonth(clients, year, month, c => !!c.plan?.hasTransport)
 }
 
 // Mean tenure in months (startDate → deactivationDate|today) over all clients ever.
