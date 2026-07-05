@@ -90,18 +90,22 @@ export function extendedFinanceKpis(row, kpis, { withIva = false } = {}) {
   }
 }
 
-// KPIs financieros de transporte para un mes (track de facturación separado de asistencia).
-// Honra el toggle de IVA (net/gross). `transportClients` = activos con transporte ese mes.
-export function transportKpis(row, transportClients, { withIva = false } = {}) {
-  const revenue = withIva ? (row?.transportGross || 0) : (row?.transportNet || 0)
-  const paid = withIva ? (row?.paidTransportGross || 0) : (row?.paidTransportNet || 0)
-  const attendance = withIva ? (row?.attendanceGross || 0) : (row?.attendanceNet || 0)
-  const totalRevenue = attendance + revenue
-  const n = transportClients || 0
+// KPIs financieros de una línea de negocio ('attendance' | 'transport') para un mes.
+// Asistencia y transporte son tracks de facturación separados. Honra el toggle de IVA.
+// `clients` = clientes de esa línea activos en el mes (todos para asistencia, con transporte
+// para transporte). Devuelve share sobre el ingreso total, ARPU y tasa de cobro de la línea.
+export function lineRevenueKpis(row, line, clients, { withIva = false } = {}) {
+  if (!row) return null
+  const val = key => (withIva ? (row[`${key}Gross`] || 0) : (row[`${key}Net`] || 0))
+  const revenue = line === 'transport' ? val('transport') : val('attendance')
+  const paid = line === 'transport' ? val('paidTransport') : val('paidAttendance')
+  const totalRevenue = val('attendance') + val('transport')
+  const n = clients || 0
   return {
+    line,
     revenue,
     paid,
-    transportClients: n,
+    clients: n,
     share: totalRevenue > 0 ? (revenue / totalRevenue) * 100 : 0,
     arpu: n > 0 ? revenue / n : 0,
     collectionRate: revenue > 0 ? (paid / revenue) * 100 : 0

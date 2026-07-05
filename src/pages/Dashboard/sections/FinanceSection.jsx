@@ -2,15 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { format, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import MonthlyFinanceChart from '../MonthlyFinanceChart'
-import KpiRow from '../KpiRow'
 import PlaceholderCard from '../PlaceholderCard'
 import CollectionPanel from '../CollectionPanel'
 import BulkInvoiceModal from '../BulkInvoiceModal'
 import BreakevenCard from '../BreakevenCard'
-import TransportFinanceCard from '../TransportFinanceCard'
-import FinanceKpisExtra from '../FinanceKpisExtra'
+import FinanceKpis from '../FinanceKpis'
+import RevenueLinesCard from '../RevenueLinesCard'
 import { getDashboardFinanceSeries, getMonthInvoicePanel } from '../../../services/dashboard/dashboardService'
-import { deriveKpis, breakevenAnalysis, transportKpis, extendedFinanceKpis } from '../../../services/dashboard/financeSeries'
+import { deriveKpis, breakevenAnalysis, lineRevenueKpis, extendedFinanceKpis } from '../../../services/dashboard/financeSeries'
 import { getClients } from '../../../services/clients/clientService'
 import { activeClientsInMonth, transportClientsInMonth } from '../../../services/dashboard/commercialStats'
 import { useAuth } from '../../../context/AuthContext'
@@ -95,8 +94,12 @@ export default function FinanceSection({ selected, onSelectMonth }) {
     [selectedRow, activeClients]
   )
 
-  const transport = useMemo(
-    () => (selectedRow ? transportKpis(selectedRow, transportClientsInMonth(clients, selected.year, selected.month), kpiOpts) : null),
+  const attendanceLine = useMemo(
+    () => (selectedRow ? lineRevenueKpis(selectedRow, 'attendance', activeClients, kpiOpts) : null),
+    [selectedRow, activeClients, kpiOpts]
+  )
+  const transportLine = useMemo(
+    () => (selectedRow ? lineRevenueKpis(selectedRow, 'transport', transportClientsInMonth(clients, selected.year, selected.month), kpiOpts) : null),
     [selectedRow, clients, selected, kpiOpts]
   )
 
@@ -144,9 +147,14 @@ export default function FinanceSection({ selected, onSelectMonth }) {
           onSelectMonth={onSelectMonth}
           onOptionsChange={setKpiOpts}
         />
-        <KpiRow kpis={kpis} />
-        <FinanceKpisExtra data={extraKpis} />
-        <TransportFinanceCard kpis={transport} activeClients={activeClients} monthLabel={monthLabel} withIva={kpiOpts.withIva} />
+        <FinanceKpis kpis={kpis} extra={extraKpis} />
+        <RevenueLinesCard
+          attendance={attendanceLine}
+          transport={transportLine}
+          arr={extraKpis?.arr}
+          monthLabel={monthLabel}
+          withIva={kpiOpts.withIva}
+        />
         <BreakevenCard analysis={breakeven} monthLabel={monthLabel} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <PlaceholderCard title="Turnos de hoy" hint="Resumen de asistencia del día." minHeight={130} />

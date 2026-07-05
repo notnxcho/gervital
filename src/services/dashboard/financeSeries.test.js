@@ -51,7 +51,7 @@ import {
   selectExpensesTotal,
   selectMargin,
   deriveKpis,
-  transportKpis,
+  lineRevenueKpis,
   extendedFinanceKpis
 } from './financeSeries'
 
@@ -167,30 +167,42 @@ describe('breakevenAnalysis', () => {
   })
 })
 
-describe('transportKpis', () => {
+describe('lineRevenueKpis', () => {
   const row = {
     attendanceNet: 800, attendanceGross: 976,
     transportNet: 200, transportGross: 244,
+    paidAttendanceNet: 600, paidAttendanceGross: 732,
     paidTransportNet: 150, paidTransportGross: 183
   }
-  test('net basis: share, arpu, collection rate', () => {
-    const k = transportKpis(row, 4, { withIva: false })
+  test('transport line (net): share, arpu, collection rate', () => {
+    const k = lineRevenueKpis(row, 'transport', 4, { withIva: false })
+    expect(k.line).toBe('transport')
     expect(k.revenue).toBe(200)
-    expect(k.transportClients).toBe(4)
-    expect(k.share).toBeCloseTo(200 / 1000 * 100) // 20%
+    expect(k.clients).toBe(4)
+    expect(k.share).toBeCloseTo(200 / 1000 * 100) // 20% del ingreso total
     expect(k.arpu).toBeCloseTo(50)                 // 200/4
     expect(k.collectionRate).toBeCloseTo(75)       // 150/200
   })
+  test('attendance line (net)', () => {
+    const k = lineRevenueKpis(row, 'attendance', 10, { withIva: false })
+    expect(k.revenue).toBe(800)
+    expect(k.share).toBeCloseTo(80)   // 800/1000
+    expect(k.arpu).toBeCloseTo(80)    // 800/10
+    expect(k.collectionRate).toBeCloseTo(75) // 600/800
+  })
   test('gross basis honors IVA toggle', () => {
-    const k = transportKpis(row, 4, { withIva: true })
+    const k = lineRevenueKpis(row, 'transport', 4, { withIva: true })
     expect(k.revenue).toBe(244)
     expect(k.collectionRate).toBeCloseTo(183 / 244 * 100)
   })
-  test('no transport clients / no revenue → zeros, no divide-by-zero', () => {
-    const k = transportKpis({ attendanceNet: 0, transportNet: 0, paidTransportNet: 0 }, 0, {})
+  test('no clients / no revenue → zeros, no divide-by-zero', () => {
+    const k = lineRevenueKpis({ attendanceNet: 0, transportNet: 0, paidTransportNet: 0 }, 'transport', 0, {})
     expect(k.share).toBe(0)
     expect(k.arpu).toBe(0)
     expect(k.collectionRate).toBe(0)
+  })
+  test('null row → null', () => {
+    expect(lineRevenueKpis(null, 'attendance', 5, {})).toBeNull()
   })
 })
 
