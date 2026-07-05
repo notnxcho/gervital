@@ -1,4 +1,4 @@
-import { salaryCostForMonth } from './financeSeries'
+import { salaryCostForMonth, breakevenAnalysis } from './financeSeries'
 
 const emp = (over = {}) => ({
   adjustments: [{ nominal: 1200, liquido: 1000, effectiveDate: '2026-01-01' }],
@@ -129,5 +129,38 @@ describe('deriveKpis', () => {
     expect(k.margen).toBe(900)             // 1200 - 300
     expect(k.tasaCobro).toBeCloseTo(50, 5) // 600/1200
     expect(k.deltas.ingresoPrevisto).toBe(1200 - 900) // prev month previsto = 800+100
+  })
+})
+
+describe('breakevenAnalysis', () => {
+  // fijos = fixedMonthly + salaries = 200 + 800 = 1000; variables = 100; ingreso neto = 2000
+  const row = { attendanceNet: 1800, transportNet: 200, variableExpenses: 100, fixedMonthly: 200, salaries: 800 }
+
+  test('zero clients → no per-client figures, no crash', () => {
+    const a = breakevenAnalysis(row, 0)
+    expect(a.activeClients).toBe(0)
+    expect(a.costPerClient).toBe(0)
+    expect(a.revenuePerClient).toBe(0)
+    expect(a.breakevenClients).toBeNull() // sin clientes la contribución por cliente es 0 → no computable
+  })
+
+  test('contribution-margin breakeven', () => {
+    // 10 clientes: ARPU=200, var/cliente=10, contribución=190, fijos=1000 → breakeven=1000/190≈5.26
+    const a = breakevenAnalysis(row, 10)
+    expect(a.costPerClient).toBeCloseTo(110) // (1000+100)/10
+    expect(a.revenuePerClient).toBeCloseTo(200)
+    expect(a.marginPerClient).toBeCloseTo(90)
+    expect(a.contributionPerClient).toBeCloseTo(190)
+    expect(a.breakevenClients).toBeCloseTo(1000 / 190)
+    expect(a.breakevenRevenue).toBeCloseTo((1000 / 190) * 200)
+  })
+
+  test('null breakeven when contribution per client is not positive', () => {
+    // variables enormes → costo variable por cliente > ARPU
+    const bad = { attendanceNet: 100, transportNet: 0, variableExpenses: 5000, fixedMonthly: 100, salaries: 0 }
+    const a = breakevenAnalysis(bad, 10)
+    expect(a.contributionPerClient).toBeLessThanOrEqual(0)
+    expect(a.breakevenClients).toBeNull()
+    expect(a.breakevenRevenue).toBeNull()
   })
 })

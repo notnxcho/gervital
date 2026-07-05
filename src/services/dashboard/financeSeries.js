@@ -71,6 +71,43 @@ export function selectMargin(row, opts) {
   return selectIncome(row, opts) - selectExpensesTotal(row, opts)
 }
 
+// Costo por cliente + punto de equilibrio (modelo de margen de contribución).
+// - Fijos = sueldos mensualizados + gastos fijos mensualizados (no escalan con clientes)
+// - Variables = gastos variables (escalan con clientes)
+// - Ingreso = neto previsto (asistencia + transporte), consistente con el modelo contable
+// breakevenClients = fijos / (ARPU − costo variable por cliente); null si la contribución
+// por cliente no es positiva (no hay punto de equilibrio alcanzable con esa estructura).
+export function breakevenAnalysis(row, activeClients) {
+  const n = activeClients || 0
+  const fixedCosts = (row?.fixedMonthly || 0) + (row?.salaries || 0)
+  const variableCosts = row?.variableExpenses || 0
+  const revenueNet = (row?.attendanceNet || 0) + (row?.transportNet || 0)
+  const totalCosts = fixedCosts + variableCosts
+
+  const costPerClient = n > 0 ? totalCosts / n : 0
+  const revenuePerClient = n > 0 ? revenueNet / n : 0
+  const variablePerClient = n > 0 ? variableCosts / n : 0
+  const contributionPerClient = revenuePerClient - variablePerClient
+  const marginPerClient = revenuePerClient - costPerClient
+  const breakevenClients = contributionPerClient > 0 ? fixedCosts / contributionPerClient : null
+  const breakevenRevenue = breakevenClients == null ? null : breakevenClients * revenuePerClient
+
+  return {
+    activeClients: n,
+    fixedCosts,
+    variableCosts,
+    totalCosts,
+    revenueNet,
+    costPerClient,
+    revenuePerClient,
+    variablePerClient,
+    contributionPerClient,
+    marginPerClient,
+    breakevenClients,
+    breakevenRevenue
+  }
+}
+
 // KPIs for the selected (year, month) + deltas vs the previous month in the series.
 export function deriveKpis(series, year, month, opts = {}) {
   const idx = (series || []).findIndex(r => r.year === year && r.month === month)

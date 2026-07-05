@@ -173,6 +173,21 @@ export function churnKpis(clients, year, month, pricing) {
   return { activeCount, altas, bajas, churnRate, mrrGained, mrrLost, avgTenureMonths }
 }
 
+// Headcount of clients active during (year, month): started on/before the month and not
+// deactivated before it (a baja within the month still counts — was active part of it).
+export function activeClientsInMonth(clients, year, month) {
+  const ref = year * 12 + month
+  let count = 0
+  for (const c of (clients || [])) {
+    const start = parseYearMonth(c.startDate)
+    if (!start || start.year * 12 + start.month > ref) continue
+    const deact = parseYearMonth(c.deactivationDate)
+    if (deact && deact.year * 12 + deact.month < ref) continue
+    count++
+  }
+  return count
+}
+
 // Mean tenure in months (startDate → deactivationDate|today) over all clients ever.
 function meanTenureMonths(clients, now = new Date()) {
   const withStart = (clients || []).filter(c => c.startDate)

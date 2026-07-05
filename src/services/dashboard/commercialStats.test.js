@@ -1,4 +1,5 @@
 import {
+  activeClientsInMonth,
   baseComposition,
   mrrForClient,
   mrrTotal,
@@ -133,5 +134,25 @@ describe('bajasByReason', () => {
     expect(out.map(r => r.reason)).toEqual(['death', 'financial', 'other'])
     expect(out.find(r => r.reason === 'death').label).toBe('Fallecimiento')
     expect(out.find(r => r.reason === 'other').label).toBe('Otro')
+  })
+})
+
+describe('activeClientsInMonth', () => {
+  const clients = [
+    { startDate: '2026-01-10', deactivationDate: null },              // activo desde ene
+    { startDate: '2026-06-05', deactivationDate: null },              // alta en junio
+    { startDate: '2026-02-01', deactivationDate: '2026-05-20' },      // baja en mayo
+    { startDate: '2026-07-01', deactivationDate: null }               // alta futura (julio)
+  ]
+  test('cuenta activos en el mes (junio 2026, month 5)', () => {
+    // cliente1 (activo), cliente2 (alta junio) → 2; cliente3 se fue en mayo, cliente4 aún no entra
+    expect(activeClientsInMonth(clients, 2026, 5)).toBe(2)
+  })
+  test('una baja dentro del mes todavía cuenta ese mes', () => {
+    // mayo 2026 (month 4): cliente1, cliente3 (baja este mes) → 2
+    expect(activeClientsInMonth(clients, 2026, 4)).toBe(2)
+  })
+  test('mes anterior a cualquier alta = 0', () => {
+    expect(activeClientsInMonth(clients, 2025, 11)).toBe(0)
   })
 })

@@ -6,8 +6,11 @@ import KpiRow from '../KpiRow'
 import PlaceholderCard from '../PlaceholderCard'
 import CollectionPanel from '../CollectionPanel'
 import BulkInvoiceModal from '../BulkInvoiceModal'
+import BreakevenCard from '../BreakevenCard'
 import { getDashboardFinanceSeries, getMonthInvoicePanel } from '../../../services/dashboard/dashboardService'
-import { deriveKpis } from '../../../services/dashboard/financeSeries'
+import { deriveKpis, breakevenAnalysis } from '../../../services/dashboard/financeSeries'
+import { getClients } from '../../../services/clients/clientService'
+import { activeClientsInMonth } from '../../../services/dashboard/commercialStats'
 import { useAuth } from '../../../context/AuthContext'
 import { RANGE_MONTHS, TODAY } from '../monthWindow'
 
@@ -24,6 +27,9 @@ export default function FinanceSection({ selected, onSelectMonth }) {
 
   const [panelRows, setPanelRows] = useState([])
   const [panelLoading, setPanelLoading] = useState(true)
+
+  // Clientes (incl. bajas) para el conteo de activos por mes del análisis de equilibrio.
+  const [clients, setClients] = useState([])
 
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkMode, setBulkMode] = useState('emit')
@@ -60,10 +66,24 @@ export default function FinanceSection({ selected, onSelectMonth }) {
 
   useEffect(() => { loadPanel() }, [loadPanel])
 
+  useEffect(() => {
+    let alive = true
+    getClients({ includeDeleted: true })
+      .then(cs => { if (alive) setClients(cs) })
+      .catch(() => { if (alive) setClients([]) })
+    return () => { alive = false }
+  }, [])
+
   const kpis = useMemo(
     () => deriveKpis(series, selected.year, selected.month, kpiOpts),
     [series, selected, kpiOpts]
   )
+
+  const breakeven = useMemo(() => {
+    const row = series.find(r => r.year === selected.year && r.month === selected.month)
+    if (!row) return null
+    return breakevenAnalysis(row, activeClientsInMonth(clients, selected.year, selected.month))
+  }, [series, clients, selected])
 
   const monthLabel = format(new Date(selected.year, selected.month, 1), 'MMMM yyyy', { locale: es })
 
@@ -105,6 +125,7 @@ export default function FinanceSection({ selected, onSelectMonth }) {
           onOptionsChange={setKpiOpts}
         />
         <KpiRow kpis={kpis} />
+        <BreakevenCard analysis={breakeven} monthLabel={monthLabel} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <PlaceholderCard title="Turnos de hoy" hint="Resumen de asistencia del día." minHeight={130} />
           <PlaceholderCard title="Transporte de hoy" hint="Resumen de viajes y autos del día." minHeight={130} />
