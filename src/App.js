@@ -10,6 +10,7 @@ import AccessList from './pages/Access/AccessList'
 import CostsPage from './pages/Costs/CostsPage'
 import DailyGroups from './pages/Groups/DailyGroups'
 import TransportScheduler from './pages/Transport/TransportScheduler'
+import ChurnBoard from './pages/Churn/ChurnBoard'
 import RequireRole from './components/Layout/RequireRole'
 import './App.css'
 
@@ -31,6 +32,7 @@ function App() {
             <Route path="clientes/:id/editar" element={<AddClient />} />
             <Route path="grupos" element={<DailyGroups />} />
             <Route path="transporte" element={<TransportScheduler />} />
+            <Route path="bajas" element={<ChurnBoard />} />
             <Route element={<RequireRole feature="users" />}>
               <Route path="accesos" element={<AccessList />} />
             </Route>

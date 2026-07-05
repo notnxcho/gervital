@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Group, LogOut, Settings, Shop, Calendar, StatsReport, Lock, Bus } from 'iconoir-react'
+import { Group, LogOut, Settings, Shop, Calendar, StatsReport, Lock, Bus, UserXmark } from 'iconoir-react'
 import { useAuth } from '../../context/AuthContext'
 import ChangePasswordModal from './ChangePasswordModal'
 
@@ -25,6 +25,7 @@ export default function Navbar() {
     { to: '/clientes', label: 'Clientes', icon: Group, access: 'clients' },
     { to: '/grupos', label: 'Grupos', icon: Calendar, access: 'clients' },
     { to: '/transporte', label: 'Transporte', icon: Bus, access: 'clients' },
+    { to: '/bajas', label: 'Bajas', icon: UserXmark, access: 'clients' },
     { to: '/costos', label: 'Costos', icon: Shop, access: 'suppliers' },
     { to: '/accesos', label: 'Accesos', icon: Settings, access: 'users' }
   ]
