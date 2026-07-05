@@ -15,6 +15,11 @@ export function periodicityLabel(months) {
   return opt ? opt.label : `Cada ${months} meses`
 }
 
+// Monthlyized amount of a single template (per-payment amount / periodicity).
+export function monthlyAmount(tpl) {
+  return Number(tpl.amount) / tpl.periodMonths
+}
+
 // Absolute month index (year*12 + month).
 const idx = (year, month) => year * 12 + month
 

@@ -147,6 +147,7 @@ export {
 export {
   PERIODICITY_OPTIONS,
   periodicityLabel,
+  monthlyAmount,
   hitsMonth,
   fixedCashForMonth,
   fixedMonthlyForMonth,

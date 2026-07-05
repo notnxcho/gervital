@@ -30,6 +30,7 @@ import {
   deleteCategory,
   PERIODICITY_OPTIONS,
   periodicityLabel,
+  monthlyAmount,
   hitsMonth,
   nextPayment,
   fixedCashForMonth,
@@ -596,7 +597,7 @@ function CategoryManagerModal({ isOpen, onClose, categories, onChanged }) {
 function FixedExpenseCard({ fixed, year, month, onEdit, onDelete }) {
   const hitsThis = hitsMonth(fixed, year, month)
   const next = nextPayment(fixed, year, month)
-  const monthly = Number(fixed.amount) / fixed.periodMonths
+  const monthly = monthlyAmount(fixed)
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between">

@@ -33,7 +33,7 @@ export async function getDashboardMetrics(year, month) {
 
     supabase
       .from('expenses')
-      .select('amount, status')
+      .select('amount')
       .eq('year', year)
       .eq('month', month)
   ])
