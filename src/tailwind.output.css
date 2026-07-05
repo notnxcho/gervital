@@ -579,16 +579,16 @@ video {
   right: 0px;
 }
 
-.-bottom-px {
-  bottom: -1px;
-}
-
 .-right-1 {
   right: -0.25rem;
 }
 
 .-top-1 {
   top: -0.25rem;
+}
+
+.bottom-0 {
+  bottom: 0px;
 }
 
 .bottom-3 {
@@ -1419,6 +1419,10 @@ video {
 
 .overflow-y-auto {
   overflow-y: auto;
+}
+
+.overflow-y-hidden {
+  overflow-y: hidden;
 }
 
 .truncate {

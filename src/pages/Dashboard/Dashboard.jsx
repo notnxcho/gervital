@@ -138,7 +138,7 @@ export default function Dashboard() {
     <div className="-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8 min-h-full bg-gray-50">
       {/* pestañas de sección + navegador de mes en una sola fila (sin título redundante) */}
       <div className="flex items-end justify-between gap-4 border-b border-gray-200 mb-6">
-        <div className="flex gap-1 overflow-x-auto">
+        <div className="flex gap-1 overflow-x-auto overflow-y-hidden">
           {available.map(s => {
             const active = s.id === activeTab
             return (
@@ -151,7 +151,7 @@ export default function Dashboard() {
                 }`}
               >
                 {s.label}
-                {active && <span className="absolute left-3 right-3 -bottom-px h-0.5 rounded bg-indigo-600" />}
+                {active && <span className="absolute left-3 right-3 bottom-0 h-0.5 rounded bg-indigo-600" />}
               </button>
             )
           })}
