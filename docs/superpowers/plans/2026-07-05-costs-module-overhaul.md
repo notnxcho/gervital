@@ -86,6 +86,9 @@ CREATE TABLE fixed_expenses (
 );
 
 -- 3. expenses -> variable-only -------------------------------------------
+-- expenses_view depends on status/paid_at, so drop it before dropping columns
+-- (CREATE OR REPLACE VIEW cannot remove columns). Recreated in step 5.
+DROP VIEW IF EXISTS expenses_view;
 ALTER TABLE expenses ADD COLUMN category_id UUID REFERENCES expense_categories(id) ON DELETE SET NULL;
 ALTER TABLE expenses DROP COLUMN IF EXISTS status;
 ALTER TABLE expenses DROP COLUMN IF EXISTS paid_at;
@@ -106,7 +109,7 @@ CREATE POLICY "Fixed expenses updatable by authenticated"  ON fixed_expenses FOR
 CREATE POLICY "Fixed expenses deletable by authenticated"  ON fixed_expenses FOR DELETE USING (is_authenticated());
 
 -- 5. Views ----------------------------------------------------------------
-CREATE OR REPLACE VIEW expenses_view AS
+CREATE VIEW expenses_view AS
 SELECT
   e.id,
   e.supplier_id AS "supplierId",
