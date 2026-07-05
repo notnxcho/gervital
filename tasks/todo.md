@@ -62,14 +62,21 @@ Nuevo `src/pages/Dashboard/charts/`:
 
 ## Fases de ejecución
 
-- [ ] **Fase 0 — Migración 038** (RPCs de stats + tablas churn + RLS). Aplicar vía `apply_migration`.
-- [ ] **Fase 1 — Toolkit de charts SVG** (`charts/`) + `StatCard`.
-- [ ] **Fase 2 — Servicios + lógica pura** (`attendanceStats.js`, `commercialStats.js`, `billingBreakdown`) + tests.
-- [ ] **Fase 3 — Dashboard tabbed shell** + extraer `FinanceSection` (sin cambios de comportamiento) + verificar finanzas intactas.
-- [ ] **Fase 4 — AttendanceSection** (KPIs + trend + breakdown sub-tabs).
-- [ ] **Fase 5 — CommercialSection** (base composition + mix facturación + altas/bajas + analítica de churn).
-- [ ] **Fase 6 — Módulo /bajas** (kanban, servicio, ruta, nav).
-- [ ] **Fase 7 — RBAC** (`statistics` → admin+superadmin; nav churn para todos) + Tailwind rebuild + verificación (build, lint, smoke).
+- [x] **Fase 0 — Migración 038** (RPCs de stats + tablas churn + RLS). Aplicada + smoke test contra datos reales.
+- [x] **Fase 1 — Toolkit de charts SVG** (`charts/`) + `StatCard`.
+- [x] **Fase 2 — Servicios + lógica pura** (`attendanceStats.js`, `commercialStats.js`, `getBillingBreakdown`) + 22 tests.
+- [x] **Fase 3 — Dashboard tabbed shell** + `FinanceSection` extraída (mismo comportamiento) + `monthWindow.js` compartido.
+- [x] **Fase 4 — AttendanceSection** (KPIs + trend + breakdown sub-tabs).
+- [x] **Fase 5 — CommercialSection** (base composition + mix facturación + altas/bajas + analítica de churn).
+- [x] **Fase 6 — Módulo /bajas** (kanban DnD, servicio, modal + notas + reactivar).
+- [x] **Fase 7 — RBAC** (`statistics` → admin+superadmin; nav Bajas para todos) + Tailwind rebuild + verificación.
+
+## Review
+- Migración 038 aplicada (con 2 fixes: `#variable_conflict use_column` y selección de plan vigente por `effective_from` — client_plans es versionado). RPCs verificadas: 8 filas asistencia, 44 clientes facturación, 5 tarjetas churn auto-provisionadas.
+- Frontend: `npm run build` OK (+9.65 kB), 22 tests verdes, eslint limpio en todo lo nuevo.
+- Dashboard ahora tabbed: Finanzas (superadmin, sin regresión) / Asistencia (admin+super) / Comercial (superadmin). Mes compartido entre pestañas; clic en barra del chart no re-fetchea.
+- Módulo /bajas para todos los roles; kanban con DnD optimista, mover a "Recuperado" ofrece reactivar (flujo real `reactivateClient`).
+- Pendiente opcional: verificación runtime en browser (build/tests OK); wire de `assignChurn` en UI (dejado para follow-up).
 
 ## Verificación
 - `npm run build` limpio; recompilar Tailwind.

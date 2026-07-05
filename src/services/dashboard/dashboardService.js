@@ -223,3 +223,65 @@ export async function getMonthInvoicePanel(year, month) {
     }
   })
 }
+
+/**
+ * Attendance stats aggregated per (year, month, segment) for the analytics dashboard.
+ * Inclusive range. Months are 0-indexed.
+ * @param {number} fromYear
+ * @param {number} fromMonth - 0-indexed
+ * @param {number} toYear
+ * @param {number} toMonth - 0-indexed
+ * @returns {Promise<Array>} rows: { year, month, frequency, schedule, cognitiveLevel, attended, absentJustified, absentUnjustified, recovery, vacation, scheduled }
+ */
+export async function getAttendanceStats(fromYear, fromMonth, toYear, toMonth) {
+  const { data, error } = await supabase.rpc('get_attendance_stats', {
+    p_from_year: fromYear,
+    p_from_month: fromMonth,
+    p_to_year: toYear,
+    p_to_month: toMonth
+  })
+
+  if (error) throw new Error(error.message)
+
+  return (data || []).map(r => ({
+    year: r.year,
+    month: r.month,
+    frequency: r.frequency,
+    schedule: r.schedule,
+    cognitiveLevel: r.cognitive_level,
+    attended: Number(r.attended) || 0,
+    absentJustified: Number(r.absent_justified) || 0,
+    absentUnjustified: Number(r.absent_unjustified) || 0,
+    recovery: Number(r.recovery) || 0,
+    vacation: Number(r.vacation) || 0,
+    scheduled: Number(r.scheduled) || 0
+  }))
+}
+
+/**
+ * Per-client billing breakdown for a single month (attendance + transport, net + gross).
+ * @param {number} year
+ * @param {number} month - 0-indexed
+ * @returns {Promise<Array>} rows: { clientId, frequency, schedule, cognitiveLevel, hasTransport, isDeactivated, attendanceNet, attendanceGross, transportNet, transportGross }
+ */
+export async function getBillingBreakdown(year, month) {
+  const { data, error } = await supabase.rpc('get_billing_breakdown_rows', {
+    p_year: year,
+    p_month: month
+  })
+
+  if (error) throw new Error(error.message)
+
+  return (data || []).map(r => ({
+    clientId: r.client_id,
+    frequency: r.frequency,
+    schedule: r.schedule,
+    cognitiveLevel: r.cognitive_level,
+    hasTransport: !!r.has_transport,
+    isDeactivated: !!r.is_deactivated,
+    attendanceNet: Number(r.attendance_net) || 0,
+    attendanceGross: Number(r.attendance_gross) || 0,
+    transportNet: Number(r.transport_net) || 0,
+    transportGross: Number(r.transport_gross) || 0
+  }))
+}

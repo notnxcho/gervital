@@ -186,6 +186,25 @@ export {
 } from './transport/transportService'
 
 // ============================================
+// DASHBOARD ANALYTICS API
+// ============================================
+export {
+  getAttendanceStats,
+  getBillingBreakdown
+} from './dashboard/dashboardService'
+
+// ============================================
+// CHURN API
+// ============================================
+export {
+  getChurnBoard,
+  updateChurnStage,
+  assignChurn,
+  getChurnNotes,
+  addChurnNote
+} from './churn/churnService'
+
+// ============================================
 // GROUPS API
 // ============================================
 export {
