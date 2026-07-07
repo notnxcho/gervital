@@ -71,6 +71,15 @@ const FILTERS_CONFIG = [
     ]
   },
   {
+    key: 'isCharity',
+    label: 'Beneficencia',
+    type: 'full',
+    options: [
+      { value: true, label: 'Beneficencia' },
+      { value: false, label: 'Regulares' }
+    ]
+  },
+  {
     key: 'showDeleted',
     label: 'Bajas',
     type: 'full',
@@ -184,6 +193,7 @@ export default function ClientList() {
     cognitiveLevel: null,
     frequency: null,
     hasTransport: null,
+    isCharity: null,
     showDeleted: null
   })
 
@@ -220,13 +230,14 @@ export default function ClientList() {
       const matchesCognitive = filters.cognitiveLevel === null || client.cognitiveLevel === filters.cognitiveLevel
       const matchesFrequency = filters.frequency === null || client.plan.frequency === filters.frequency
       const matchesTransport = filters.hasTransport === null || client.plan.hasTransport === filters.hasTransport
+      const matchesCharity = filters.isCharity === null || (!!client.isCharity) === filters.isCharity
       // "Solo bajas": con el filtro activo se muestran únicamente los dados de baja
       const matchesDeleted = filters.showDeleted === true ? !!client.deletedAt : !client.deletedAt
 
-      return matchesSearch && matchesCognitive && matchesFrequency && matchesTransport && matchesDeleted
+      return matchesSearch && matchesCognitive && matchesFrequency && matchesTransport && matchesCharity && matchesDeleted
     })
     return sortClients(filtered, sortBy)
-  }, [clients, search, filters.cognitiveLevel, filters.frequency, filters.hasTransport, filters.showDeleted, sortBy])
+  }, [clients, search, filters.cognitiveLevel, filters.frequency, filters.hasTransport, filters.isCharity, filters.showDeleted, sortBy])
 
   const activeFiltersCount = getActiveFiltersCount(filters)
 
@@ -333,7 +344,7 @@ export default function ClientList() {
           </p>
           {activeFiltersCount > 0 && (
             <button
-              onClick={() => setFilters({ cognitiveLevel: null, frequency: null, hasTransport: null, showDeleted: null })}
+              onClick={() => setFilters({ cognitiveLevel: null, frequency: null, hasTransport: null, isCharity: null, showDeleted: null })}
               className="mt-2 text-purple-600 hover:text-purple-700 text-sm font-medium"
             >
               Limpiar filtros
@@ -427,6 +438,10 @@ const ClientCard = memo(function ClientCard({ client }) {
             </div>
 
             <div className="cc-right">
+              {client.isCharity && (
+                <span className="cc-tchip" title="Beneficencia" style={{ background: '#ede9fe', color: '#7c3aed' }}>♥</span>
+              )}
+
               {client.plan.hasTransport && (
                 <span className="cc-tchip"><VanIcon /></span>
               )}
@@ -480,7 +495,12 @@ const ClientRow = memo(function ClientRow({ client }) {
 
       {/* Nombre + edad */}
       <div className="cr-main">
-        <span className="cr-name">{client.firstName} {client.lastName}</span>
+        <span className="cr-name">
+          {client.firstName} {client.lastName}
+          {client.isCharity && (
+            <span title="Beneficencia" style={{ marginLeft: 6, color: '#7c3aed' }}>♥</span>
+          )}
+        </span>
         <span className="cr-sub">
           {age ? `${age} años` : 'Edad sin dato'}
           {isDeactivated && deactivatedLabel ? ` · ${deactivatedLabel}` : ''}
