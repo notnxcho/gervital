@@ -131,9 +131,11 @@ export default function CostsPage() {
   const categoryOptions = categories.map(c => ({ value: c.id, label: c.name }))
   const supplierOptions = suppliers.map(s => ({ value: s.id, label: s.name }))
 
+  const getSupplierName = (supplierId) => suppliers.find(s => s.id === supplierId)?.name
+
   // Accessors shared by fixed & variable expenses.
   const expenseAccessors = {
-    getText: (e) => [e.description, e.notes, e.supplierName].filter(Boolean).join(' '),
+    getText: (e) => [e.description, e.notes, getSupplierName(e.supplierId)].filter(Boolean).join(' '),
     getCategoryId: (e) => e.categoryId,
     getSupplierId: (e) => e.supplierId,
     getAmount: (e) => Number(e.amount)
@@ -220,8 +222,6 @@ export default function CostsPage() {
       alert('Error al eliminar: ' + e.message)
     }
   }
-
-  const getSupplierName = (supplierId) => suppliers.find(s => s.id === supplierId)?.name
 
   const selectedEmployee = employeeModal.employee
     ? employees.find(e => e.id === employeeModal.employee.id) || null
