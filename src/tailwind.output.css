@@ -553,6 +553,10 @@ video {
   visibility: visible;
 }
 
+.collapse {
+  visibility: collapse;
+}
+
 .fixed {
   position: fixed;
 }
@@ -905,6 +909,10 @@ video {
   height: 2.25rem;
 }
 
+.h-\[18px\] {
+  height: 18px;
+}
+
 .h-auto {
   height: auto;
 }
@@ -1084,6 +1092,10 @@ video {
 
 .min-w-\[180px\] {
   min-width: 180px;
+}
+
+.min-w-\[18px\] {
+  min-width: 18px;
 }
 
 .min-w-\[2rem\] {
