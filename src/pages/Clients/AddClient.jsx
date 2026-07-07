@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { formatCurrency } from '../../utils/format'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, Plus, Trash, Bus } from 'iconoir-react'
-import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion, syncClientToBiller } from '../../services/api'
+import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion, syncClientToBiller, voidPendingInvoices } from '../../services/api'
 import { geocodeAndCalculateDistance } from '../../services/clients/geocodingService'
 import { getPlanPricing, getPlanPriceSync } from '../../services/pricing/pricingService'
 import { getTransportPricing, getTransportPriceSync } from '../../services/pricing/transportPricingService'
@@ -112,7 +112,9 @@ const INITIAL_FORM_DATA = {
   isDiabetic: false,
   isCeliac: false,
   isHypertensive: false,
-  isLactoseIntolerant: false
+  isLactoseIntolerant: false,
+  // Beneficencia (no genera facturación; write admin-gated)
+  isCharity: false
 }
 
 export default function AddClient() {
@@ -184,7 +186,8 @@ export default function AddClient() {
           isDiabetic: client.medicalInfo?.isDiabetic || false,
           isCeliac: client.medicalInfo?.isCeliac || false,
           isHypertensive: client.medicalInfo?.isHypertensive || false,
-          isLactoseIntolerant: client.medicalInfo?.isLactoseIntolerant || false
+          isLactoseIntolerant: client.medicalInfo?.isLactoseIntolerant || false,
+          isCharity: client.isCharity || false
         })
 
         const invoices = await getClientInvoices(id).catch(() => [])
@@ -320,6 +323,7 @@ export default function AddClient() {
         documentType: formData.documentType,
         documentNumber: formData.documentNumber,
         transferResponsible: formData.transferResponsible,
+        isCharity: formData.isCharity,
         plan: {
           frequency: parseInt(formData.frequency),
           schedule: formData.schedule,
@@ -368,8 +372,13 @@ export default function AddClient() {
         if (avatarFile) {
           await uploadClientAvatar(id, avatarFile).catch(console.error)
         }
+        // Beneficencia: anular facturas pendientes no emitidas ni pagadas (idempotente).
+        if (formData.isCharity) {
+          await voidPendingInvoices(id).catch(err => console.warn('Void facturas falló:', err))
+        }
         // Re-sync receptor en Biller: los datos fiscales (nombre/CI/dirección/email) pudieron cambiar.
-        if (formData.documentNumber) {
+        // No se sincroniza a clientes de beneficencia (no facturan).
+        if (formData.documentNumber && !formData.isCharity) {
           syncClientToBiller(id, true).catch(err => console.warn('Re-sync Biller falló:', err))
         }
         navigate(`/clientes/${id}`)
@@ -382,7 +391,8 @@ export default function AddClient() {
           await uploadClientAvatar(newClient.id, avatarFile).catch(console.error)
         }
         // Sync receptor en Biller. No bloquea el alta: el cliente ya quedó creado.
-        if (newClient?.id && formData.documentNumber) {
+        // No se sincroniza a clientes de beneficencia (no facturan).
+        if (newClient?.id && formData.documentNumber && !formData.isCharity) {
           try {
             await syncClientToBiller(newClient.id)
           } catch (err) {
@@ -858,8 +868,22 @@ export default function AddClient() {
                 </div>
               </button>
 
-              {/* Price preview */}
+              {/* Beneficencia (solo admin+) */}
               {hasAccess('billing') && (
+                <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                  <Checkbox
+                    label="Cliente de beneficencia (no genera facturación)"
+                    checked={formData.isCharity}
+                    onChange={(e) => updateField('isCharity', e.target.checked)}
+                  />
+                  <p className="mt-1 ml-7 text-xs text-gray-500">
+                    Participa de la operativa (transporte, grupos, asistencia) pero no genera facturas ni impacta el dashboard financiero ni las métricas comerciales.
+                  </p>
+                </div>
+              )}
+
+              {/* Price preview */}
+              {hasAccess('billing') && !formData.isCharity && (
               <div className="bg-indigo-50 rounded-lg p-4 space-y-2">
                 <p className="text-sm text-indigo-700">Precio mensual estimado</p>
                 <p className="text-2xl font-bold text-indigo-900">
