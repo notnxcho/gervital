@@ -131,6 +131,23 @@ export {
 } from './expenses/expenseService'
 
 export {
+  getExtraordinaryByMonth,
+  createExtraordinary,
+  updateExtraordinary,
+  deleteExtraordinary
+} from './expenses/extraordinaryExpenseService'
+
+export {
+  contingencyLimit,
+  contingencyStatus
+} from './expenses/contingencyFund'
+
+export {
+  getSetting,
+  setSetting
+} from './settings/appSettingsService'
+
+export {
   getCategories,
   createCategory,
   updateCategory,
