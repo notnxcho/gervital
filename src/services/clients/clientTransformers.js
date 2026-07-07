@@ -42,7 +42,9 @@ export function transformClientToDb(clientData) {
     p_med_is_diabetic: clientData.medicalInfo?.isDiabetic || false,
     p_med_is_celiac: clientData.medicalInfo?.isCeliac || false,
     p_med_is_hypertensive: clientData.medicalInfo?.isHypertensive || false,
-    p_med_is_lactose_intolerant: clientData.medicalInfo?.isLactoseIntolerant || false
+    p_med_is_lactose_intolerant: clientData.medicalInfo?.isLactoseIntolerant || false,
+    // Charity flag (write is admin-gated server-side)
+    p_is_charity: clientData.isCharity || false
   }
 }
 
@@ -65,6 +67,7 @@ export function transformClientFromDb(dbClient) {
     deactivationDate: dbClient.deactivationDate ? String(dbClient.deactivationDate).split('T')[0] : null,
     deactivationReason: dbClient.deactivationReason || null,
     deactivationNotes: dbClient.deactivationNotes || null,
+    isCharity: dbClient.isCharity || false,
     recoveryDaysAvailable: dbClient.recoveryDaysAvailable || 0,
     plan: dbClient.plan || {
       frequency: 1,
@@ -123,6 +126,7 @@ export function transformUpdateToDb(clientId, updateData) {
   if (updateData.startDate !== undefined) params.p_start_date = updateData.startDate
   if (updateData.documentType !== undefined) params.p_document_type = updateData.documentType
   if (updateData.documentNumber !== undefined) params.p_document_number = updateData.documentNumber
+  if (updateData.isCharity !== undefined) params.p_is_charity = updateData.isCharity
 
   // Emergency contacts (array, 1..5) + transfer responsible
   if (updateData.emergencyContacts !== undefined) params.p_emergency_contacts = updateData.emergencyContacts

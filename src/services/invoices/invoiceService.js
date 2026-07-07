@@ -10,6 +10,18 @@ export async function ensureClientMonths(clientId) {
 }
 
 /**
+ * Delete pending, non-emitted, unpaid monthly invoices for a client.
+ * Used when a client is marked as charity. Admin-only (enforced server-side).
+ * @param {string} clientId
+ * @returns {Promise<number>} count of deleted rows
+ */
+export async function voidPendingInvoices(clientId) {
+  const { data, error } = await supabase.rpc('void_pending_invoices', { p_client_id: clientId })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/**
  * Get all invoices for a client
  * @param {string} clientId
  * @returns {Promise<Array>}

@@ -73,6 +73,7 @@ export {
 // ============================================
 export {
   ensureClientMonths,
+  voidPendingInvoices,
   getClientInvoices,
   calculateMonthBilling,
   markMonthPaid,
