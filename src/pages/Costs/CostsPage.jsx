@@ -154,6 +154,19 @@ export default function CostsPage() {
     expenseGroupOpts
   )
 
+  // Supplier categories come from the suppliers' own `category` string.
+  const supplierCategoryOptions = Array.from(new Set(suppliers.map(s => s.category).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'es'))
+    .map(c => ({ value: c, label: c }))
+
+  const supplierGroups = groupByCategory(
+    filterItems(suppliers, supplierFilters, {
+      getText: (s) => [s.name, s.contact, s.notes].filter(Boolean).join(' '),
+      getCategoryId: (s) => s.category
+    }),
+    { getKey: (s) => s.category, getLabel: (s) => s.category }
+  )
+
   // Handlers
   const handleDeleteExpense = async () => {
     if (!deleteModal.item) return
@@ -369,40 +382,55 @@ export default function CostsPage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {suppliers.map(supplier => (
-            <Card key={supplier.id} className="p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="font-semibold text-gray-900">{supplier.name}</h4>
-                  <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
-                    {supplier.category}
-                  </span>
-                </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setSupplierModal({ open: true, supplier })}
-                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setDeleteModal({ open: true, type: 'supplier', item: supplier })}
-                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash className="w-4 h-4" />
-                  </button>
-                </div>
+        <CostsFilterBar
+          filters={supplierFilters}
+          onChange={setSupplierFilters}
+          categoryOptions={supplierCategoryOptions}
+          searchPlaceholder="Buscar proveedor…"
+        />
+
+        {supplierGroups.length === 0 ? (
+          <Card className="p-6 text-center"><p className="text-gray-500">No hay proveedores</p></Card>
+        ) : (
+          supplierGroups.map(group => (
+            <CategoryGroup key={group.key} label={group.label} count={group.items.length}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {group.items.map(supplier => (
+                  <Card key={supplier.id} className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="font-semibold text-gray-900">{supplier.name}</h4>
+                        <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                          {supplier.category}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setSupplierModal({ open: true, supplier })}
+                          className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteModal({ open: true, type: 'supplier', item: supplier })}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    {supplier.contact && (
+                      <p className="text-sm text-gray-500 mt-2">{supplier.contact}</p>
+                    )}
+                    {supplier.phone && (
+                      <p className="text-sm text-gray-500">{supplier.phone}</p>
+                    )}
+                  </Card>
+                ))}
               </div>
-              {supplier.contact && (
-                <p className="text-sm text-gray-500 mt-2">{supplier.contact}</p>
-              )}
-              {supplier.phone && (
-                <p className="text-sm text-gray-500">{supplier.phone}</p>
-              )}
-            </Card>
-          ))}
-        </div>
+            </CategoryGroup>
+          ))
+        )}
       </div>
 
       {/* Sueldos / Empleados (solo superadmin) */}

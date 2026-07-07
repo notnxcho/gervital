@@ -1082,6 +1082,10 @@ video {
   min-width: 0px;
 }
 
+.min-w-\[180px\] {
+  min-width: 180px;
+}
+
 .min-w-\[2rem\] {
   min-width: 2rem;
 }
@@ -2179,6 +2183,10 @@ video {
 
 .pl-8 {
   padding-left: 2rem;
+}
+
+.pl-9 {
+  padding-left: 2.25rem;
 }
 
 .pr-0 {
