@@ -149,6 +149,11 @@ export default function CostsPage() {
     expenseGroupOpts
   )
 
+  const fixedGroups = groupByCategory(
+    filterItems(fixedExpenses, fixedFilters, expenseAccessors),
+    expenseGroupOpts
+  )
+
   // Handlers
   const handleDeleteExpense = async () => {
     if (!deleteModal.item) return
@@ -289,21 +294,31 @@ export default function CostsPage() {
               <span className="w-3 h-3 rounded-full bg-blue-500"></span>
               Gastos fijos
             </h3>
-            {fixedExpenses.length === 0 ? (
+            <CostsFilterBar
+              filters={fixedFilters}
+              onChange={setFixedFilters}
+              categoryOptions={categoryOptions}
+              supplierOptions={supplierOptions}
+              showAmountRange
+              searchPlaceholder="Buscar gasto fijo…"
+            />
+            {fixedGroups.length === 0 ? (
               <Card className="p-6 text-center"><p className="text-gray-500">Sin gastos fijos</p></Card>
             ) : (
-              <div className="space-y-3">
-                {fixedExpenses.map(f => (
-                  <FixedExpenseCard
-                    key={f.id}
-                    fixed={f}
-                    year={year}
-                    month={month}
-                    onEdit={() => setFixedModal({ open: true, item: f })}
-                    onDelete={() => handleDeleteFixed(f.id)}
-                  />
-                ))}
-              </div>
+              fixedGroups.map(group => (
+                <CategoryGroup key={group.key} label={group.label} count={group.items.length} subtotal={group.subtotal}>
+                  {group.items.map(f => (
+                    <FixedExpenseCard
+                      key={f.id}
+                      fixed={f}
+                      year={year}
+                      month={month}
+                      onEdit={() => setFixedModal({ open: true, item: f })}
+                      onDelete={() => handleDeleteFixed(f.id)}
+                    />
+                  ))}
+                </CategoryGroup>
+              ))
             )}
           </div>
 
