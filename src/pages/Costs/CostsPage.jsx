@@ -20,6 +20,13 @@ import {
   createExpense,
   updateExpense,
   deleteExpense,
+  getExtraordinaryByMonth,
+  createExtraordinary,
+  updateExtraordinary,
+  deleteExtraordinary,
+  getSetting,
+  setSetting,
+  contingencyLimit,
   getFixedExpenses,
   createFixedExpense,
   updateFixedExpense,
@@ -55,6 +62,7 @@ import Input from '../../components/ui/Input'
 import { filterItems, groupByCategory } from '../../services/costs/costsFilters'
 import CostsFilterBar from './CostsFilterBar'
 import CategoryGroup from './CategoryGroup'
+import ContingencyFundBar from './ContingencyFundBar'
 
 export default function CostsPage() {
   const { hasAccess } = useAuth()
@@ -64,6 +72,8 @@ export default function CostsPage() {
   const [categories, setCategories] = useState([])
   const [employees, setEmployees] = useState([])
   const [standaloneCosts, setStandaloneCosts] = useState([])
+  const [extraordinaryExpenses, setExtraordinaryExpenses] = useState([])
+  const [contingencyPct, setContingencyPct] = useState(10)
   const [loading, setLoading] = useState(true)
 
   const emptyFilters = { query: '', categoryId: '', supplierId: '', minAmount: '', maxAmount: '' }
@@ -78,6 +88,7 @@ export default function CostsPage() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const [fixedModal, setFixedModal] = useState({ open: false, item: null })
   const [variableModal, setVariableModal] = useState({ open: false, item: null })
+  const [extraordinaryModal, setExtraordinaryModal] = useState({ open: false, item: null })
   const [employeeModal, setEmployeeModal] = useState({ open: false, employee: null })
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false)
   const [standaloneModalOpen, setStandaloneModalOpen] = useState(false)
@@ -93,16 +104,20 @@ export default function CostsPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [suppliersData, expensesData, fixedData, categoriesData] = await Promise.all([
+      const [suppliersData, expensesData, fixedData, categoriesData, extraordinaryData, pctSetting] = await Promise.all([
         getSuppliers(),
         getExpensesByMonth(year, month),
         getFixedExpenses(),
-        getCategories()
+        getCategories(),
+        getExtraordinaryByMonth(year, month),
+        getSetting('contingency_fund_pct')
       ])
       setSuppliers(suppliersData)
       setExpenses(expensesData)
       setFixedExpenses(fixedData)
       setCategories(categoriesData)
+      setExtraordinaryExpenses(extraordinaryData)
+      setContingencyPct(pctSetting != null ? Number(pctSetting) : 10)
       if (hasAccess('salaries')) {
         const [employeesData, standaloneData] = await Promise.all([
           getEmployees(),
@@ -125,7 +140,9 @@ export default function CostsPage() {
   const variableTotal = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
   const fixedCashThisMonth = fixedCashForMonth(fixedExpenses, year, month)
   const fixedMonthlyThisMonth = fixedMonthlyForMonth(fixedExpenses, year, month)
-  const totalCashMonth = variableTotal + fixedCashThisMonth
+  const extraordinaryTotal = extraordinaryExpenses.reduce((sum, e) => sum + Number(e.amount), 0)
+  const contingencyLimitAmount = contingencyLimit(fixedMonthlyThisMonth, contingencyPct)
+  const totalCashMonth = variableTotal + fixedCashThisMonth + extraordinaryTotal
 
   // Filter option lists derived from loaded data.
   const categoryOptions = categories.map(c => ({ value: c.id, label: c.name }))
@@ -148,6 +165,11 @@ export default function CostsPage() {
 
   const variableGroups = groupByCategory(
     filterItems(expenses, variableFilters, expenseAccessors),
+    expenseGroupOpts
+  )
+
+  const extraordinaryGroups = groupByCategory(
+    filterItems(extraordinaryExpenses, emptyFilters, expenseAccessors),
     expenseGroupOpts
   )
 
@@ -178,6 +200,25 @@ export default function CostsPage() {
       loadData()
     } catch (error) {
       console.error('Error eliminando gasto:', error)
+    }
+  }
+
+  const handleDeleteExtraordinary = async (id) => {
+    if (!window.confirm('¿Eliminar este gasto extraordinario del fondo de contingencia?')) return
+    try {
+      await deleteExtraordinary(id)
+      await loadData()
+    } catch (e) {
+      alert('Error al eliminar: ' + e.message)
+    }
+  }
+
+  const handleSaveContingencyPct = async (newPct) => {
+    try {
+      await setSetting('contingency_fund_pct', newPct)
+      setContingencyPct(newPct)
+    } catch (e) {
+      alert('Error al guardar el porcentaje: ' + e.message)
     }
   }
 
@@ -294,6 +335,40 @@ export default function CostsPage() {
           <p className="text-2xl font-bold text-gray-700">{formatCurrency(fixedMonthlyThisMonth)}</p>
         </Card>
       </div>
+
+      {/* Contingency fund */}
+      <ContingencyFundBar
+        limitAmount={contingencyLimitAmount}
+        consumed={extraordinaryTotal}
+        pct={contingencyPct}
+        canEdit={hasAccess('expense_settings')}
+        onSavePct={handleSaveContingencyPct}
+        count={extraordinaryExpenses.length}
+      >
+        <div className="flex justify-end mb-3">
+          <Button variant="secondary" onClick={() => setExtraordinaryModal({ open: true, item: null })}>
+            <Plus className="w-4 h-4" />
+            Gasto extraordinario
+          </Button>
+        </div>
+        {extraordinaryGroups.length === 0 ? (
+          <Card className="p-6 text-center"><p className="text-gray-500">No hay gastos extraordinarios este mes</p></Card>
+        ) : (
+          extraordinaryGroups.map(group => (
+            <CategoryGroup key={group.key} label={group.label} count={group.items.length} subtotal={group.subtotal}>
+              {group.items.map(expense => (
+                <VariableExpenseCard
+                  key={expense.id}
+                  expense={expense}
+                  supplierName={getSupplierName(expense.supplierId)}
+                  onEdit={() => setExtraordinaryModal({ open: true, item: expense })}
+                  onDelete={() => handleDeleteExtraordinary(expense.id)}
+                />
+              ))}
+            </CategoryGroup>
+          ))
+        )}
+      </ContingencyFundBar>
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -538,6 +613,18 @@ export default function CostsPage() {
         isOpen={variableModal.open}
         onClose={() => setVariableModal({ open: false, item: null })}
         expense={variableModal.item}
+        categories={categories}
+        suppliers={suppliers}
+        selectedYear={year}
+        selectedMonth={month}
+        onSave={loadData}
+      />
+
+      {/* Extraordinary expense modal */}
+      <ExtraordinaryExpenseModal
+        isOpen={extraordinaryModal.open}
+        onClose={() => setExtraordinaryModal({ open: false, item: null })}
+        expense={extraordinaryModal.item}
         categories={categories}
         suppliers={suppliers}
         selectedYear={year}
@@ -934,6 +1021,76 @@ function VariableExpenseModal({ isOpen, onClose, expense, categories, suppliers,
     <Modal isOpen={isOpen} onClose={onClose} title={expense ? 'Editar gasto variable' : 'Registrar gasto variable'}>
       <form onSubmit={submit} className="space-y-4">
         <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ej: Reparación de heladera" required />
+        <CategorySelect value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} categories={categories} />
+        <SupplierSelect value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} suppliers={suppliers} />
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Monto" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+          <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+          <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+        </div>
+        <div className="flex gap-3 justify-end pt-4">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" loading={loading}>{expense ? 'Guardar cambios' : 'Registrar gasto'}</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+// Extraordinary expense modal (contingency fund)
+function ExtraordinaryExpenseModal({ isOpen, onClose, expense, categories, suppliers, selectedYear, selectedMonth, onSave }) {
+  const [loading, setLoading] = useState(false)
+  const [form, setForm] = useState({ supplierId: '', categoryId: '', description: '', amount: '', date: '', notes: '' })
+
+  useEffect(() => {
+    if (expense) {
+      setForm({
+        supplierId: expense.supplierId || '',
+        categoryId: expense.categoryId || '',
+        description: expense.description || '',
+        amount: expense.amount?.toString() || '',
+        date: expense.date || '',
+        notes: expense.notes || ''
+      })
+    } else {
+      const defaultDate = new Date(selectedYear, selectedMonth, 1)
+      setForm({ supplierId: '', categoryId: '', description: '', amount: '', date: format(defaultDate, 'yyyy-MM-dd'), notes: '' })
+    }
+  }, [expense, isOpen, selectedYear, selectedMonth])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    const expenseDate = new Date(form.date)
+    const payload = {
+      supplierId: form.supplierId || null,
+      categoryId: form.categoryId || null,
+      description: form.description,
+      amount: parseFloat(form.amount),
+      date: form.date,
+      notes: form.notes,
+      year: expenseDate.getFullYear(),
+      month: expenseDate.getMonth()
+    }
+    try {
+      if (expense) await updateExtraordinary(expense.id, payload)
+      else await createExtraordinary(payload)
+      onSave()
+      onClose()
+    } catch (err) {
+      alert('Error al guardar gasto extraordinario: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={expense ? 'Editar gasto extraordinario' : 'Registrar gasto extraordinario'}>
+      <form onSubmit={submit} className="space-y-4">
+        <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ej: Reparación imprevista" required />
         <CategorySelect value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} categories={categories} />
         <SupplierSelect value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} suppliers={suppliers} />
         <div className="grid grid-cols-2 gap-4">
