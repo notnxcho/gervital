@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { NavArrowRight } from 'iconoir-react'
 import { format } from 'date-fns'
@@ -71,6 +71,17 @@ export default function CollectionPanel({ rows, loading, kpis, onBulkAction, can
   const rowAmount = (r) => (tab === 'emitidas' ? r.invoicedAmount : tab === 'cobrados' ? r.paidAmount : r.amount)
   const totalPending = list.reduce((s, r) => s + rowAmount(r), 0)
 
+  // La difuminación inferior se apaga cuando el scroll llega al final (o no hay overflow),
+  // así el último item queda legible.
+  const listRef = useRef(null)
+  const [atBottom, setAtBottom] = useState(true)
+  const syncFade = useCallback(() => {
+    const el = listRef.current
+    if (!el) return
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight <= 1)
+  }, [])
+  useEffect(() => { syncFade() }, [syncFade, list, tab])
+
   const pct = kpis && kpis.ingresoPrevisto > 0 ? (kpis.cobrado / kpis.ingresoPrevisto) * 100 : 0
 
   return (
@@ -125,7 +136,11 @@ export default function CollectionPanel({ rows, loading, kpis, onBulkAction, can
 
       {/* list — on xl it scrolls inside the column and fades behind the footer;
           when stacked it grows naturally and the whole page scrolls */}
-      <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto scrollbar-thin divide-y divide-gray-50 dashboard-list-fade">
+      <div
+        ref={listRef}
+        onScroll={syncFade}
+        className={`xl:flex-1 xl:min-h-0 xl:overflow-y-auto scrollbar-thin divide-y divide-gray-50 ${atBottom ? '' : 'dashboard-list-fade'}`}
+      >
         {loading ? (
           <div className="px-5 py-10 text-center text-sm text-gray-400">Cargando…</div>
         ) : list.length === 0 ? (
