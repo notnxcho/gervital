@@ -56,7 +56,8 @@ export default function CommercialSection({ selected }) {
   useEffect(() => {
     let alive = true
     Promise.all([getClients({ includeDeleted: true }), getPlanPricing()])
-      .then(([cs, pr]) => { if (alive) { setClients(cs); setPricing(pr) } })
+      // Charity clients are excluded from all commercial metrics (MRR, altas/bajas, base).
+      .then(([cs, pr]) => { if (alive) { setClients(cs.filter(c => !c.isCharity)); setPricing(pr) } })
       .catch(() => { if (alive) { setClients([]); setPricing([]) } })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }

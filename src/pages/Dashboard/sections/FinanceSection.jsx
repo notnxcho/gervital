@@ -76,7 +76,8 @@ export default function FinanceSection({ selected, onSelectMonth }) {
   useEffect(() => {
     let alive = true
     getClients({ includeDeleted: true })
-      .then(cs => { if (alive) setClients(cs) })
+      // Charity clients don't count toward ARPU/breakeven client counts.
+      .then(cs => { if (alive) setClients(cs.filter(c => !c.isCharity)) })
       .catch(() => { if (alive) setClients([]) })
     getFixedExpenses()
       .then(fs => { if (alive) setFixedTemplates(fs) })
