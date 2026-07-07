@@ -11,7 +11,8 @@ const FEATURE_ROLES = {
   salaries: ['superadmin'],
   dashboard_financials: ['superadmin'],
   users: ['superadmin'],
-  statistics: ['admin', 'superadmin']
+  statistics: ['admin', 'superadmin'],
+  expense_settings: ['admin', 'superadmin']
 }
 
 // Pure helper usable outside the hook (e.g. in nested components with only `role`)
