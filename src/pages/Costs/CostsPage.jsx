@@ -52,6 +52,9 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
+import { filterItems, groupByCategory } from '../../services/costs/costsFilters'
+import CostsFilterBar from './CostsFilterBar'
+import CategoryGroup from './CategoryGroup'
 
 export default function CostsPage() {
   const { hasAccess } = useAuth()
@@ -62,6 +65,11 @@ export default function CostsPage() {
   const [employees, setEmployees] = useState([])
   const [standaloneCosts, setStandaloneCosts] = useState([])
   const [loading, setLoading] = useState(true)
+
+  const emptyFilters = { query: '', categoryId: '', supplierId: '', minAmount: '', maxAmount: '' }
+  const [variableFilters, setVariableFilters] = useState(emptyFilters)
+  const [fixedFilters, setFixedFilters] = useState(emptyFilters)
+  const [supplierFilters, setSupplierFilters] = useState({ query: '', categoryId: '' })
   const [selectedDate, setSelectedDate] = useState(new Date())
 
   // Modals
@@ -118,6 +126,28 @@ export default function CostsPage() {
   const fixedCashThisMonth = fixedCashForMonth(fixedExpenses, year, month)
   const fixedMonthlyThisMonth = fixedMonthlyForMonth(fixedExpenses, year, month)
   const totalCashMonth = variableTotal + fixedCashThisMonth
+
+  // Filter option lists derived from loaded data.
+  const categoryOptions = categories.map(c => ({ value: c.id, label: c.name }))
+  const supplierOptions = suppliers.map(s => ({ value: s.id, label: s.name }))
+
+  // Accessors shared by fixed & variable expenses.
+  const expenseAccessors = {
+    getText: (e) => [e.description, e.notes, e.supplierName].filter(Boolean).join(' '),
+    getCategoryId: (e) => e.categoryId,
+    getSupplierId: (e) => e.supplierId,
+    getAmount: (e) => Number(e.amount)
+  }
+  const expenseGroupOpts = {
+    getKey: (e) => e.categoryId,
+    getLabel: (e) => e.categoryName,
+    getAmount: (e) => Number(e.amount)
+  }
+
+  const variableGroups = groupByCategory(
+    filterItems(expenses, variableFilters, expenseAccessors),
+    expenseGroupOpts
+  )
 
   // Handlers
   const handleDeleteExpense = async () => {
@@ -283,20 +313,30 @@ export default function CostsPage() {
               <span className="w-3 h-3 rounded-full bg-amber-500"></span>
               Gastos variables
             </h3>
-            {expenses.length === 0 ? (
+            <CostsFilterBar
+              filters={variableFilters}
+              onChange={setVariableFilters}
+              categoryOptions={categoryOptions}
+              supplierOptions={supplierOptions}
+              showAmountRange
+              searchPlaceholder="Buscar gasto…"
+            />
+            {variableGroups.length === 0 ? (
               <Card className="p-6 text-center"><p className="text-gray-500">No hay gastos variables este mes</p></Card>
             ) : (
-              <div className="space-y-3">
-                {expenses.map(expense => (
-                  <VariableExpenseCard
-                    key={expense.id}
-                    expense={expense}
-                    supplierName={getSupplierName(expense.supplierId)}
-                    onEdit={() => setVariableModal({ open: true, item: expense })}
-                    onDelete={() => setDeleteModal({ open: true, type: 'expense', item: expense })}
-                  />
-                ))}
-              </div>
+              variableGroups.map(group => (
+                <CategoryGroup key={group.key} label={group.label} count={group.items.length} subtotal={group.subtotal}>
+                  {group.items.map(expense => (
+                    <VariableExpenseCard
+                      key={expense.id}
+                      expense={expense}
+                      supplierName={getSupplierName(expense.supplierId)}
+                      onEdit={() => setVariableModal({ open: true, item: expense })}
+                      onDelete={() => setDeleteModal({ open: true, type: 'expense', item: expense })}
+                    />
+                  ))}
+                </CategoryGroup>
+              ))
             )}
           </div>
         </div>
