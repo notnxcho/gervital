@@ -13,6 +13,8 @@ import Button from '../../components/ui/Button'
 import Input, { Select, Textarea, Checkbox } from '../../components/ui/Input'
 import Card, { CardContent } from '../../components/ui/Card'
 import { useAuth } from '../../context/AuthContext'
+import { RepeatableRows } from './medical/RepeatableRows'
+import { MARITAL_STATUS_OPTIONS, RESIDENCE_TYPE_OPTIONS, CHARACTER_OPTIONS, DIAGNOSIS_TYPE_OPTIONS, MEDICAL_HISTORY_CONDITIONS } from '../../services/clients/medicalConstants'
 
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
 
@@ -106,18 +108,32 @@ const INITIAL_FORM_DATA = {
   schedule: 'morning',
   hasTransport: false,
   assignedDays: [],
-  // Médico
-  dietaryRestrictions: '',
-  medicalRestrictions: '',
-  mobilityRestrictions: '',
-  medication: '',
-  medicationSchedule: '',
-  notes: '',
-  // Condiciones
-  isDiabetic: false,
-  isCeliac: false,
-  isHypertensive: false,
-  isLactoseIntolerant: false,
+  // Personal extra
+  maritalStatus: '',
+  residenceType: '',
+  livesWith: '',
+  // Servicio de salud
+  healthEmergencyService: '',
+  healthProvider: '',
+  healthNotes: '',
+  // Tratamiento farmacológico
+  medications: [],
+  medicationNotes: '',
+  // Antecedentes
+  medicalHistory: [], // [{condition, comment}]
+  historyNotes: '',
+  // Diagnóstico
+  diagnoses: [], // [{diagnosisType, behaviorDisorder}]
+  // Historia de vida
+  educationLevel: '',
+  occupation: '',
+  significantInterests: '',
+  significantBonds: '',
+  musicTaste: '',
+  favoriteFoods: '',
+  character: '',
+  personalResources: '',
+  vulnerabilities: '',
   // Beneficencia (no genera facturación; write admin-gated)
   isCharity: false
 }
@@ -194,16 +210,26 @@ export default function AddClient() {
           schedule: client.plan?.schedule || 'morning',
           hasTransport: client.plan?.hasTransport || false,
           assignedDays: client.plan?.assignedDays || [],
-          dietaryRestrictions: client.medicalInfo?.dietaryRestrictions || '',
-          medicalRestrictions: client.medicalInfo?.medicalRestrictions || '',
-          mobilityRestrictions: client.medicalInfo?.mobilityRestrictions || '',
-          medication: client.medicalInfo?.medication || '',
-          medicationSchedule: client.medicalInfo?.medicationSchedule || '',
-          notes: client.medicalInfo?.notes || '',
-          isDiabetic: client.medicalInfo?.isDiabetic || false,
-          isCeliac: client.medicalInfo?.isCeliac || false,
-          isHypertensive: client.medicalInfo?.isHypertensive || false,
-          isLactoseIntolerant: client.medicalInfo?.isLactoseIntolerant || false,
+          maritalStatus: client.maritalStatus || '',
+          residenceType: client.residenceType || '',
+          livesWith: client.livesWith || '',
+          healthEmergencyService: client.medicalInfo?.healthEmergencyService || '',
+          healthProvider: client.medicalInfo?.healthProvider || '',
+          healthNotes: client.medicalInfo?.healthNotes || '',
+          medications: client.medications || [],
+          medicationNotes: client.medicalInfo?.medicationNotes || '',
+          medicalHistory: client.medicalHistory || [],
+          historyNotes: client.medicalInfo?.historyNotes || '',
+          diagnoses: client.diagnoses || [],
+          educationLevel: client.medicalInfo?.educationLevel || '',
+          occupation: client.medicalInfo?.occupation || '',
+          significantInterests: client.medicalInfo?.significantInterests || '',
+          significantBonds: client.medicalInfo?.significantBonds || '',
+          musicTaste: client.medicalInfo?.musicTaste || '',
+          favoriteFoods: client.medicalInfo?.favoriteFoods || '',
+          character: client.medicalInfo?.character || '',
+          personalResources: client.medicalInfo?.personalResources || '',
+          vulnerabilities: client.medicalInfo?.vulnerabilities || '',
           isCharity: client.isCharity || false
         })
 
@@ -245,6 +271,16 @@ export default function AddClient() {
     lastGeocodedStreetRef.current = street
     const range = distanceToRange(haversineKm(g.lat, g.lng, CLUB_LOCATION.lat, CLUB_LOCATION.lng))
     setFormData(prev => ({ ...prev, latitude: g.lat, longitude: g.lng, distanceRange: range }))
+  }
+
+  // Antecedentes: estado derivado de formData.medicalHistory ([{condition, comment}])
+  const historyByCondition = Object.fromEntries((formData.medicalHistory || []).map(h => [h.condition, h]))
+  const toggleCondition = (cond, checked) => {
+    if (checked) updateField('medicalHistory', [...(formData.medicalHistory || []), { condition: cond, comment: '' }])
+    else updateField('medicalHistory', (formData.medicalHistory || []).filter(h => h.condition !== cond))
+  }
+  const setConditionComment = (cond, comment) => {
+    updateField('medicalHistory', (formData.medicalHistory || []).map(h => h.condition === cond ? { ...h, comment } : h))
   }
 
   const toggleDay = (day) => {
@@ -355,18 +391,28 @@ export default function AddClient() {
           longitude: formData.longitude,
           distanceRange: formData.distanceRange
         },
+        maritalStatus: formData.maritalStatus,
+        residenceType: formData.residenceType,
+        livesWith: formData.livesWith,
         medicalInfo: {
-          dietaryRestrictions: formData.dietaryRestrictions,
-          medicalRestrictions: formData.medicalRestrictions,
-          mobilityRestrictions: formData.mobilityRestrictions,
-          medication: formData.medication,
-          medicationSchedule: formData.medicationSchedule,
-          notes: formData.notes,
-          isDiabetic: formData.isDiabetic,
-          isCeliac: formData.isCeliac,
-          isHypertensive: formData.isHypertensive,
-          isLactoseIntolerant: formData.isLactoseIntolerant
-        }
+          healthEmergencyService: formData.healthEmergencyService,
+          healthProvider: formData.healthProvider,
+          healthNotes: formData.healthNotes,
+          medicationNotes: formData.medicationNotes,
+          historyNotes: formData.historyNotes,
+          educationLevel: formData.educationLevel,
+          occupation: formData.occupation,
+          significantInterests: formData.significantInterests,
+          significantBonds: formData.significantBonds,
+          musicTaste: formData.musicTaste,
+          favoriteFoods: formData.favoriteFoods,
+          character: formData.character,
+          personalResources: formData.personalResources,
+          vulnerabilities: formData.vulnerabilities
+        },
+        medications: formData.medications,
+        diagnoses: formData.diagnoses,
+        medicalHistory: formData.medicalHistory
       }
       
       if (isEditMode) {
@@ -643,6 +689,25 @@ export default function AddClient() {
                     value={formData.transferResponsible}
                     onChange={(e) => updateField('transferResponsible', e.target.value)}
                     placeholder="Nombre de quien realiza la transferencia"
+                    className="col-span-2"
+                  />
+                  <Select
+                    label="Estado civil"
+                    value={formData.maritalStatus}
+                    onChange={(e) => updateField('maritalStatus', e.target.value)}
+                    options={[{ value: '', label: 'Seleccionar...' }, ...MARITAL_STATUS_OPTIONS]}
+                  />
+                  <Select
+                    label="Tipo de domicilio"
+                    value={formData.residenceType}
+                    onChange={(e) => updateField('residenceType', e.target.value)}
+                    options={[{ value: '', label: 'Seleccionar...' }, ...RESIDENCE_TYPE_OPTIONS]}
+                  />
+                  <Input
+                    label="Con quién vive"
+                    value={formData.livesWith}
+                    onChange={(e) => updateField('livesWith', e.target.value)}
+                    placeholder="Ej: Residencial Huertas"
                     className="col-span-2"
                   />
                 </div>
@@ -955,89 +1020,167 @@ export default function AddClient() {
 
           {/* Step 3: Información médica */}
           {currentStep === 3 && (
-            <div className="space-y-6">
+            <div className="space-y-8">
+              {/* 1. Servicio de salud */}
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Restricciones</h3>
-                <div className="grid grid-cols-1 gap-4">
-                  <Textarea
-                    label="Restricciones alimentarias"
-                    value={formData.dietaryRestrictions}
-                    onChange={(e) => updateField('dietaryRestrictions', e.target.value)}
-                    placeholder="Ej: Sin gluten, diabético, vegetariano..."
-                    rows={2}
-                  />
-                  <Textarea
-                    label="Restricciones médicas"
-                    value={formData.medicalRestrictions}
-                    onChange={(e) => updateField('medicalRestrictions', e.target.value)}
-                    placeholder="Ej: Hipertensión, diabetes, problemas cardíacos..."
-                    rows={2}
-                  />
-                  <Textarea
-                    label="Restricciones de movilidad"
-                    value={formData.mobilityRestrictions}
-                    onChange={(e) => updateField('mobilityRestrictions', e.target.value)}
-                    placeholder="Ej: Usa bastón, silla de ruedas, dificultad para escaleras..."
-                    rows={2}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Condiciones</h3>
-                <div className="flex flex-wrap gap-6">
-                  <Checkbox
-                    label="Diabético"
-                    checked={formData.isDiabetic}
-                    onChange={(e) => updateField('isDiabetic', e.target.checked)}
-                  />
-                  <Checkbox
-                    label="Celíaco"
-                    checked={formData.isCeliac}
-                    onChange={(e) => updateField('isCeliac', e.target.checked)}
-                  />
-                  <Checkbox
-                    label="Hipertenso"
-                    checked={formData.isHypertensive}
-                    onChange={(e) => updateField('isHypertensive', e.target.checked)}
-                  />
-                  <Checkbox
-                    label="Intolerante a la lactosa"
-                    checked={formData.isLactoseIntolerant}
-                    onChange={(e) => updateField('isLactoseIntolerant', e.target.checked)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Medicación</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Servicio de salud</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <Textarea
-                    label="Medicación"
-                    value={formData.medication}
-                    onChange={(e) => updateField('medication', e.target.value)}
-                    placeholder="Nombre y dosis de medicamentos..."
-                    rows={2}
-                    className="col-span-2"
+                  <Input
+                    label="Servicio de emergencia"
+                    value={formData.healthEmergencyService}
+                    onChange={(e) => updateField('healthEmergencyService', e.target.value)}
+                    placeholder="Ej: SEMM, UCM..."
                   />
                   <Input
-                    label="Horario de medicación"
-                    value={formData.medicationSchedule}
-                    onChange={(e) => updateField('medicationSchedule', e.target.value)}
-                    placeholder="Ej: 8:00 y 20:00"
+                    label="Prestador de salud"
+                    value={formData.healthProvider}
+                    onChange={(e) => updateField('healthProvider', e.target.value)}
+                    placeholder="Ej: ASSE, mutualista..."
+                  />
+                  <Textarea
+                    label="Notas generales"
+                    value={formData.healthNotes}
+                    onChange={(e) => updateField('healthNotes', e.target.value)}
+                    rows={2}
                     className="col-span-2"
                   />
                 </div>
               </div>
 
+              {/* 2. Tratamiento farmacológico */}
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Notas adicionales</h3>
-                <Textarea
-                  value={formData.notes}
-                  onChange={(e) => updateField('notes', e.target.value)}
-                  placeholder="Cualquier información adicional relevante..."
-                  rows={3}
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Tratamiento farmacológico</h3>
+                <RepeatableRows
+                  value={formData.medications}
+                  onChange={(v) => updateField('medications', v)}
+                  addLabel="Agregar medicamento"
+                  emptyRow={{ name: '', schedule: '', dose: '', indicatedFor: '' }}
+                  fields={[
+                    { key: 'name', label: 'Nombre' },
+                    { key: 'schedule', label: 'Horario' },
+                    { key: 'dose', label: 'Dosis' },
+                    { key: 'indicatedFor', label: 'Indicado para' }
+                  ]}
                 />
+                <Textarea
+                  label="Notas generales"
+                  value={formData.medicationNotes}
+                  onChange={(e) => updateField('medicationNotes', e.target.value)}
+                  rows={2}
+                  className="mt-4"
+                />
+              </div>
+
+              {/* 3. Antecedentes */}
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Antecedentes</h3>
+                <div className="space-y-2">
+                  {MEDICAL_HISTORY_CONDITIONS.map(c => {
+                    const active = Boolean(historyByCondition[c.value])
+                    return (
+                      <div key={c.value} className="flex flex-col gap-1 py-1">
+                        <Checkbox
+                          label={c.label}
+                          checked={active}
+                          onChange={(e) => toggleCondition(c.value, e.target.checked)}
+                        />
+                        {active && (
+                          <Input
+                            placeholder="Comentario (opcional)"
+                            value={historyByCondition[c.value].comment || ''}
+                            onChange={(e) => setConditionComment(c.value, e.target.value)}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <Textarea
+                  label="Notas generales"
+                  value={formData.historyNotes}
+                  onChange={(e) => updateField('historyNotes', e.target.value)}
+                  rows={2}
+                  className="mt-4"
+                />
+              </div>
+
+              {/* 4. Diagnóstico */}
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Diagnóstico</h3>
+                <RepeatableRows
+                  value={formData.diagnoses}
+                  onChange={(v) => updateField('diagnoses', v)}
+                  addLabel="Agregar diagnóstico"
+                  emptyRow={{ diagnosisType: '', behaviorDisorder: '' }}
+                  fields={[
+                    { key: 'diagnosisType', label: 'Tipo', type: 'select', options: DIAGNOSIS_TYPE_OPTIONS },
+                    { key: 'behaviorDisorder', label: 'Tipo y trastorno de comportamiento' }
+                  ]}
+                />
+              </div>
+
+              {/* 5. Historia de vida */}
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Historia de vida</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Nivel educativo"
+                    value={formData.educationLevel}
+                    onChange={(e) => updateField('educationLevel', e.target.value)}
+                  />
+                  <Input
+                    label="Trabajo / profesión"
+                    value={formData.occupation}
+                    onChange={(e) => updateField('occupation', e.target.value)}
+                  />
+                  <Textarea
+                    label="Intereses significativos (actuales y previos)"
+                    value={formData.significantInterests}
+                    onChange={(e) => updateField('significantInterests', e.target.value)}
+                    rows={2}
+                    className="col-span-2"
+                  />
+                  <Textarea
+                    label="Vínculos significativos"
+                    value={formData.significantBonds}
+                    onChange={(e) => updateField('significantBonds', e.target.value)}
+                    rows={2}
+                    className="col-span-2"
+                  />
+                  <Textarea
+                    label="Gustos musicales"
+                    value={formData.musicTaste}
+                    onChange={(e) => updateField('musicTaste', e.target.value)}
+                    rows={2}
+                  />
+                  <Textarea
+                    label="Comidas favoritas"
+                    value={formData.favoriteFoods}
+                    onChange={(e) => updateField('favoriteFoods', e.target.value)}
+                    rows={2}
+                  />
+                  <Select
+                    label="Carácter"
+                    value={formData.character}
+                    onChange={(e) => updateField('character', e.target.value)}
+                    options={[{ value: '', label: 'Seleccionar...' }, ...CHARACTER_OPTIONS]}
+                    className="col-span-2"
+                  />
+                  <Textarea
+                    label="Recursos personales"
+                    value={formData.personalResources}
+                    onChange={(e) => updateField('personalResources', e.target.value)}
+                    rows={2}
+                    className="col-span-2"
+                  />
+                  <Textarea
+                    label="Vulnerabilidad, miedos o preocupaciones actuales"
+                    value={formData.vulnerabilities}
+                    onChange={(e) => updateField('vulnerabilities', e.target.value)}
+                    rows={2}
+                    className="col-span-2"
+                  />
+                </div>
               </div>
             </div>
           )}
