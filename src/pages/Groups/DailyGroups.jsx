@@ -411,13 +411,6 @@ export default function DailyGroups() {
           <p className="text-sm text-gray-500 mt-0.5 capitalize">{formattedDate}</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            variant="secondary"
-            onClick={() => setShowWeek(true)}
-          >
-            <Calendar className="w-4 h-4" />
-            Vista semanal
-          </Button>
           {!readOnly && (
             <Button
               variant="secondary"
@@ -482,6 +475,14 @@ export default function DailyGroups() {
             Solo lectura
           </span>
         )}
+        <Button
+          variant="secondary"
+          onClick={() => setShowWeek(true)}
+          className="ml-2"
+        >
+          <Calendar className="w-4 h-4" />
+          Vista semanal
+        </Button>
       </div>
 
       {/* Shift tabs */}
