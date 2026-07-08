@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { formatCurrency } from '../../utils/format'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -95,6 +95,18 @@ export default function CostsPage() {
 
   const year = selectedDate.getFullYear()
   const month = selectedDate.getMonth()
+
+  // Collapse the header title when the sticky bar pins. A 1px sentinel above the
+  // header: once it scrolls out of the viewport, the header is stuck.
+  const [stuck, setStuck] = useState(false)
+  const sentinelRef = useRef(null)
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(([entry]) => setStuck(!entry.isIntersecting), { threshold: 0 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -271,11 +283,13 @@ export default function CostsPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen -mt-8 -mx-4 sm:-mx-6 lg:-mx-8">
+      {/* Sentinel: cuando sale del viewport, el header queda pegado */}
+      <div ref={sentinelRef} className="h-px" />
       {/* Sticky header: título + navegación de mes + acciones */}
-      <div className="sticky top-0 z-20 bg-gray-50/90 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4">
+      <div className={`sticky top-0 z-20 bg-gray-50/90 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 lg:px-8 transition-all duration-300 ${stuck ? 'py-2.5' : 'py-4'}`}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4 min-w-0">
-            <div>
+          <div className={`flex items-center min-w-0 transition-all duration-300 ${stuck ? 'gap-0' : 'gap-4'}`}>
+            <div className={`overflow-hidden whitespace-nowrap transition-all duration-300 ${stuck ? 'max-w-0 opacity-0 -translate-x-2' : 'max-w-[360px] opacity-100 translate-x-0'}`}>
               <h1 className="text-2xl font-semibold text-gray-900">Costos</h1>
               <p className="text-gray-500 text-sm mt-0.5">Gestión de costos operativos</p>
             </div>
