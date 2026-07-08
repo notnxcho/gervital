@@ -155,6 +155,33 @@ describe('classifyDay', () => {
     expect(absent).toEqual([])
     expect(vacation).toEqual([])
   })
+
+  test('reflectAbsences=false keeps absent/vacation planned clients in present (weekly view)', () => {
+    const clients = [
+      client('present', ['monday']),
+      client('hebe', ['monday']),
+      client('onvac', ['monday'])
+    ]
+    const att = new Map([
+      ['hebe', { status: 'absent', isJustified: true }],
+      ['onvac', { status: 'vacation' }]
+    ])
+    const { present, absent, vacation } = classifyDay({
+      clients, dayName: 'monday', matchesShift: morningShift, attendanceByClientId: att, reflectAbsences: false
+    })
+    expect(present.map(c => c.id)).toEqual(['present', 'hebe', 'onvac'])
+    expect(absent).toEqual([])
+    expect(vacation).toEqual([])
+  })
+
+  test('reflectAbsences=false still adds recovery attendees on non-planned days', () => {
+    const clients = [client('r', ['monday'], 'morning')]
+    const att = new Map([['r', { status: 'recovery' }]])
+    const { present } = classifyDay({
+      clients, dayName: 'thursday', matchesShift: morningShift, attendanceByClientId: att, reflectAbsences: false
+    })
+    expect(present.map(c => c.id)).toEqual(['r'])
+  })
 })
 
 describe('isRecoveryAttendee', () => {

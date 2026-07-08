@@ -490,7 +490,6 @@ export default function TransportScheduler() {
         clients={allClients}
         weekDates={weekDates}
         attendanceByDate={weekAttendanceByDate}
-        showAbsences={showAbsences}
       />
 
       {/* Save with unassigned warning */}

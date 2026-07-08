@@ -16,14 +16,14 @@ const WEEK_DAYS = [
   { key: 'friday', label: 'Viernes' }
 ]
 
-function classifyForDayShift(clients, shiftId, dayKey, attMap) {
+// Plan-based: absences are NOT reflected here (reflectAbsences: false), only recoveries add.
+function presentForDayShift(clients, shiftId, dayKey, attMap) {
   const matchesShift = c => shiftMatchesSchedule(shiftId, c.plan?.schedule)
-  return classifyDay({ clients, dayName: dayKey, matchesShift, attendanceByClientId: attMap })
+  return classifyDay({ clients, dayName: dayKey, matchesShift, attendanceByClientId: attMap, reflectAbsences: false }).present
 }
 
-function Cell({ present, absent, vacation, attMap, showAbsences }) {
-  const extra = showAbsences ? absent.length + vacation.length : 0
-  if (present.length === 0 && extra === 0) return <div className="wk-empty">—</div>
+function Cell({ present, attMap }) {
+  if (present.length === 0) return <div className="wk-empty">—</div>
 
   const cars = Math.ceil(present.length / SEAT_CAP)
   return (
@@ -42,20 +42,6 @@ function Cell({ present, absent, vacation, attMap, showAbsences }) {
           </div>
         </Fragment>
       ))}
-      {showAbsences && absent.map(c => (
-        <div key={c.id} className="wk-chip wk-chip-absent" title={c.isJustified ? 'Falta justificada' : 'Falta no justificada'}>
-          <span className="wk-dot" style={{ background: '#ef4444' }} />
-          <span className="wk-name">{c.firstName} {c.lastName}</span>
-          <span className="wk-chip-tag wk-chip-tag-absent">falta</span>
-        </div>
-      ))}
-      {showAbsences && vacation.map(c => (
-        <div key={c.id} className="wk-chip wk-chip-vacation" title="Vacaciones">
-          <span className="wk-dot" style={{ background: '#f59e0b' }} />
-          <span className="wk-name">{c.firstName} {c.lastName}</span>
-          <span className="wk-chip-tag wk-chip-tag-vacation">vac.</span>
-        </div>
-      ))}
     </>
   )
 }
@@ -63,7 +49,7 @@ function Cell({ present, absent, vacation, attMap, showAbsences }) {
 const normalize = (str) =>
   (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
-export default function TransportWeekTable({ isOpen, onClose, clients, weekDates, attendanceByDate, showAbsences = false }) {
+export default function TransportWeekTable({ isOpen, onClose, clients, weekDates, attendanceByDate }) {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -92,7 +78,7 @@ export default function TransportWeekTable({ isOpen, onClose, clients, weekDates
   const dayUnique = {}
   WEEK_DAYS.forEach(d => {
     const ids = new Set()
-    SHIFTS.forEach(s => classifyForDayShift(visibleClients, s.id, d.key, attFor(d.key)).present.forEach(c => ids.add(c.id)))
+    SHIFTS.forEach(s => presentForDayShift(visibleClients, s.id, d.key, attFor(d.key)).forEach(c => ids.add(c.id)))
     dayUnique[d.key] = ids.size
   })
 
@@ -158,20 +144,14 @@ export default function TransportWeekTable({ isOpen, onClose, clients, weekDates
                       {s.type === 'arrive' ? 'Llegada' : 'Salida'}
                     </span>
                   </th>
-                  {WEEK_DAYS.map(d => {
-                    const cls = classifyForDayShift(visibleClients, s.id, d.key, attFor(d.key))
-                    return (
-                      <td key={d.key} className="wk-cell">
-                        <Cell
-                          present={cls.present}
-                          absent={cls.absent}
-                          vacation={cls.vacation}
-                          attMap={attFor(d.key)}
-                          showAbsences={showAbsences}
-                        />
-                      </td>
-                    )
-                  })}
+                  {WEEK_DAYS.map(d => (
+                    <td key={d.key} className="wk-cell">
+                      <Cell
+                        present={presentForDayShift(visibleClients, s.id, d.key, attFor(d.key))}
+                        attMap={attFor(d.key)}
+                      />
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>

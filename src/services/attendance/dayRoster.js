@@ -38,9 +38,12 @@ export function indexAttendanceByClientId(records) {
  * @param {string} params.dayName - 'monday' | 'tuesday' | ...
  * @param {(client: object) => boolean} params.matchesShift - shift membership predicate
  * @param {Map<string, object>} [params.attendanceByClientId] - records for this date; empty = plan-only
+ * @param {boolean} [params.reflectAbsences=true] - when false, absences are ignored: planned
+ *   clients stay in `present` regardless of an absent/vacation record (absent/vacation come back
+ *   empty). Recovery attendees are still added. Used by the weekly views, which are plan-based.
  * @returns {{present: Array, absent: Array, vacation: Array}} lists in input order
  */
-export function classifyDay({ clients, dayName, matchesShift, attendanceByClientId }) {
+export function classifyDay({ clients, dayName, matchesShift, attendanceByClientId, reflectAbsences = true }) {
   const att = attendanceByClientId || new Map()
   const present = []
   const absent = []
@@ -50,8 +53,8 @@ export function classifyDay({ clients, dayName, matchesShift, attendanceByClient
     const rec = att.get(c.id)
     const planned = c.plan?.assignedDays?.includes(dayName)
     if (planned) {
-      if (rec?.status === 'absent') absent.push(c)
-      else if (rec?.status === 'vacation') vacation.push(c)
+      if (reflectAbsences && rec?.status === 'absent') absent.push(c)
+      else if (reflectAbsences && rec?.status === 'vacation') vacation.push(c)
       else present.push(c)
     } else if (rec?.status === RECOVERY_STATUS) {
       present.push(c)

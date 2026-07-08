@@ -24,22 +24,17 @@ const sortRoster = (a, b) =>
   `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`)
 
 // Same rule as shiftClients in DailyGroups — full_day clients match both shifts.
-// Classifies the day into present / absent / vacation using real attendance.
-function classifyForDayShift(clients, dayKey, shift, attendanceByClientId) {
+// Plan-based: absences are NOT reflected here (reflectAbsences: false), only recoveries add.
+function presentForDayShift(clients, dayKey, shift, attendanceByClientId) {
   const matchesShift = c => shift === 'morning'
     ? (c.plan?.schedule === 'morning' || c.plan?.schedule === 'full_day')
     : (c.plan?.schedule === 'afternoon' || c.plan?.schedule === 'full_day')
-  const { present, absent, vacation } = classifyDay({ clients, dayName: dayKey, matchesShift, attendanceByClientId })
-  return {
-    present: present.sort(sortRoster),
-    absent: absent.sort(sortRoster),
-    vacation: vacation.sort(sortRoster)
-  }
+  const { present } = classifyDay({ clients, dayName: dayKey, matchesShift, attendanceByClientId, reflectAbsences: false })
+  return present.sort(sortRoster)
 }
 
-function Cell({ present, absent, vacation, attMap, showAbsences }) {
-  const extra = showAbsences ? absent.length + vacation.length : 0
-  if (present.length === 0 && extra === 0) return <div className="gwk-empty">—</div>
+function Cell({ present, attMap }) {
+  if (present.length === 0) return <div className="gwk-empty">—</div>
 
   return (
     <>
@@ -54,20 +49,6 @@ function Cell({ present, absent, vacation, attMap, showAbsences }) {
           {c.plan?.hasTransport && <Truck className="gwk-truck" title="Con transporte" />}
         </div>
       ))}
-      {showAbsences && absent.map(c => (
-        <div key={c.id} className="gwk-chip gwk-chip-absent" title={c.isJustified ? 'Falta justificada' : 'Falta no justificada'}>
-          <span className="gwk-dot" style={{ background: '#ef4444' }} />
-          <span className="gwk-name">{c.firstName} {c.lastName}</span>
-          <span className="gwk-tag gwk-tag-absent">falta</span>
-        </div>
-      ))}
-      {showAbsences && vacation.map(c => (
-        <div key={c.id} className="gwk-chip gwk-chip-vacation" title="Vacaciones">
-          <span className="gwk-dot" style={{ background: '#f59e0b' }} />
-          <span className="gwk-name">{c.firstName} {c.lastName}</span>
-          <span className="gwk-tag gwk-tag-vacation">vac.</span>
-        </div>
-      ))}
     </>
   )
 }
@@ -75,7 +56,7 @@ function Cell({ present, absent, vacation, attMap, showAbsences }) {
 const normalize = (str) =>
   (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
-export default function GroupsWeekTable({ isOpen, onClose, clients, weekDates, attendanceByDate, showAbsences = false }) {
+export default function GroupsWeekTable({ isOpen, onClose, clients, weekDates, attendanceByDate }) {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -105,7 +86,7 @@ export default function GroupsWeekTable({ isOpen, onClose, clients, weekDates, a
   WEEK_DAYS.forEach(d => {
     const ids = new Set()
     let transport = 0
-    SHIFT_ROWS.forEach(s => classifyForDayShift(visibleClients, d.key, s.key, attFor(d.key)).present.forEach(c => {
+    SHIFT_ROWS.forEach(s => presentForDayShift(visibleClients, d.key, s.key, attFor(d.key)).forEach(c => {
       if (!ids.has(c.id)) {
         ids.add(c.id)
         if (c.plan?.hasTransport) transport += 1
@@ -179,20 +160,14 @@ export default function GroupsWeekTable({ isOpen, onClose, clients, weekDates, a
                   <th className="gwk-shift">
                     <div className="gwk-shift-label">{s.label}</div>
                   </th>
-                  {WEEK_DAYS.map(d => {
-                    const cls = classifyForDayShift(visibleClients, d.key, s.key, attFor(d.key))
-                    return (
-                      <td key={d.key} className="gwk-cell">
-                        <Cell
-                          present={cls.present}
-                          absent={cls.absent}
-                          vacation={cls.vacation}
-                          attMap={attFor(d.key)}
-                          showAbsences={showAbsences}
-                        />
-                      </td>
-                    )
-                  })}
+                  {WEEK_DAYS.map(d => (
+                    <td key={d.key} className="gwk-cell">
+                      <Cell
+                        present={presentForDayShift(visibleClients, d.key, s.key, attFor(d.key))}
+                        attMap={attFor(d.key)}
+                      />
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
