@@ -34,7 +34,6 @@ import { PoolClientChip } from './ClientChip'
 import TemplateModal from './TemplateModal'
 import GroupsWeekTable from './GroupsWeekTable'
 import Button from '../../components/ui/Button'
-import Toggle from '../../components/ui/Toggle'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -59,7 +58,6 @@ export default function DailyGroups() {
   const [timeSlots, setTimeSlots] = useState([])
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [showWeek, setShowWeek] = useState(false)
-  const [showAbsences, setShowAbsences] = useState(true)
   const [referenceInfo, setReferenceInfo] = useState({ exists: false, updatedAt: null })
   const [refBusy, setRefBusy] = useState(false)
 
@@ -413,12 +411,6 @@ export default function DailyGroups() {
           <p className="text-sm text-gray-500 mt-0.5 capitalize">{formattedDate}</p>
         </div>
         <div className="flex items-center gap-3">
-          <Toggle
-            id="toggle-absences-groups"
-            checked={showAbsences}
-            onChange={setShowAbsences}
-            label="Mostrar faltas"
-          />
           <Button
             variant="secondary"
             onClick={() => setShowWeek(true)}
@@ -580,7 +572,6 @@ export default function DailyGroups() {
               recoveryIds={recoveryIds}
               absentClients={dayClassified.absent}
               vacationClients={dayClassified.vacation}
-              showAbsences={showAbsences}
             />
           </div>
 
