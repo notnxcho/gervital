@@ -36,23 +36,23 @@ const CATEGORICAL_PALETTE = ['#4f46e5', '#0d9488', '#d97706', '#db2777', '#7c3ae
 
 const REASON_LABELS = {
   death: 'Fallecimiento',
-  transfer_to_other_center: 'Cambio de institución',
-  relocation: 'Mudanza',
-  health_decline: 'Deterioro / internación',
-  family_decision: 'Decisión familiar',
-  financial: 'Razones económicas',
-  service_dissatisfaction: 'Insatisfacción',
-  other: 'Otro'
+  institutionalization: 'Institucionalización',
+  health_decline: 'Deterioro de salud',
+  adaptation_motivation: 'Adaptación / motivación',
+  financial: 'Motivo económico',
+  logistical_family: 'Motivo logístico-familiar',
+  temporary_pause_not_resumed: 'Pausa temporal no retomada',
+  other: 'Otro / sin especificar'
 }
 
 const REASON_ORDER = [
   'death',
-  'transfer_to_other_center',
-  'relocation',
+  'institutionalization',
   'health_decline',
-  'family_decision',
+  'adaptation_motivation',
   'financial',
-  'service_dissatisfaction',
+  'logistical_family',
+  'temporary_pause_not_resumed',
   'other'
 ]
 

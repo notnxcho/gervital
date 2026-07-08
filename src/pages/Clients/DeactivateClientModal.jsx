@@ -5,7 +5,6 @@ import Button from '../../components/ui/Button'
 import { getReasons } from '../../services/api'
 
 const NOTES_PLACEHOLDERS = {
-  service_dissatisfaction: '¿Qué aspecto puntual? Ayudanos a mejorar.',
   other: 'Describí brevemente el motivo (obligatorio).',
   default: 'Información adicional (opcional).'
 }
@@ -21,13 +20,15 @@ export default function DeactivateClientModal({ isOpen, onClose, client, onConfi
   const [notes, setNotes] = useState('')
   const [deactivationDate, setDeactivationDate] = useState(todayStr())
   const [reasons, setReasons] = useState([])
+  const [reasonsError, setReasonsError] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       setReason(null)
       setNotes('')
       setDeactivationDate(todayStr())
-      getReasons().then(setReasons).catch(() => {})
+      setReasonsError(false)
+      getReasons().then(setReasons).catch(() => setReasonsError(true))
     }
   }, [isOpen])
 
@@ -91,6 +92,9 @@ export default function DeactivateClientModal({ isOpen, onClose, client, onConfi
           )
         })}
       </div>
+      {reasonsError && (
+        <p className="-mt-2 mb-4 text-sm text-red-600">No se pudieron cargar los motivos. Reintentá.</p>
+      )}
       {selectedReason?.description && (
         <p className="-mt-2 mb-4 text-sm text-gray-500">{selectedReason.description}</p>
       )}

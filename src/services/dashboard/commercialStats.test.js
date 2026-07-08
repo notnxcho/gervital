@@ -134,7 +134,7 @@ describe('bajasByReason', () => {
     // ordered: death before financial before other
     expect(out.map(r => r.reason)).toEqual(['death', 'financial', 'other'])
     expect(out.find(r => r.reason === 'death').label).toBe('Fallecimiento')
-    expect(out.find(r => r.reason === 'other').label).toBe('Otro')
+    expect(out.find(r => r.reason === 'other').label).toBe('Otro / sin especificar')
   })
 })
 
