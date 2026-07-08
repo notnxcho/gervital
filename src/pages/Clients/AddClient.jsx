@@ -276,11 +276,18 @@ export default function AddClient() {
   // Antecedentes: estado derivado de formData.medicalHistory ([{condition, comment}])
   const historyByCondition = Object.fromEntries((formData.medicalHistory || []).map(h => [h.condition, h]))
   const toggleCondition = (cond, checked) => {
-    if (checked) updateField('medicalHistory', [...(formData.medicalHistory || []), { condition: cond, comment: '' }])
-    else updateField('medicalHistory', (formData.medicalHistory || []).filter(h => h.condition !== cond))
+    setFormData(prev => ({
+      ...prev,
+      medicalHistory: checked
+        ? [...(prev.medicalHistory || []), { condition: cond, comment: '' }]
+        : (prev.medicalHistory || []).filter(h => h.condition !== cond)
+    }))
   }
   const setConditionComment = (cond, comment) => {
-    updateField('medicalHistory', (formData.medicalHistory || []).map(h => h.condition === cond ? { ...h, comment } : h))
+    setFormData(prev => ({
+      ...prev,
+      medicalHistory: (prev.medicalHistory || []).map(h => h.condition === cond ? { ...h, comment } : h)
+    }))
   }
 
   const toggleDay = (day) => {
