@@ -250,3 +250,9 @@ export {
   updateTemplateActivity,
   deleteTemplateActivity
 } from './groups/groupService'
+
+export {
+  saveReferenceGroup,
+  applyReferenceGroup,
+  getReferenceGroupInfo
+} from './groups/referenceGroupService'
