@@ -14,6 +14,7 @@ import { deriveKpis, breakevenAnalysis, lineRevenueKpis, extendedFinanceKpis, ex
 import { getClients } from '../../../services/clients/clientService'
 import { getExpensesByMonth } from '../../../services/expenses/expenseService'
 import { getFixedExpenses } from '../../../services/expenses/fixedExpenseService'
+import { getExtraordinaryByMonth } from '../../../services/expenses/extraordinaryExpenseService'
 import { activeClientsInMonth, transportClientsInMonth } from '../../../services/dashboard/commercialStats'
 import { useAuth } from '../../../context/AuthContext'
 import { RANGE_MONTHS, TODAY } from '../monthWindow'
@@ -37,6 +38,7 @@ export default function FinanceSection({ selected, onSelectMonth }) {
   // Gastos: fijos (plantillas, una vez) y variables del mes seleccionado.
   const [fixedTemplates, setFixedTemplates] = useState([])
   const [monthExpenses, setMonthExpenses] = useState([])
+  const [monthExtraordinary, setMonthExtraordinary] = useState([])
 
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkMode, setBulkMode] = useState('emit')
@@ -90,6 +92,9 @@ export default function FinanceSection({ selected, onSelectMonth }) {
     getExpensesByMonth(selected.year, selected.month)
       .then(rows => { if (alive) setMonthExpenses(rows) })
       .catch(() => { if (alive) setMonthExpenses([]) })
+    getExtraordinaryByMonth(selected.year, selected.month)
+      .then(rows => { if (alive) setMonthExtraordinary(rows) })
+      .catch(() => { if (alive) setMonthExtraordinary([]) })
     return () => { alive = false }
   }, [selected])
 
@@ -128,10 +133,10 @@ export default function FinanceSection({ selected, onSelectMonth }) {
 
   const expenseCategories = useMemo(
     () => expensesByCategory(
-      { variableRows: monthExpenses, fixedTemplates, salaries: selectedRow?.salaries || 0 },
+      { variableRows: monthExpenses, fixedTemplates, extraordinaryRows: monthExtraordinary, salaries: selectedRow?.salaries || 0 },
       selected.year, selected.month
     ),
-    [monthExpenses, fixedTemplates, selectedRow, selected]
+    [monthExpenses, fixedTemplates, monthExtraordinary, selectedRow, selected]
   )
 
   const monthLabel = format(new Date(selected.year, selected.month, 1), 'MMMM yyyy', { locale: es })
