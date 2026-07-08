@@ -23,6 +23,11 @@ import {
   removeClientFromActivity,
   cleanupOldGroups
 } from '../../services/groups/groupService'
+import {
+  saveReferenceGroup,
+  applyReferenceGroup,
+  getReferenceGroupInfo
+} from '../../services/groups/referenceGroupService'
 import TimeSlotCard from './TimeSlotCard'
 import ClientPool from './ClientPool'
 import { PoolClientChip } from './ClientChip'
@@ -55,6 +60,8 @@ export default function DailyGroups() {
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [showWeek, setShowWeek] = useState(false)
   const [showAbsences, setShowAbsences] = useState(true)
+  const [referenceInfo, setReferenceInfo] = useState({ exists: false, updatedAt: null })
+  const [refBusy, setRefBusy] = useState(false)
 
   // DnD state
   const [draggedClient, setDraggedClient] = useState(null)
@@ -145,6 +152,45 @@ export default function DailyGroups() {
       if (!silent) setLoading(false)
     }
   }, [])
+
+  // Reference-group info for the current (weekday, shift)
+  useEffect(() => {
+    if (isWeekend) { setReferenceInfo({ exists: false, updatedAt: null }); return }
+    let alive = true
+    getReferenceGroupInfo(dayName, activeShift)
+      .then(info => { if (alive) setReferenceInfo(info) })
+      .catch(() => { if (alive) setReferenceInfo({ exists: false, updatedAt: null }) })
+    return () => { alive = false }
+  }, [dayName, activeShift, isWeekend])
+
+  const handleSaveReference = async () => {
+    if (referenceInfo.exists && !window.confirm('Ya existe un grupo de referencia para este día y turno. ¿Sobrescribir con la configuración actual?')) return
+    setRefBusy(true)
+    try {
+      await saveReferenceGroup(dateStr, activeShift, dayName)
+      const info = await getReferenceGroupInfo(dayName, activeShift)
+      setReferenceInfo(info)
+    } catch (e) {
+      alert('Error al guardar el grupo de referencia: ' + e.message)
+    } finally {
+      setRefBusy(false)
+    }
+  }
+
+  const handleApplyReference = async () => {
+    if (!referenceInfo.exists) return
+    if (timeSlots.length > 0 && !window.confirm('Esto reemplaza todos los grupos y asignaciones de hoy con el grupo de referencia. ¿Continuar?')) return
+    setRefBusy(true)
+    try {
+      const presentIds = shiftClients.map(c => c.id)
+      await applyReferenceGroup(dayName, activeShift, dateStr, presentIds)
+      await loadSlots(dateStr, activeShift, { silent: true })
+    } catch (e) {
+      alert('Error al aplicar el grupo de referencia: ' + e.message)
+    } finally {
+      setRefBusy(false)
+    }
+  }
 
   // Initial load: cleanup + load clients
   useEffect(() => {
@@ -388,6 +434,25 @@ export default function DailyGroups() {
               Plantillas
             </Button>
           )}
+          {!readOnly && !isWeekend && (
+            <>
+              <Button
+                variant="secondary"
+                onClick={handleSaveReference}
+                disabled={refBusy}
+                title={referenceInfo.updatedAt ? `Última actualización: ${format(new Date(referenceInfo.updatedAt), "d MMM yyyy HH:mm", { locale: es })}` : 'Sin referencia guardada'}
+              >
+                Guardar grupo de referencia
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleApplyReference}
+                disabled={refBusy || !referenceInfo.exists}
+              >
+                Aplicar grupo de referencia
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -546,7 +611,6 @@ export default function DailyGroups() {
         clients={allClients}
         weekDates={weekDates}
         attendanceByDate={weekAttendanceByDate}
-        showAbsences={showAbsences}
       />
     </div>
   )
