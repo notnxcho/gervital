@@ -32,6 +32,8 @@ export default function BulkInvoiceModal({
   const [search, setSearch] = useState('')
   const [running, setRunning] = useState(false)
   const [hasRun, setHasRun] = useState(false)
+  const [isDirty, setIsDirty] = useState(false) // el usuario editó algo (selección/fechas)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
 
   // Settings globales de la corrida (solo emit)
   const [fechaEmision, setFechaEmision] = useState('')
@@ -44,17 +46,20 @@ export default function BulkInvoiceModal({
       ...r,
       runStatus: r.eligibility === 'listo' ? 'idle' : 'skipped',
       runError: null,
-      selected: r.eligibility === 'listo',
+      // Cobro: todo de-seleccionado por defecto. Facturar: pre-selecciona los listos.
+      selected: isPay ? false : r.eligibility === 'listo',
       paidDate: todayStr() // fecha de cobro por fila (default: hoy)
     })))
     setSearch('')
     setRunning(false)
     setHasRun(false)
+    setIsDirty(false)
+    setShowDiscardConfirm(false)
     const defEmision = format(lastBusinessDayOfMonth(year, month), 'yyyy-MM-dd')
     setFechaEmision(defEmision)
     setFechaVencimiento(defEmision) // vencimiento = emisión por defecto
     setVencTouched(false)
-  }, [isOpen, rows, year, month])
+  }, [isOpen, rows, year, month, isPay])
 
   const setItem = (id, patch) =>
     setItems(curr => curr.map(it => it.id === id ? { ...it, ...patch } : it))
@@ -84,6 +89,7 @@ export default function BulkInvoiceModal({
       if (i < ids.length - 1) await new Promise(res => setTimeout(res, RATE_LIMIT_MS))
     }
     setRunning(false)
+    setIsDirty(false) // la corrida quedó guardada; ya no hay trabajo que descartar
   }
 
   const runSelected = () => {
@@ -95,17 +101,26 @@ export default function BulkInvoiceModal({
     if (ids.length) processIds(ids)
   }
 
-  const handleClose = () => {
-    if (running) return
+  // Cierre efectivo (backdrop / X / Cerrar / Descartar confirmado)
+  const doClose = () => {
+    setShowDiscardConfirm(false)
     onClose()
     if (hasRun) onComplete()
+  }
+  // Si hay cambios sin guardar, pregunta antes de cerrar
+  const requestClose = () => {
+    if (running) return
+    if (isDirty) { setShowDiscardConfirm(true); return }
+    doClose()
   }
 
   const selectedCount = items.filter(it => it.selected && it.runStatus !== 'skipped').length
   const selectableItems = items.filter(it => it.runStatus !== 'skipped')
   const allSelected = selectableItems.length > 0 && selectableItems.every(it => it.selected)
-  const toggleAll = (checked) =>
+  const toggleAll = (checked) => {
+    setIsDirty(true)
     setItems(curr => curr.map(it => it.runStatus !== 'skipped' ? { ...it, selected: checked } : it))
+  }
   const failedCount = items.filter(it => it.runStatus === 'error').length
   const successCount = items.filter(it => it.runStatus === 'success').length
   const processedCount = successCount + failedCount
@@ -119,7 +134,8 @@ export default function BulkInvoiceModal({
   const actionVerb = isPay ? 'Marcar cobradas' : 'Emitir seleccionadas'
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={`${isPay ? 'Marcar cobrado' : 'Facturar'} — ${monthLabel}`} size="xl">
+    <>
+    <Modal isOpen={isOpen} onClose={requestClose} title={`${isPay ? 'Marcar cobrado' : 'Facturar'} — ${monthLabel}`} size="xl">
       <div className="space-y-4">
         {/* Progreso */}
         {runTotal > 0 && (
@@ -165,7 +181,7 @@ export default function BulkInvoiceModal({
             return (
               <label key={it.id} className={`flex items-center gap-3 px-3 py-3 text-sm ${it.runStatus === 'skipped' ? 'opacity-60' : selectable ? 'cursor-pointer hover:bg-gray-50' : ''}`}>
                 <input type="checkbox" checked={it.selected} disabled={!selectable}
-                  onChange={(e) => setItem(it.id, { selected: e.target.checked })} />
+                  onChange={(e) => { setIsDirty(true); setItem(it.id, { selected: e.target.checked }) }} />
                 <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                   <p className="text-gray-900 truncate">{it.name}</p>
                   <p className={`text-xs truncate ${it.transferResponsible ? 'font-medium text-gray-600' : 'text-gray-400'}`}>
@@ -181,7 +197,7 @@ export default function BulkInvoiceModal({
                     value={it.paidDate || ''}
                     disabled={running || it.runStatus === 'success'}
                     onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => setItem(it.id, { paidDate: e.target.value })}
+                    onChange={(e) => { setIsDirty(true); setItem(it.id, { paidDate: e.target.value }) }}
                     title="Fecha de cobro"
                     className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-gray-50 flex-shrink-0"
                   />
@@ -197,14 +213,14 @@ export default function BulkInvoiceModal({
         {!isPay && (
           <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
             <Input label="Fecha de emisión" type="date" value={fechaEmision}
-              onChange={e => { setFechaEmision(e.target.value); if (!vencTouched) setFechaVencimiento(e.target.value) }} disabled={running} />
+              onChange={e => { setIsDirty(true); setFechaEmision(e.target.value); if (!vencTouched) setFechaVencimiento(e.target.value) }} disabled={running} />
             <Input label="Fecha de vencimiento" type="date" value={fechaVencimiento}
-              onChange={e => { setFechaVencimiento(e.target.value); setVencTouched(true) }} disabled={running} />
+              onChange={e => { setIsDirty(true); setFechaVencimiento(e.target.value); setVencTouched(true) }} disabled={running} />
           </div>
         )}
 
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={handleClose} disabled={running}>Cerrar</Button>
+          <Button variant="secondary" onClick={requestClose} disabled={running}>Cerrar</Button>
           {failedCount > 0 && !running ? (
             <Button onClick={retryFailed}>Reintentar fallidas ({failedCount})</Button>
           ) : (
@@ -215,6 +231,16 @@ export default function BulkInvoiceModal({
         </div>
       </div>
     </Modal>
+
+    {/* Confirmación de descarte de cambios sin guardar */}
+    <Modal isOpen={showDiscardConfirm} onClose={() => setShowDiscardConfirm(false)} title="Cambios sin guardar" size="sm">
+      <p className="text-gray-600 mb-6">Hiciste cambios que no se guardaron. ¿Querés descartarlos?</p>
+      <div className="flex gap-3 justify-end">
+        <Button variant="secondary" onClick={() => setShowDiscardConfirm(false)}>Cancelar</Button>
+        <Button variant="danger" onClick={doClose}>Descartar</Button>
+      </div>
+    </Modal>
+    </>
   )
 }
 
