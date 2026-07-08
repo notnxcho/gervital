@@ -32,17 +32,29 @@ export function transformClientToDb(clientData) {
     p_addr_doorbell: clientData.address?.doorbell || null,
     p_addr_concierge: clientData.address?.concierge || null,
     p_addr_distance_range: clientData.address?.distanceRange || null,
-    // Medical info
-    p_med_dietary: clientData.medicalInfo?.dietaryRestrictions || null,
-    p_med_medical: clientData.medicalInfo?.medicalRestrictions || null,
-    p_med_mobility: clientData.medicalInfo?.mobilityRestrictions || null,
-    p_med_medication: clientData.medicalInfo?.medication || null,
-    p_med_medication_schedule: clientData.medicalInfo?.medicationSchedule || null,
-    p_med_notes: clientData.medicalInfo?.notes || null,
-    p_med_is_diabetic: clientData.medicalInfo?.isDiabetic || false,
-    p_med_is_celiac: clientData.medicalInfo?.isCeliac || false,
-    p_med_is_hypertensive: clientData.medicalInfo?.isHypertensive || false,
-    p_med_is_lactose_intolerant: clientData.medicalInfo?.isLactoseIntolerant || false,
+    // Personal
+    p_marital_status: clientData.maritalStatus || null,
+    p_residence_type: clientData.residenceType || null,
+    p_lives_with: clientData.livesWith || null,
+    // Medical info (scalars)
+    p_health_emergency_service: clientData.medicalInfo?.healthEmergencyService || null,
+    p_health_provider: clientData.medicalInfo?.healthProvider || null,
+    p_health_notes: clientData.medicalInfo?.healthNotes || null,
+    p_medication_notes: clientData.medicalInfo?.medicationNotes || null,
+    p_history_notes: clientData.medicalInfo?.historyNotes || null,
+    p_education_level: clientData.medicalInfo?.educationLevel || null,
+    p_occupation: clientData.medicalInfo?.occupation || null,
+    p_significant_interests: clientData.medicalInfo?.significantInterests || null,
+    p_significant_bonds: clientData.medicalInfo?.significantBonds || null,
+    p_music_taste: clientData.medicalInfo?.musicTaste || null,
+    p_favorite_foods: clientData.medicalInfo?.favoriteFoods || null,
+    p_character: clientData.medicalInfo?.character || null,
+    p_personal_resources: clientData.medicalInfo?.personalResources || null,
+    p_vulnerabilities: clientData.medicalInfo?.vulnerabilities || null,
+    // Medical collections (arrays -> jsonb)
+    p_medications: clientData.medications || [],
+    p_diagnoses: clientData.diagnoses || [],
+    p_medical_history: clientData.medicalHistory || [],
     // Charity flag (write is admin-gated server-side)
     p_is_charity: clientData.isCharity || false
   }
@@ -89,17 +101,17 @@ export function transformClientFromDb(dbClient) {
       concierge: '',
       distanceRange: null
     },
+    maritalStatus: dbClient.maritalStatus || '',
+    residenceType: dbClient.residenceType || '',
+    livesWith: dbClient.livesWith || '',
+    medications: dbClient.medications || [],
+    diagnoses: dbClient.diagnoses || [],
+    medicalHistory: dbClient.medicalHistory || [],
     medicalInfo: dbClient.medicalInfo || {
-      dietaryRestrictions: '',
-      medicalRestrictions: '',
-      mobilityRestrictions: '',
-      medication: '',
-      medicationSchedule: '',
-      notes: '',
-      isDiabetic: false,
-      isCeliac: false,
-      isHypertensive: false,
-      isLactoseIntolerant: false
+      healthEmergencyService: '', healthProvider: '', healthNotes: '',
+      medicationNotes: '', historyNotes: '',
+      educationLevel: '', occupation: '', significantInterests: '', significantBonds: '',
+      musicTaste: '', favoriteFoods: '', character: '', personalResources: '', vulnerabilities: ''
     }
   }
 }
@@ -141,19 +153,34 @@ export function transformUpdateToDb(clientId, updateData) {
     if (updateData.address.distanceRange !== undefined) params.p_addr_distance_range = updateData.address.distanceRange
   }
 
-  // Medical info
+  // Personal
+  if (updateData.maritalStatus !== undefined) params.p_marital_status = updateData.maritalStatus
+  if (updateData.residenceType !== undefined) params.p_residence_type = updateData.residenceType
+  if (updateData.livesWith !== undefined) params.p_lives_with = updateData.livesWith
+
+  // Medical info (scalars)
   if (updateData.medicalInfo) {
-    if (updateData.medicalInfo.dietaryRestrictions !== undefined) params.p_med_dietary = updateData.medicalInfo.dietaryRestrictions
-    if (updateData.medicalInfo.medicalRestrictions !== undefined) params.p_med_medical = updateData.medicalInfo.medicalRestrictions
-    if (updateData.medicalInfo.mobilityRestrictions !== undefined) params.p_med_mobility = updateData.medicalInfo.mobilityRestrictions
-    if (updateData.medicalInfo.medication !== undefined) params.p_med_medication = updateData.medicalInfo.medication
-    if (updateData.medicalInfo.medicationSchedule !== undefined) params.p_med_medication_schedule = updateData.medicalInfo.medicationSchedule
-    if (updateData.medicalInfo.notes !== undefined) params.p_med_notes = updateData.medicalInfo.notes
-    if (updateData.medicalInfo.isDiabetic !== undefined) params.p_med_is_diabetic = updateData.medicalInfo.isDiabetic
-    if (updateData.medicalInfo.isCeliac !== undefined) params.p_med_is_celiac = updateData.medicalInfo.isCeliac
-    if (updateData.medicalInfo.isHypertensive !== undefined) params.p_med_is_hypertensive = updateData.medicalInfo.isHypertensive
-    if (updateData.medicalInfo.isLactoseIntolerant !== undefined) params.p_med_is_lactose_intolerant = updateData.medicalInfo.isLactoseIntolerant
+    const m = updateData.medicalInfo
+    if (m.healthEmergencyService !== undefined) params.p_health_emergency_service = m.healthEmergencyService
+    if (m.healthProvider !== undefined) params.p_health_provider = m.healthProvider
+    if (m.healthNotes !== undefined) params.p_health_notes = m.healthNotes
+    if (m.medicationNotes !== undefined) params.p_medication_notes = m.medicationNotes
+    if (m.historyNotes !== undefined) params.p_history_notes = m.historyNotes
+    if (m.educationLevel !== undefined) params.p_education_level = m.educationLevel
+    if (m.occupation !== undefined) params.p_occupation = m.occupation
+    if (m.significantInterests !== undefined) params.p_significant_interests = m.significantInterests
+    if (m.significantBonds !== undefined) params.p_significant_bonds = m.significantBonds
+    if (m.musicTaste !== undefined) params.p_music_taste = m.musicTaste
+    if (m.favoriteFoods !== undefined) params.p_favorite_foods = m.favoriteFoods
+    if (m.character !== undefined) params.p_character = m.character
+    if (m.personalResources !== undefined) params.p_personal_resources = m.personalResources
+    if (m.vulnerabilities !== undefined) params.p_vulnerabilities = m.vulnerabilities
   }
+
+  // Medical collections
+  if (updateData.medications !== undefined) params.p_medications = updateData.medications
+  if (updateData.diagnoses !== undefined) params.p_diagnoses = updateData.diagnoses
+  if (updateData.medicalHistory !== undefined) params.p_medical_history = updateData.medicalHistory
 
   return params
 }
