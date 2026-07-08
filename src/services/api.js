@@ -133,6 +133,7 @@ export {
 
 export {
   getExtraordinaryByMonth,
+  getAllExtraordinaryExpenses,
   createExtraordinary,
   updateExtraordinary,
   deleteExtraordinary

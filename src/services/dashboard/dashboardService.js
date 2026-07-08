@@ -2,6 +2,7 @@ import { supabase } from '../supabase/client'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { getEmployees, getStandaloneExtraCosts } from '../salaries/salaryService'
 import { getFixedExpenses } from '../expenses/fixedExpenseService'
+import { getAllExtraordinaryExpenses } from '../expenses/extraordinaryExpenseService'
 import { mergeFinanceSeries } from './financeSeries'
 
 /**
@@ -164,7 +165,7 @@ export async function getDashboardMetrics(year, month) {
  * @returns {Promise<Array>} merged month objects (see mergeFinanceSeries)
  */
 export async function getDashboardFinanceSeries(fromYear, fromMonth, toYear, toMonth) {
-  const [seriesRes, employees, fixedExpenses, standaloneCosts] = await Promise.all([
+  const [seriesRes, employees, fixedExpenses, standaloneCosts, contingencyRows] = await Promise.all([
     supabase.rpc('get_dashboard_finance_series', {
       p_from_year: fromYear,
       p_from_month: fromMonth,
@@ -173,11 +174,12 @@ export async function getDashboardFinanceSeries(fromYear, fromMonth, toYear, toM
     }),
     getEmployees().catch(() => []), // operador lacks salary access → empty, never throws
     getFixedExpenses().catch(() => []), // never throw the whole dashboard
-    getStandaloneExtraCosts().catch(() => []) // standalone extra costs (no employee)
+    getStandaloneExtraCosts().catch(() => []), // standalone extra costs (no employee)
+    getAllExtraordinaryExpenses().catch(() => []) // contingency extraordinary expenses
   ])
 
   if (seriesRes.error) throw new Error(seriesRes.error.message)
-  return mergeFinanceSeries(seriesRes.data || [], employees, fixedExpenses, standaloneCosts)
+  return mergeFinanceSeries(seriesRes.data || [], employees, fixedExpenses, standaloneCosts, contingencyRows)
 }
 
 /**

@@ -12,6 +12,16 @@ export async function getExtraordinaryByMonth(year, month) {
   return data
 }
 
+// All extraordinary expenses (for dashboard series bucketing by month).
+export async function getAllExtraordinaryExpenses() {
+  const { data, error } = await supabase
+    .from('extraordinary_expenses_view')
+    .select('*')
+    .order('date', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data
+}
+
 export async function createExtraordinary(expenseData) {
   const { data, error } = await supabase
     .from('extraordinary_expenses')
