@@ -47,6 +47,7 @@ describe('salaryCostForMonth', () => {
 // append to src/services/dashboard/financeSeries.test.js
 import {
   mergeFinanceSeries,
+  standaloneExtraCostForMonth,
   selectIncome,
   selectExpensesTotal,
   selectMargin,
@@ -90,6 +91,30 @@ describe('mergeFinanceSeries', () => {
     const jan = mergeFinanceSeries([rpcRow({ month: 0 })], [], [semestral])[0]
     expect(jan.fixedCash).toBe(6000)
     expect(jan.fixedMonthly).toBe(1000)
+  })
+})
+
+describe('standaloneExtraCostForMonth', () => {
+  test('zero when empty/undefined', () => {
+    expect(standaloneExtraCostForMonth([], 2026, 5)).toBe(0)
+    expect(standaloneExtraCostForMonth(undefined, 2026, 5)).toBe(0)
+  })
+  test('monthlyizes a cost in the trailing 12m (amount/12)', () => {
+    // cost 12000 on 2026-03-15, asked for junio 2026 (asOf 2026-06-30) → within 12m
+    expect(standaloneExtraCostForMonth([{ amount: 12000, date: '2026-03-15' }], 2026, 5)).toBeCloseTo(1000, 2)
+  })
+  test('ignores costs outside the trailing 12m', () => {
+    expect(standaloneExtraCostForMonth([{ amount: 12000, date: '2024-01-01' }], 2026, 5)).toBe(0)
+  })
+})
+
+describe('mergeFinanceSeries standalone extra costs', () => {
+  test('folds monthlyized standalone costs into salaries', () => {
+    const out = mergeFinanceSeries([rpcRow()], [], [], [{ amount: 12000, date: '2026-03-15' }])
+    expect(out[0].salaries).toBeCloseTo(1000, 2)
+  })
+  test('defaults to no standalone costs (backward compatible)', () => {
+    expect(mergeFinanceSeries([rpcRow()], []) [0].salaries).toBe(0)
   })
 })
 

@@ -1,4 +1,4 @@
-import { currentSalary, costoAnualMensualizado } from '../salaries/salaryCalc'
+import { currentSalary, costoAnualMensualizado, extraordinarios12m } from '../salaries/salaryCalc'
 import { fixedCashForMonth, fixedMonthlyForMonth, isActive, monthlyAmount } from '../expenses/fixedExpenseCalc'
 
 // Last calendar day of a 0-indexed month as 'YYYY-MM-DD' (UTC-safe).
@@ -24,8 +24,18 @@ export function salaryCostForMonth(employees, year, month) {
   return total
 }
 
-// Raw RPC rows + employees + fixed-expense templates → UI-ready month objects.
-export function mergeFinanceSeries(rpcRows, employees, fixedExpenses = []) {
+// Monthlyized standalone extra costs (no employee) for (year, month): same
+// amortization as per-employee extraordinarios (trailing 12m / 12). These live in
+// employee_extra_costs with employee_id NULL and belong to no employee, so
+// salaryCostForMonth misses them — they are folded into `salaries` here.
+export function standaloneExtraCostForMonth(standaloneCosts, year, month) {
+  if (!standaloneCosts || standaloneCosts.length === 0) return 0
+  return extraordinarios12m(standaloneCosts, lastDayOfMonth(year, month)) / 12
+}
+
+// Raw RPC rows + employees + fixed-expense templates + standalone extra costs →
+// UI-ready month objects.
+export function mergeFinanceSeries(rpcRows, employees, fixedExpenses = [], standaloneCosts = []) {
   return (rpcRows || []).map(r => ({
     year: r.year,
     month: r.month,
@@ -41,6 +51,7 @@ export function mergeFinanceSeries(rpcRows, employees, fixedExpenses = []) {
     fixedCash: fixedCashForMonth(fixedExpenses, r.year, r.month),
     fixedMonthly: fixedMonthlyForMonth(fixedExpenses, r.year, r.month),
     salaries: salaryCostForMonth(employees, r.year, r.month)
+      + standaloneExtraCostForMonth(standaloneCosts, r.year, r.month)
   }))
 }
 
