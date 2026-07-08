@@ -32,7 +32,7 @@ export async function getChurnBoard() {
 /**
  * Move a follow-up to a new pipeline stage.
  * @param {string} clientId
- * @param {'new'|'contacting'|'negotiating'|'recovered'|'lost'} stage
+ * @param {'new'|'contacting'|'negotiating'|'temporary_pause'|'lost'} stage
  */
 export async function updateChurnStage(clientId, stage) {
   const { error } = await supabase

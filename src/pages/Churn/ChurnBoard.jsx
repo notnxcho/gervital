@@ -7,7 +7,6 @@ import {
   useSensors
 } from '@dnd-kit/core'
 import { getChurnBoard, updateChurnStage } from '../../services/churn/churnService'
-import { reactivateClient } from '../../services/clients/clientService'
 import { getReasons } from '../../services/churn/deactivationReasonService'
 import { useAuth } from '../../context/AuthContext'
 import { STAGES } from './churnConstants'
@@ -91,26 +90,8 @@ export default function ChurnBoard() {
     const { clientId } = card
     const prevStage = card.stage
 
-    // Moving to "recovered" requires confirmation + reactivation.
-    if (newStage === 'recovered') {
-      const ok = window.confirm(
-        `¿Reactivar a ${card.firstName} ${card.lastName}? El cliente volverá a estar activo.`
-      )
-      if (!ok) return
-
-      // Optimistic move
-      setCards(prev => prev.map(c => c.clientId === clientId ? { ...c, stage: newStage } : c))
-      try {
-        await reactivateClient(clientId)
-        await updateChurnStage(clientId, newStage)
-      } catch (err) {
-        console.error('Error reactivating client:', err)
-        setCards(prev => prev.map(c => c.clientId === clientId ? { ...c, stage: prevStage } : c))
-      }
-      return
-    }
-
-    // Optimistic move for any other stage.
+    // Optimistic move. Reactivación ya no ocurre por drag: se hace desde el botón
+    // "Reactivar cliente" del modal (que saca al cliente del tablero al recargar).
     setCards(prev => prev.map(c => c.clientId === clientId ? { ...c, stage: newStage } : c))
     try {
       await updateChurnStage(clientId, newStage)

@@ -4,7 +4,6 @@ export const STAGES = [
   { key: 'contacting', label: 'En seguimiento', color: '#d97706' },
   { key: 'negotiating', label: 'En negociación', color: '#2563eb' },
   { key: 'temporary_pause', label: 'Pausa temporal', color: '#7c3aed' },
-  { key: 'recovered', label: 'Recuperado', color: '#059669' },
   { key: 'lost', label: 'Perdido', color: '#94a3b8' }
 ]
 
