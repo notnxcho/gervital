@@ -223,6 +223,15 @@ export {
   addChurnNote
 } from './churn/churnService'
 
+export {
+  slugify,
+  getReasons,
+  createReason,
+  updateReason,
+  setReasonActive,
+  reorderReasons
+} from './churn/deactivationReasonService'
+
 // ============================================
 // GROUPS API
 // ============================================
