@@ -2,17 +2,7 @@ import { useState, useEffect } from 'react'
 import { WarningCircle } from 'iconoir-react'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
-
-export const DEACTIVATION_REASONS = [
-  { value: 'death', label: 'Fallecimiento' },
-  { value: 'transfer_to_other_center', label: 'Cambio a otra institución' },
-  { value: 'relocation', label: 'Mudanza' },
-  { value: 'health_decline', label: 'Internación / deterioro de salud' },
-  { value: 'family_decision', label: 'Decisión familiar' },
-  { value: 'financial', label: 'Razones económicas' },
-  { value: 'service_dissatisfaction', label: 'Insatisfacción con el servicio' },
-  { value: 'other', label: 'Otro' }
-]
+import { getReasons } from '../../services/api'
 
 const NOTES_PLACEHOLDERS = {
   service_dissatisfaction: '¿Qué aspecto puntual? Ayudanos a mejorar.',
@@ -30,15 +20,18 @@ export default function DeactivateClientModal({ isOpen, onClose, client, onConfi
   const [reason, setReason] = useState(null)
   const [notes, setNotes] = useState('')
   const [deactivationDate, setDeactivationDate] = useState(todayStr())
+  const [reasons, setReasons] = useState([])
 
   useEffect(() => {
     if (isOpen) {
       setReason(null)
       setNotes('')
       setDeactivationDate(todayStr())
+      getReasons().then(setReasons).catch(() => {})
     }
   }, [isOpen])
 
+  const selectedReason = reasons.find(r => r.key === reason)
   const requiresNotes = reason === 'other'
   const canConfirm = reason !== null && !!deactivationDate && (!requiresNotes || notes.trim().length > 0)
 
@@ -80,13 +73,13 @@ export default function DeactivateClientModal({ isOpen, onClose, client, onConfi
 
       <p className="text-sm font-medium text-gray-700 mb-2">Motivo</p>
       <div className="grid grid-cols-2 gap-2 mb-4">
-        {DEACTIVATION_REASONS.map(r => {
-          const selected = reason === r.value
+        {reasons.map(r => {
+          const selected = reason === r.key
           return (
             <button
-              key={r.value}
+              key={r.key}
               type="button"
-              onClick={() => setReason(r.value)}
+              onClick={() => setReason(r.key)}
               className={`text-left text-sm px-3 py-2 rounded-lg border transition-colors ${
                 selected
                   ? 'bg-purple-50 border-purple-400 text-purple-900'
@@ -98,6 +91,9 @@ export default function DeactivateClientModal({ isOpen, onClose, client, onConfi
           )
         })}
       </div>
+      {selectedReason?.description && (
+        <p className="-mt-2 mb-4 text-sm text-gray-500">{selectedReason.description}</p>
+      )}
 
       <label className="block text-sm font-medium text-gray-700 mb-1">
         Notas {requiresNotes && <span className="text-red-600">*</span>}

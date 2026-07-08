@@ -68,3 +68,18 @@ export async function reorderReasons(orderedIds) {
     )
   )
 }
+
+let _labelMapPromise = null
+
+export async function getReasonLabelMap() {
+  if (!_labelMapPromise) {
+    _labelMapPromise = getReasons({ includeInactive: true })
+      .then(list => Object.fromEntries(list.map(r => [r.key, r.label])))
+      .catch(err => { _labelMapPromise = null; throw err })
+  }
+  return _labelMapPromise
+}
+
+export function invalidateReasonLabelMap() {
+  _labelMapPromise = null
+}

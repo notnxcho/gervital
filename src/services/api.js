@@ -229,7 +229,9 @@ export {
   createReason,
   updateReason,
   setReasonActive,
-  reorderReasons
+  reorderReasons,
+  getReasonLabelMap,
+  invalidateReasonLabelMap
 } from './churn/deactivationReasonService'
 
 // ============================================

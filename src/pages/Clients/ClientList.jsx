@@ -5,10 +5,11 @@ import { differenceInYears, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getClients, deactivateClient } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import { useReasonLabels } from '../../hooks/useReasonLabels'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Filters, { getActiveFiltersCount } from '../../components/ui/Filters'
-import DeactivateClientModal, { DEACTIVATION_REASONS } from './DeactivateClientModal'
+import DeactivateClientModal from './DeactivateClientModal'
 import './ClientCard.css'
 
 // MOCKED RES - Días de la semana
@@ -97,10 +98,6 @@ const SORT_OPTIONS = [
   { value: 'freq_desc', label: 'Frecuencia (mayor primero)' },
   { value: 'tier_asc', label: 'Tier (A-D)' }
 ]
-
-const REASON_LABEL = Object.fromEntries(
-  DEACTIVATION_REASONS.map(r => [r.value, r.label])
-)
 
 // MOCKED RES - Calcular edad desde fecha de nacimiento
 const calculateAge = (birthDate) => {
@@ -377,10 +374,11 @@ export default function ClientList() {
 }
 
 const ClientCard = memo(function ClientCard({ client }) {
+  const reasonLabels = useReasonLabels()
   const age = calculateAge(client.birthDate)
   const isDeactivated = !!client.deletedAt
   const deactivatedLabel = isDeactivated
-    ? `Baja: ${REASON_LABEL[client.deactivationReason] || 'Sin motivo'} · ${format(bajaDate(client), "d MMM yyyy", { locale: es })}`
+    ? `Baja: ${reasonLabels[client.deactivationReason] || 'Sin motivo'} · ${format(bajaDate(client), "d MMM yyyy", { locale: es })}`
     : null
   const flags = MEDICAL_FLAGS.filter(f => client.medicalInfo?.[f.key])
   const schedule = SCHEDULE_CONFIG[client.plan.schedule]
@@ -465,10 +463,11 @@ const ClientCard = memo(function ClientCard({ client }) {
 })
 
 const ClientRow = memo(function ClientRow({ client }) {
+  const reasonLabels = useReasonLabels()
   const age = calculateAge(client.birthDate)
   const isDeactivated = !!client.deletedAt
   const deactivatedLabel = isDeactivated
-    ? `Baja: ${REASON_LABEL[client.deactivationReason] || 'Sin motivo'} · ${format(bajaDate(client), "d MMM yyyy", { locale: es })}`
+    ? `Baja: ${reasonLabels[client.deactivationReason] || 'Sin motivo'} · ${format(bajaDate(client), "d MMM yyyy", { locale: es })}`
     : null
   const flags = MEDICAL_FLAGS.filter(f => client.medicalInfo?.[f.key])
   const schedule = SCHEDULE_CONFIG[client.plan.schedule]

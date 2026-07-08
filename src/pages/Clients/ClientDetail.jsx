@@ -35,13 +35,14 @@ import {
   removePlanDiscount
 } from '../../services/api'
 import { useAuth, roleHasAccess } from '../../context/AuthContext'
+import { useReasonLabels } from '../../hooks/useReasonLabels'
 import EmitInvoiceModal from './EmitInvoiceModal'
 import ApplyDiscountModal from './ApplyDiscountModal'
 import Button from '../../components/ui/Button'
 import Card, { CardContent, CardHeader } from '../../components/ui/Card'
 import Tabs from '../../components/ui/Tabs'
 import Modal from '../../components/ui/Modal'
-import DeactivateClientModal, { DEACTIVATION_REASONS } from './DeactivateClientModal'
+import DeactivateClientModal from './DeactivateClientModal'
 import RecoveryCreditsModal from './RecoveryCreditsModal'
 
 const SCHEDULE_LABELS = {
@@ -93,10 +94,6 @@ const COGNITIVE_LEVEL_CONFIG = {
   D: { label: 'Tier D - Asistencia alta', color: 'bg-red-100 text-red-700 border-red-200' }
 }
 
-const REASON_LABEL = Object.fromEntries(
-  DEACTIVATION_REASONS.map(r => [r.value, r.label])
-)
-
 // Day cell styling by status
 function getDayStyle(status, isJustified) {
   if (status === 'attended') return 'bg-green-500 text-white'
@@ -120,6 +117,7 @@ export default function ClientDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const reasonLabels = useReasonLabels()
 
   const [client, setClient] = useState(null)
   const [attendance, setAttendance] = useState([])
@@ -439,7 +437,7 @@ export default function ClientDetail() {
               Cliente dado de baja el {format(client.deactivationDate ? new Date(`${client.deactivationDate}T00:00:00`) : new Date(client.deletedAt), "d 'de' MMMM, yyyy", { locale: es })}
             </p>
             <p className="text-sm text-amber-800 mt-1">
-              Motivo: {REASON_LABEL[client.deactivationReason] || '—'}
+              Motivo: {reasonLabels[client.deactivationReason] || '—'}
               {client.deactivationNotes && <> · {client.deactivationNotes}</>}
             </p>
           </div>
