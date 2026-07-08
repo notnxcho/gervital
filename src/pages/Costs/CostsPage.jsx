@@ -274,52 +274,46 @@ export default function CostsPage() {
     : null
 
   return (
-    <div className="bg-gray-50 min-h-screen -mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Costos</h1>
-          <p className="text-gray-500 text-sm mt-1">Gestión de costos operativos</p>
-        </div>
+    <div className="bg-gray-50 min-h-screen -mt-8 -mx-4 sm:-mx-6 lg:-mx-8">
+      {/* Sticky header: título + navegación de mes + acciones */}
+      <div className="sticky top-0 z-20 bg-gray-50/90 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4 min-w-0">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Costos</h1>
+              <p className="text-gray-500 text-sm mt-0.5">Gestión de costos operativos</p>
+            </div>
+            <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1 py-0.5 shadow-sm">
+              <button onClick={goToPreviousMonth} className="p-1.5 hover:bg-gray-100 rounded-md transition-colors" title="Mes anterior">
+                <NavArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <span className="text-sm font-semibold text-gray-900 capitalize min-w-[120px] text-center">
+                {format(selectedDate, 'MMMM yyyy', { locale: es })}
+              </span>
+              <button onClick={goToNextMonth} className="p-1.5 hover:bg-gray-100 rounded-md transition-colors" title="Mes siguiente">
+                <NavArrowRight className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+          </div>
 
-        <div className="flex items-center gap-3">
-          <Button variant="secondary" onClick={() => setCategoryModalOpen(true)}>
-            Categorías
-          </Button>
-          <Button variant="secondary" onClick={() => setFixedModal({ open: true, item: null })}>
-            <Plus className="w-4 h-4" />
-            Gasto fijo
-          </Button>
-          <Button onClick={() => setVariableModal({ open: true, item: null })} className="bg-purple-600 hover:bg-purple-700">
-            <Plus className="w-4 h-4" />
-            Gasto variable
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" onClick={() => setCategoryModalOpen(true)}>
+              Categorías
+            </Button>
+            <Button variant="secondary" onClick={() => setFixedModal({ open: true, item: null })}>
+              <Plus className="w-4 h-4" />
+              Gasto fijo
+            </Button>
+            <Button onClick={() => setVariableModal({ open: true, item: null })} className="bg-purple-600 hover:bg-purple-700">
+              <Plus className="w-4 h-4" />
+              Gasto variable
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Month selector */}
-      <Card className="mb-6">
-        <div className="p-4 flex items-center justify-between">
-          <button
-            onClick={goToPreviousMonth}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <NavArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
-
-          <h2 className="text-xl font-semibold text-gray-900 capitalize">
-            {format(selectedDate, 'MMMM yyyy', { locale: es })}
-          </h2>
-
-          <button
-            onClick={goToNextMonth}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <NavArrowRight className="w-5 h-5 text-gray-600" />
-          </button>
-        </div>
-      </Card>
-
+      {/* Body */}
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">
@@ -707,6 +701,7 @@ export default function CostsPage() {
           </Button>
         </div>
       </Modal>
+      </div>
     </div>
   )
 }
