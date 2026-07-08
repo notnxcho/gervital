@@ -47,8 +47,10 @@ describe('salaryCostForMonth', () => {
 // append to src/services/dashboard/financeSeries.test.js
 import {
   mergeFinanceSeries,
-  standaloneExtraCostForMonth,
+  standaloneExtraForMonth,
+  contingencyForMonth,
   selectIncome,
+  selectExpensesOnly,
   selectExpensesTotal,
   selectMargin,
   deriveKpis,
@@ -94,27 +96,47 @@ describe('mergeFinanceSeries', () => {
   })
 })
 
-describe('standaloneExtraCostForMonth', () => {
-  test('zero when empty/undefined', () => {
-    expect(standaloneExtraCostForMonth([], 2026, 5)).toBe(0)
-    expect(standaloneExtraCostForMonth(undefined, 2026, 5)).toBe(0)
+describe('standaloneExtraForMonth', () => {
+  test('suma standalone con fecha en el mes (sin amortizar)', () => {
+    const costs = [
+      { amount: 10000, date: '2026-06-10' },
+      { amount: 2500, date: '2026-06-28' },
+      { amount: 9999, date: '2026-05-30' }
+    ]
+    expect(standaloneExtraForMonth(costs, 2026, 5)).toBe(12500) // junio = month 5
   })
-  test('monthlyizes a cost in the trailing 12m (amount/12)', () => {
-    // cost 12000 on 2026-03-15, asked for junio 2026 (asOf 2026-06-30) → within 12m
-    expect(standaloneExtraCostForMonth([{ amount: 12000, date: '2026-03-15' }], 2026, 5)).toBeCloseTo(1000, 2)
-  })
-  test('ignores costs outside the trailing 12m', () => {
-    expect(standaloneExtraCostForMonth([{ amount: 12000, date: '2024-01-01' }], 2026, 5)).toBe(0)
+  test('cero si no hay del mes / vacío', () => {
+    expect(standaloneExtraForMonth([], 2026, 5)).toBe(0)
+    expect(standaloneExtraForMonth(undefined, 2026, 5)).toBe(0)
+    expect(standaloneExtraForMonth([{ amount: 100, date: '2026-04-01' }], 2026, 5)).toBe(0)
   })
 })
 
-describe('mergeFinanceSeries standalone extra costs', () => {
-  test('folds monthlyized standalone costs into salaries', () => {
-    const out = mergeFinanceSeries([rpcRow()], [], [], [{ amount: 12000, date: '2026-03-15' }])
-    expect(out[0].salaries).toBeCloseTo(1000, 2)
+describe('contingencyForMonth', () => {
+  const rows = [
+    { amount: 5000, year: 2026, month: 5, categoryName: 'Vehículo' },
+    { amount: 3000, year: 2026, month: 5, categoryName: 'Salud' },
+    { amount: 1000, year: 2026, month: 4, categoryName: 'Vehículo' }
+  ]
+  test('suma contingencia del mes', () => {
+    expect(contingencyForMonth(rows, 2026, 5)).toBe(8000)
   })
-  test('defaults to no standalone costs (backward compatible)', () => {
-    expect(mergeFinanceSeries([rpcRow()], []) [0].salaries).toBe(0)
+  test('cero si vacío/otro mes', () => {
+    expect(contingencyForMonth([], 2026, 5)).toBe(0)
+    expect(contingencyForMonth(rows, 2026, 6)).toBe(0)
+  })
+})
+
+describe('mergeFinanceSeries standalone + contingencia', () => {
+  test('standalone del mes va a salaries (sin amortizar)', () => {
+    const out = mergeFinanceSeries([rpcRow()], [], [], [{ amount: 12000, date: '2026-06-15' }])
+    expect(out[0].salaries).toBe(12000) // junio (month 5), sin empleados
+  })
+  test('contingencia del mes entra en contingencyExpenses y en selectExpensesOnly', () => {
+    const out = mergeFinanceSeries([rpcRow()], [], [], [], [{ amount: 7000, year: 2026, month: 5 }])
+    expect(out[0].contingencyExpenses).toBe(7000)
+    // variableExpenses 300 + contingency 7000 (fixed 0) = 7300
+    expect(selectExpensesOnly(out[0], { fixedBasis: 'cash' })).toBe(7300)
   })
 })
 

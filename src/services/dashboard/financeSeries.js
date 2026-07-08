@@ -1,4 +1,4 @@
-import { currentSalary, costoAnualMensualizado, extraordinarios12m } from '../salaries/salaryCalc'
+import { currentSalary, costoAnualMensualizado } from '../salaries/salaryCalc'
 import { fixedCashForMonth, fixedMonthlyForMonth, isActive, monthlyAmount } from '../expenses/fixedExpenseCalc'
 
 // Last calendar day of a 0-indexed month as 'YYYY-MM-DD' (UTC-safe).
@@ -24,18 +24,28 @@ export function salaryCostForMonth(employees, year, month) {
   return total
 }
 
-// Monthlyized standalone extra costs (no employee) for (year, month): same
-// amortization as per-employee extraordinarios (trailing 12m / 12). These live in
-// employee_extra_costs with employee_id NULL and belong to no employee, so
-// salaryCostForMonth misses them — they are folded into `salaries` here.
-export function standaloneExtraCostForMonth(standaloneCosts, year, month) {
+// Standalone extra costs (no employee) dated in (year, month) — CASH, not amortized.
+// They live in employee_extra_costs with employee_id NULL, are entered per month, and
+// belong to no employee (salaryCostForMonth misses them) → folded into `salaries` here.
+export function standaloneExtraForMonth(standaloneCosts, year, month) {
   if (!standaloneCosts || standaloneCosts.length === 0) return 0
-  return extraordinarios12m(standaloneCosts, lastDayOfMonth(year, month)) / 12
+  const prefix = `${year}-${String(month + 1).padStart(2, '0')}`
+  return standaloneCosts
+    .filter(c => String(c.date || '').slice(0, 7) === prefix)
+    .reduce((s, c) => s + (Number(c.amount) || 0), 0)
 }
 
-// Raw RPC rows + employees + fixed-expense templates + standalone extra costs →
+// Contingency extraordinary expenses for (year, month) — rows carry year/month.
+export function contingencyForMonth(rows, year, month) {
+  if (!rows || rows.length === 0) return 0
+  return rows
+    .filter(r => r.year === year && r.month === month)
+    .reduce((s, r) => s + (Number(r.amount) || 0), 0)
+}
+
+// Raw RPC rows + employees + fixed templates + standalone extras + contingency rows →
 // UI-ready month objects.
-export function mergeFinanceSeries(rpcRows, employees, fixedExpenses = [], standaloneCosts = []) {
+export function mergeFinanceSeries(rpcRows, employees, fixedExpenses = [], standaloneCosts = [], contingencyRows = []) {
   return (rpcRows || []).map(r => ({
     year: r.year,
     month: r.month,
@@ -48,10 +58,11 @@ export function mergeFinanceSeries(rpcRows, employees, fixedExpenses = [], stand
     paidTransportNet: Number(r.paid_trans_net) || 0,
     paidTransportGross: Number(r.paid_trans_gross) || 0,
     variableExpenses: Number(r.expenses_total) || 0,
+    contingencyExpenses: contingencyForMonth(contingencyRows, r.year, r.month),
     fixedCash: fixedCashForMonth(fixedExpenses, r.year, r.month),
     fixedMonthly: fixedMonthlyForMonth(fixedExpenses, r.year, r.month),
     salaries: salaryCostForMonth(employees, r.year, r.month)
-      + standaloneExtraCostForMonth(standaloneCosts, r.year, r.month)
+      + standaloneExtraForMonth(standaloneCosts, r.year, r.month)
   }))
 }
 
@@ -67,10 +78,10 @@ export function selectIncome(row, { basis = 'previsto', withIva = false } = {}) 
     : row.attendanceNet + row.transportNet
 }
 
-// Variable + fixed (basis-dependent), WITHOUT salaries.
+// Variable + fixed (basis-dependent) + contingency, WITHOUT salaries.
 export function selectExpensesOnly(row, { fixedBasis = 'cash' } = {}) {
   const fixed = fixedBasis === 'monthly' ? (row.fixedMonthly || 0) : (row.fixedCash || 0)
-  return (row.variableExpenses || 0) + fixed
+  return (row.variableExpenses || 0) + fixed + (row.contingencyExpenses || 0)
 }
 
 // Total monthly expenses = variable + fixed (basis) + monthlyized salaries.
@@ -125,7 +136,7 @@ export function lineRevenueKpis(row, line, clients, { withIva = false } = {}) {
 
 // Gasto del mes desglosado por categoría: variables (mes) + fijos mensualizados (activos)
 // + sueldos como categoría propia. Devuelve [{ label, value }] ordenado desc.
-export function expensesByCategory({ variableRows = [], fixedTemplates = [], salaries = 0 } = {}, year, month) {
+export function expensesByCategory({ variableRows = [], fixedTemplates = [], extraordinaryRows = [], salaries = 0 } = {}, year, month) {
   const totals = new Map()
   const add = (name, amount) => {
     if (!amount) return
@@ -136,6 +147,7 @@ export function expensesByCategory({ variableRows = [], fixedTemplates = [], sal
   for (const t of fixedTemplates) {
     if (isActive(t, year, month)) add(t.categoryName, monthlyAmount(t))
   }
+  for (const x of extraordinaryRows) add(x.categoryName, Number(x.amount) || 0)
   add('Sueldos', salaries || 0)
   return [...totals.entries()]
     .map(([label, value]) => ({ label, value }))
