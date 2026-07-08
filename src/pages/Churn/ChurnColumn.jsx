@@ -2,7 +2,7 @@ import { useDroppable } from '@dnd-kit/core'
 import ChurnCard from './ChurnCard'
 
 // Droppable pipeline column. data shape: { type: 'churn-column', stage }.
-export default function ChurnColumn({ stage, label, color, cards, onCardClick }) {
+export default function ChurnColumn({ stage, label, color, cards, onCardClick, reasonsByKey }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `column-${stage}`,
     data: { type: 'churn-column', stage }
@@ -30,7 +30,7 @@ export default function ChurnColumn({ stage, label, color, cards, onCardClick })
           </div>
         ) : (
           cards.map(card => (
-            <ChurnCard key={card.clientId} card={card} onClick={onCardClick} />
+            <ChurnCard key={card.clientId} card={card} onClick={onCardClick} reasonsByKey={reasonsByKey} />
           ))
         )}
       </div>

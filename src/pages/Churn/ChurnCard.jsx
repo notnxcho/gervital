@@ -1,23 +1,25 @@
 import { useDraggable } from '@dnd-kit/core'
 import { formatCurrency } from '../../utils/format'
-import { REASON_CONFIG, TIER_HEX, planSubtitle } from './churnConstants'
+import { TIER_HEX, planSubtitle } from './churnConstants'
 
-// Small colored badge for the deactivation reason.
-function ReasonBadge({ reason }) {
-  const cfg = REASON_CONFIG[reason] || REASON_CONFIG.other
+// Small colored badge for the deactivation reason. `info` is the resolved
+// reason from `reasonsByKey`; falls back to the raw key when unresolved.
+function ReasonBadge({ info, reasonKey }) {
+  const r = info || { label: reasonKey || 'Sin motivo', color: '#94a3b8', description: '' }
   return (
     <span
       className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold"
-      style={{ background: `${cfg.color}1a`, color: cfg.color }}
+      style={{ background: `${r.color}1a`, color: r.color }}
+      title={r.description || ''}
     >
-      {cfg.label}
+      {r.label}
     </span>
   )
 }
 
 // Draggable churn card. `overlay` renders the same visual without the drag hooks
 // (used inside DragOverlay). data shape: { type: 'churn-card', clientId, stage }.
-export default function ChurnCard({ card, onClick, overlay = false }) {
+export default function ChurnCard({ card, onClick, overlay = false, reasonsByKey = {} }) {
   const draggable = useDraggable({
     id: `churn-${card.clientId}`,
     data: { type: 'churn-card', clientId: card.clientId, stage: card.stage },
@@ -61,7 +63,7 @@ export default function ChurnCard({ card, onClick, overlay = false }) {
 
       {/* Reason badge */}
       <div className="mb-2.5">
-        <ReasonBadge reason={card.reason} />
+        <ReasonBadge info={reasonsByKey[card.reason]} reasonKey={card.reason} />
       </div>
 
       {/* Footer: days since + MRR lost */}

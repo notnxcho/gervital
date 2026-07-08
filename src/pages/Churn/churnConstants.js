@@ -10,18 +10,6 @@ export const STAGES = [
 
 export const STAGE_LABEL = Object.fromEntries(STAGES.map(s => [s.key, s.label]))
 
-// Deactivation reasons → Spanish label + badge color.
-export const REASON_CONFIG = {
-  death: { label: 'Fallecimiento', color: '#64748b' },
-  transfer_to_other_center: { label: 'Cambio de institución', color: '#7c3aed' },
-  relocation: { label: 'Mudanza', color: '#0891b2' },
-  health_decline: { label: 'Deterioro / internación', color: '#dc2626' },
-  family_decision: { label: 'Decisión familiar', color: '#d97706' },
-  financial: { label: 'Razones económicas', color: '#2563eb' },
-  service_dissatisfaction: { label: 'Insatisfacción', color: '#e11d48' },
-  other: { label: 'Otro', color: '#94a3b8' }
-}
-
 // Cognitive tier → color hex.
 export const TIER_HEX = {
   A: '#16a34a',

@@ -7,7 +7,7 @@ import { reactivateClient } from '../../services/clients/clientService'
 import { formatCurrency } from '../../utils/format'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
-import { REASON_CONFIG, STAGE_LABEL, planSubtitle } from './churnConstants'
+import { STAGE_LABEL, planSubtitle } from './churnConstants'
 
 // A single labeled field in the details grid.
 function Field({ label, value, valueClass = 'text-gray-900' }) {
@@ -37,7 +37,7 @@ function fmtRelative(iso) {
   }
 }
 
-export default function ChurnCardModal({ card, isOpen, onClose, onReactivated }) {
+export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, reasonsByKey = {} }) {
   const { user } = useAuth()
   const [notes, setNotes] = useState([])
   const [loadingNotes, setLoadingNotes] = useState(false)
@@ -69,7 +69,7 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated })
 
   if (!card) return null
 
-  const reasonCfg = REASON_CONFIG[card.reason] || REASON_CONFIG.other
+  const reasonCfg = reasonsByKey[card.reason] || { label: card.reason || 'Sin motivo', color: '#94a3b8', description: '' }
 
   const handleAddNote = async () => {
     const trimmed = body.trim()
@@ -120,7 +120,7 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated })
         <div className="grid grid-cols-2 gap-4">
           <Field
             label="Motivo"
-            value={reasonCfg.label}
+            value={<span title={reasonCfg.description || ''}>{reasonCfg.label}</span>}
             valueClass=""
           />
           <Field label="Fecha de baja" value={fmtDate(card.deactivationDate)} />
