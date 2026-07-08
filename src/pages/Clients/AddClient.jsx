@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency } from '../../utils/format'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Check, Plus, Trash, Bus } from 'iconoir-react'
+import { ArrowLeft, Check, Plus, Trash, Bus, MapPin } from 'iconoir-react'
 import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion, syncClientToBiller, voidPendingInvoices } from '../../services/api'
-import { geocodeAndCalculateDistance } from '../../services/clients/geocodingService'
+import LocationPickerModal from './LocationPickerModal'
 import { getPlanPricing, getPlanPriceSync } from '../../services/pricing/pricingService'
 import { getTransportPricing, getTransportPriceSync } from '../../services/pricing/transportPricingService'
 import Button from '../../components/ui/Button'
@@ -96,6 +96,8 @@ const INITIAL_FORM_DATA = {
   doorbell: '',
   concierge: '',
   distanceRange: '',
+  latitude: null,
+  longitude: null,
   // Plan
   frequency: '1',
   schedule: 'morning',
@@ -131,7 +133,7 @@ export default function AddClient() {
   const [transportPricingData, setTransportPricingData] = useState([])
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
-  const [geocoding, setGeocoding] = useState(false)
+  const [showLocationModal, setShowLocationModal] = useState(false)
   const [planEffectiveFrom, setPlanEffectiveFrom] = useState('')
   const [planFloorMonth, setPlanFloorMonth] = useState('')
 
@@ -173,6 +175,8 @@ export default function AddClient() {
           doorbell: client.address?.doorbell || '',
           concierge: client.address?.concierge || '',
           distanceRange: client.address?.distanceRange || '',
+          latitude: client.address?.latitude ?? null,
+          longitude: client.address?.longitude ?? null,
           frequency: String(client.plan?.frequency || 1),
           schedule: client.plan?.schedule || 'morning',
           hasTransport: client.plan?.hasTransport || false,
@@ -212,20 +216,6 @@ export default function AddClient() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }))
     }
-  }
-
-  const handleStreetBlur = async () => {
-    if (!formData.street || formData.street.trim().length < 5) return
-    setGeocoding(true)
-    try {
-      const geo = await geocodeAndCalculateDistance(formData.street)
-      if (geo.distanceRange) {
-        updateField('distanceRange', geo.distanceRange)
-      }
-    } catch (e) {
-      console.warn('Geocoding on blur failed:', e)
-    }
-    setGeocoding(false)
   }
 
   const toggleDay = (day) => {
@@ -306,12 +296,6 @@ export default function AddClient() {
     
     setLoading(true)
     try {
-      // Geocode address to get lat/lng and auto-calculate distance range
-      let geoData = { lat: null, lng: null, distanceRange: null }
-      if (formData.street) {
-        geoData = await geocodeAndCalculateDistance(formData.street)
-      }
-
       const clientData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -338,9 +322,9 @@ export default function AddClient() {
           accessNotes: formData.accessNotes,
           doorbell: formData.doorbell,
           concierge: formData.concierge,
-          latitude: geoData.lat,
-          longitude: geoData.lng,
-          distanceRange: formData.distanceRange || geoData.distanceRange
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          distanceRange: formData.distanceRange
         },
         medicalInfo: {
           dietaryRestrictions: formData.dietaryRestrictions,
@@ -366,8 +350,8 @@ export default function AddClient() {
           assignedDays: formData.assignedDays,
           distanceRange: clientData.address.distanceRange
         })
-        if (geoData.lat && geoData.lng) {
-          await updateClientAddressCoords(id, geoData.lat, geoData.lng).catch(console.error)
+        if (formData.latitude != null && formData.longitude != null) {
+          await updateClientAddressCoords(id, formData.latitude, formData.longitude).catch(console.error)
         }
         if (avatarFile) {
           await uploadClientAvatar(id, avatarFile).catch(console.error)
@@ -384,8 +368,8 @@ export default function AddClient() {
         navigate(`/clientes/${id}`)
       } else {
         const newClient = await createClient(clientData)
-        if (geoData.lat && geoData.lng && newClient?.id) {
-          await updateClientAddressCoords(newClient.id, geoData.lat, geoData.lng).catch(console.error)
+        if (formData.latitude != null && formData.longitude != null && newClient?.id) {
+          await updateClientAddressCoords(newClient.id, formData.latitude, formData.longitude).catch(console.error)
         }
         if (avatarFile && newClient?.id) {
           await uploadClientAvatar(newClient.id, avatarFile).catch(console.error)
@@ -694,11 +678,28 @@ export default function AddClient() {
                     label="Dirección"
                     value={formData.street}
                     onChange={(e) => updateField('street', e.target.value)}
-                    onBlur={handleStreetBlur}
                     error={errors.street}
                     placeholder="18 de Julio 1234, Montevideo"
                     className="col-span-2"
                   />
+                  <div className="col-span-2 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowLocationModal(true)}
+                      disabled={!formData.street || formData.street.trim().length < 5}
+                      className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      {formData.latitude != null ? 'Ajustar ubicación en el mapa' : 'Confirmar ubicación en el mapa'}
+                    </button>
+                    {formData.latitude != null && (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700">
+                        <Check className="h-3.5 w-3.5" />
+                        Ubicación confirmada
+                        {formData.distanceRange ? ` · ${DISTANCE_LABELS[formData.distanceRange]}` : ''}
+                      </span>
+                    )}
+                  </div>
                   <Input
                     label="Timbre"
                     value={formData.doorbell}
@@ -712,7 +713,7 @@ export default function AddClient() {
                     placeholder="De 8 a 20hs"
                   />
                   <Select
-                    label={geocoding ? 'Calculando distancia...' : 'Distancia al club'}
+                    label="Distancia al club"
                     value={formData.distanceRange}
                     onChange={(e) => updateField('distanceRange', e.target.value)}
                     options={[
@@ -1030,6 +1031,21 @@ export default function AddClient() {
           </div>
         </CardContent>
       </Card>
+
+      <LocationPickerModal
+        isOpen={showLocationModal}
+        address={formData.street}
+        initialCoords={formData.latitude != null && formData.longitude != null
+          ? { lat: formData.latitude, lng: formData.longitude }
+          : null}
+        onClose={() => setShowLocationModal(false)}
+        onConfirm={(res) => {
+          updateField('latitude', res.lat)
+          updateField('longitude', res.lng)
+          if (res.distanceRange) updateField('distanceRange', res.distanceRange)
+          setShowLocationModal(false)
+        }}
+      />
     </div>
   )
 }
