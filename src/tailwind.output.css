@@ -1089,6 +1089,10 @@ video {
   width: 214px;
 }
 
+.w-\[220px\] {
+  width: 220px;
+}
+
 .w-\[230px\] {
   width: 230px;
 }
@@ -1318,6 +1322,10 @@ video {
 
 .grid-rows-\[1fr\] {
   grid-template-rows: 1fr;
+}
+
+.flex-row {
+  flex-direction: row;
 }
 
 .flex-col {

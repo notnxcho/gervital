@@ -16,6 +16,10 @@ import ChurnCardModal from './ChurnCardModal'
 import ReasonsManagerModal from './ReasonsManagerModal'
 import Button from '../../components/ui/Button'
 
+// "Nueva baja" se muestra como bandeja horizontal arriba; el resto, como columnas.
+const NEW_STAGE = STAGES.find(s => s.key === 'new')
+const COLUMN_STAGES = STAGES.filter(s => s.key !== 'new')
+
 export default function ChurnBoard() {
   const { user } = useAuth()
   const [cards, setCards] = useState([])
@@ -132,8 +136,24 @@ export default function ChurnBoard() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
+          {/* Bandeja de nuevas bajas: solo se muestra si hay. De acá se toman
+              las tarjetas para asignarlas a la columna que corresponda. */}
+          {NEW_STAGE && cardsByStage.new.length > 0 && (
+            <div className="mb-6">
+              <ChurnColumn
+                horizontal
+                stage={NEW_STAGE.key}
+                label={NEW_STAGE.label}
+                color={NEW_STAGE.color}
+                cards={cardsByStage.new}
+                onCardClick={setSelectedCard}
+                reasonsByKey={reasonsByKey}
+              />
+            </div>
+          )}
+
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {STAGES.map(stage => (
+            {COLUMN_STAGES.map(stage => (
               <ChurnColumn
                 key={stage.key}
                 stage={stage.key}
