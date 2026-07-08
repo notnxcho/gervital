@@ -57,7 +57,10 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
   const [range, setRange] = useState(12)
   const [basis, setBasis] = useState('previsto')
   const [withIva, setWithIva] = useState(false)
-  const [active, setActive] = useState({ asistencia: true, transporte: true, gastos: true, sueldos: false, margen: true })
+  // Sueldos ON by default: the expense bar stacks gastos + sueldos, so the visible bar
+  // equals the tooltip total (selectExpensesTotal). With it off, salaries — usually the
+  // bulk of the cost — vanished from the bar, making it look tiny vs income.
+  const [active, setActive] = useState({ asistencia: true, transporte: true, gastos: true, sueldos: true, margen: true })
   const [hover, setHover] = useState(null) // hovered month index within `data`
 
   // Keep KPI row in sync with the income toggles.
@@ -166,12 +169,12 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
         <div>
           <h2 className="text-[15px] font-bold text-gray-900">Ingresos vs Gastos</h2>
           <p className="text-xs text-gray-400 mt-0.5">
-            {range} meses visibles · {withIva ? 'con IVA' : 'sin IVA'} · {basis === 'cobrado' ? 'cobrado' : 'previsto'}
+            {range} meses visibles · {withIva ? 'con IVA' : 'sin IVA'} · {basis === 'cobrado' ? 'cobrado' : 'previsto'} · gastos en caja
           </p>
         </div>
         {focal && (
           <div className="text-right">
-            <p className="text-[11px] text-gray-400 capitalize">Margen · {MONTH_LABELS[selected.month]}</p>
+            <p className="text-[11px] text-gray-400 capitalize">Margen (caja) · {MONTH_LABELS[selected.month]}</p>
             <div className="flex items-center justify-end gap-2 mt-0.5">
               <span className={`text-2xl font-semibold tracking-tight tabular-nums ${focal.margin >= 0 ? 'text-gray-900' : 'text-rose-600'}`}>
                 {formatCurrency(focal.margin)}
@@ -305,8 +308,8 @@ export default function MonthlyFinanceChart({ series, selected, onSelectMonth, o
                     {MONTH_LABELS[tipRow.month]} {tipRow.year}
                   </p>
                   <TipRow color={COLORS.asistencia} label="Ingreso" value={formatCurrency(selectIncome(tipRow, opts))} />
-                  <TipRow color={COLORS.gastos} label="Gastos" value={formatCurrency(selectExpensesTotal(tipRow, opts))} />
-                  <TipRow color={COLORS.margen} label="Margen" value={formatCurrency(selectMargin(tipRow, opts))} />
+                  <TipRow color={COLORS.gastos} label="Gastos (caja)" value={formatCurrency(selectExpensesTotal(tipRow, opts))} />
+                  <TipRow color={COLORS.margen} label="Margen (caja)" value={formatCurrency(selectMargin(tipRow, opts))} />
                 </div>
               </div>
             )}
@@ -338,7 +341,7 @@ function TipRow({ color, label, value }) {
   return (
     <div className="flex items-center gap-2 text-[11px]">
       <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-      <span className="text-gray-400 w-12">{label}</span>
+      <span className="text-gray-400 w-24">{label}</span>
       <span className="text-gray-900 font-semibold tabular-nums">{value}</span>
     </div>
   )

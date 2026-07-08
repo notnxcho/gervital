@@ -65,13 +65,13 @@ export default function FinanceKpis({ kpis, extra }) {
           label="Gastos"
           value={formatCurrency(kpis.gastos)}
           pill={<DeltaPill current={kpis.gastos} delta={kpis.deltas.gastos} invert />}
-          sub="vs mes anterior"
+          sub="mensualizado · vs mes anterior"
         />
         <StatCard
           label="Margen"
           value={formatCurrency(kpis.margen)}
           valueClass={kpis.margen < 0 ? 'text-rose-600' : 'text-gray-900'}
-          sub={extra?.marginPct != null ? `${extra.marginPct.toFixed(0)}% del ingreso` : 'Ingreso − Gastos'}
+          sub={extra?.marginPct != null ? `mensualizado · ${extra.marginPct.toFixed(0)}% del ingreso` : 'mensualizado · Ingreso − Gastos'}
         />
       </div>
 
