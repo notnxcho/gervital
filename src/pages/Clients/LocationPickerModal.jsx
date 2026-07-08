@@ -48,36 +48,42 @@ export default function LocationPickerModal({ isOpen, address, initialCoords, on
     return distanceToRange(km)
   }, [])
 
+  // Depend on primitive coords, not the object literal, so a parent re-render while
+  // the modal is open (e.g. mid-drag) does not re-run the effect and snap the pin back.
+  const initLat = initialCoords?.lat ?? null
+  const initLng = initialCoords?.lng ?? null
+
   // On open: resolve the initial pin (stored coords > geocoded address > club).
   useEffect(() => {
     if (!isOpen || !isLoaded) return
     let cancelled = false
     setStatus('loading')
     geocoderRef.current = geocoderRef.current || new window.google.maps.Geocoder()
+    const stored = initLat != null && initLng != null ? { lat: initLat, lng: initLng } : null
 
     const run = async () => {
       let geocoded = null
       let foundLabel = ''
-      if (!initialCoords) {
+      if (!stored) {
         const g = await geocodeWithGoogle(geocoderRef.current, address)
         if (g) {
           geocoded = { lat: g.lat, lng: g.lng }
           foundLabel = g.formattedAddress
         }
       }
-      const center = resolveInitialCenter(initialCoords, geocoded, CLUB_LOCATION)
-      if (initialCoords) {
+      const center = resolveInitialCenter(stored, geocoded, CLUB_LOCATION)
+      if (stored) {
         foundLabel = await reverseGeocode(geocoderRef.current, center) || ''
       }
       if (cancelled) return
       setCoords(center)
       setDistanceRange(computeRange(center.lat, center.lng))
       setFormattedAddress(foundLabel)
-      setStatus(!initialCoords && !geocoded ? 'not_found' : 'ready')
+      setStatus(!stored && !geocoded ? 'not_found' : 'ready')
     }
     run()
     return () => { cancelled = true }
-  }, [isOpen, isLoaded, address, initialCoords, computeRange])
+  }, [isOpen, isLoaded, address, initLat, initLng, computeRange])
 
   const onDragEnd = useCallback(async (e) => {
     const lat = e.latLng.lat()
