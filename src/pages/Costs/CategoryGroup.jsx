@@ -1,11 +1,35 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavArrowDown, NavArrowRight } from 'iconoir-react'
 import { formatCurrency } from '../../utils/format'
 
+const STORAGE_PREFIX = 'gervital.costs.categoryOpen.'
+
+// Read persisted open/closed preference for this group (falls back to defaultOpen).
+function readStoredOpen(storageKey, defaultOpen) {
+  if (!storageKey) return defaultOpen
+  try {
+    const stored = localStorage.getItem(STORAGE_PREFIX + storageKey)
+    if (stored === null) return defaultOpen
+    return stored === '1'
+  } catch {
+    return defaultOpen
+  }
+}
+
 // Collapsible category header wrapping already-rendered item cards.
-export default function CategoryGroup({ label, count, subtotal, defaultOpen = true, children }) {
-  const [open, setOpen] = useState(defaultOpen)
+// When `storageKey` is provided, the open/closed state persists to localStorage.
+export default function CategoryGroup({ label, count, subtotal, defaultOpen = true, storageKey, children }) {
+  const [open, setOpen] = useState(() => readStoredOpen(storageKey, defaultOpen))
   const showSubtotal = subtotal != null
+
+  useEffect(() => {
+    if (!storageKey) return
+    try {
+      localStorage.setItem(STORAGE_PREFIX + storageKey, open ? '1' : '0')
+    } catch {
+      // Ignore storage errors (e.g. private mode, quota)
+    }
+  }, [storageKey, open])
 
   return (
     <div className="mb-4">

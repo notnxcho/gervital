@@ -357,7 +357,7 @@ export default function CostsPage() {
           <Card className="p-6 text-center"><p className="text-gray-500">No hay gastos extraordinarios este mes</p></Card>
         ) : (
           extraordinaryGroups.map(group => (
-            <CategoryGroup key={group.key} label={group.label} count={group.items.length} subtotal={group.subtotal}>
+            <CategoryGroup key={group.key} storageKey={`extraordinary.${group.key}`} label={group.label} count={group.items.length} subtotal={group.subtotal}>
               {group.items.map(expense => (
                 <VariableExpenseCard
                   key={expense.id}
@@ -396,7 +396,7 @@ export default function CostsPage() {
               <Card className="p-6 text-center"><p className="text-gray-500">Sin gastos fijos</p></Card>
             ) : (
               fixedGroups.map(group => (
-                <CategoryGroup key={group.key} label={group.label} count={group.items.length} subtotal={group.subtotal}>
+                <CategoryGroup key={group.key} storageKey={`fixed.${group.key}`} label={group.label} count={group.items.length} subtotal={group.subtotal}>
                   {group.items.map(f => (
                     <FixedExpenseCard
                       key={f.id}
@@ -435,7 +435,7 @@ export default function CostsPage() {
               <Card className="p-6 text-center"><p className="text-gray-500">No hay gastos variables este mes</p></Card>
             ) : (
               variableGroups.map(group => (
-                <CategoryGroup key={group.key} label={group.label} count={group.items.length} subtotal={group.subtotal}>
+                <CategoryGroup key={group.key} storageKey={`variable.${group.key}`} label={group.label} count={group.items.length} subtotal={group.subtotal}>
                   {group.items.map(expense => (
                     <VariableExpenseCard
                       key={expense.id}
@@ -475,7 +475,7 @@ export default function CostsPage() {
           <Card className="p-6 text-center"><p className="text-gray-500">No hay proveedores</p></Card>
         ) : (
           supplierGroups.map(group => (
-            <CategoryGroup key={group.key} label={group.label} count={group.items.length}>
+            <CategoryGroup key={group.key} storageKey={`suppliers.${group.key}`} label={group.label} count={group.items.length}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {group.items.map(supplier => (
                   <Card key={supplier.id} className="p-4">
