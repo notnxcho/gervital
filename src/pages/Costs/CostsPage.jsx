@@ -88,6 +88,7 @@ export default function CostsPage() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const [fixedModal, setFixedModal] = useState({ open: false, item: null })
   const [variableModal, setVariableModal] = useState({ open: false, item: null })
+  const [copyModalOpen, setCopyModalOpen] = useState(false)
   const [extraordinaryModal, setExtraordinaryModal] = useState({ open: false, item: null })
   const [employeeModal, setEmployeeModal] = useState({ open: false, employee: null })
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false)
@@ -143,6 +144,10 @@ export default function CostsPage() {
   const extraordinaryTotal = extraordinaryExpenses.reduce((sum, e) => sum + Number(e.amount), 0)
   const contingencyLimitAmount = contingencyLimit(fixedMonthlyThisMonth, contingencyPct)
   const totalCashMonth = variableTotal + fixedCashThisMonth + extraordinaryTotal
+
+  // Standalone extra costs (no employee) belong to a month via their date.
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`
+  const standaloneThisMonth = standaloneCosts.filter(c => String(c.date || '').slice(0, 7) === monthPrefix)
 
   // Filter option lists derived from loaded data.
   const categoryOptions = categories.map(c => ({ value: c.id, label: c.name }))
@@ -412,10 +417,15 @@ export default function CostsPage() {
 
           {/* Gastos variables (mes) */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-              Gastos variables
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                Gastos variables
+              </h3>
+              <Button variant="secondary" onClick={() => setCopyModalOpen(true)}>
+                Copiar del mes pasado
+              </Button>
+            </div>
             <CostsFilterBar
               filters={variableFilters}
               onChange={setVariableFilters}
@@ -561,11 +571,11 @@ export default function CostsPage() {
                 Agregar
               </Button>
             </div>
-            {standaloneCosts.length === 0 ? (
-              <Card className="p-6 text-center"><p className="text-gray-500">Sin gastos extraordinarios</p></Card>
+            {standaloneThisMonth.length === 0 ? (
+              <Card className="p-6 text-center"><p className="text-gray-500">Sin gastos extraordinarios este mes</p></Card>
             ) : (
               <div className="space-y-3">
-                {standaloneCosts.map(c => (
+                {standaloneThisMonth.map(c => (
                   <Card key={c.id} className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -618,6 +628,15 @@ export default function CostsPage() {
         selectedYear={year}
         selectedMonth={month}
         onSave={loadData}
+      />
+
+      {/* Copy last month's variable expenses */}
+      <CopyLastMonthVariablesModal
+        isOpen={copyModalOpen}
+        onClose={() => setCopyModalOpen(false)}
+        year={year}
+        month={month}
+        onSaved={loadData}
       />
 
       {/* Extraordinary expense modal */}
@@ -1036,6 +1055,100 @@ function VariableExpenseModal({ isOpen, onClose, expense, categories, suppliers,
           <Button type="submit" loading={loading}>{expense ? 'Guardar cambios' : 'Registrar gasto'}</Button>
         </div>
       </form>
+    </Modal>
+  )
+}
+
+// Copy last month's variable expenses into the current month. Preview list with
+// inline-editable amounts + per-row include toggle; confirm creates them.
+function CopyLastMonthVariablesModal({ isOpen, onClose, year, month, onSaved }) {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const prev = new Date(year, month - 1, 1)
+  const prevYear = prev.getFullYear()
+  const prevMonth = prev.getMonth()
+
+  useEffect(() => {
+    if (!isOpen) return
+    setLoading(true)
+    getExpensesByMonth(prevYear, prevMonth)
+      .then(data => setRows(data.map(e => ({
+        include: true,
+        description: e.description,
+        categoryId: e.categoryId,
+        categoryName: e.categoryName,
+        supplierId: e.supplierId,
+        amount: String(e.amount ?? '')
+      }))))
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, prevYear, prevMonth])
+
+  const setRow = (i, patch) => setRows(rs => rs.map((r, idx) => idx === i ? { ...r, ...patch } : r))
+  const selected = rows.filter(r => r.include && parseFloat(r.amount) > 0)
+
+  const confirm = async () => {
+    setSaving(true)
+    const date = format(new Date(year, month, 1), 'yyyy-MM-dd')
+    try {
+      for (const r of selected) {
+        await createExpense({
+          supplierId: r.supplierId || null,
+          categoryId: r.categoryId || null,
+          description: r.description,
+          amount: parseFloat(r.amount),
+          date,
+          notes: '',
+          year,
+          month
+        })
+      }
+      onSaved()
+      onClose()
+    } catch (err) {
+      alert('Error al copiar gastos: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const prevLabel = format(prev, 'MMMM yyyy', { locale: es })
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Copiar gastos variables del mes pasado">
+      <p className="text-sm text-gray-500 mb-3 capitalize">Desde {prevLabel}</p>
+      {loading ? (
+        <p className="text-gray-500 py-6 text-center">Cargando…</p>
+      ) : rows.length === 0 ? (
+        <p className="text-gray-500 py-6 text-center">No hubo gastos variables el mes pasado.</p>
+      ) : (
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {rows.map((r, i) => (
+            <div key={i} className={`flex items-center gap-3 border border-gray-100 rounded-lg px-3 py-2 ${r.include ? '' : 'opacity-50'}`}>
+              <input type="checkbox" checked={r.include} onChange={(e) => setRow(i, { include: e.target.checked })} />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900 truncate">{r.description}</p>
+                {r.categoryName && <p className="text-xs text-gray-400">{r.categoryName}</p>}
+              </div>
+              <input
+                type="number"
+                value={r.amount}
+                onChange={(e) => setRow(i, { amount: e.target.value })}
+                className="w-28 px-2 py-1 border border-gray-300 rounded-lg text-sm text-right"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-3 justify-end pt-4">
+        <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
+        <Button type="button" onClick={confirm} loading={saving} disabled={selected.length === 0}>
+          Agregar {selected.length > 0 ? `(${selected.length})` : ''}
+        </Button>
+      </div>
     </Modal>
   )
 }

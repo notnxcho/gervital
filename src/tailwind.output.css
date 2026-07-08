@@ -937,6 +937,10 @@ video {
   max-height: 20rem;
 }
 
+.max-h-96 {
+  max-height: 24rem;
+}
+
 .max-h-\[50vh\] {
   max-height: 50vh;
 }
@@ -1003,6 +1007,10 @@ video {
 
 .w-24 {
   width: 6rem;
+}
+
+.w-28 {
+  width: 7rem;
 }
 
 .w-3 {
@@ -2699,6 +2707,10 @@ video {
 
 .opacity-40 {
   opacity: 0.4;
+}
+
+.opacity-50 {
+  opacity: 0.5;
 }
 
 .opacity-60 {
