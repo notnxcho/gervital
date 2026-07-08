@@ -2247,6 +2247,10 @@ video {
   padding-left: 1.5rem;
 }
 
+.pl-7 {
+  padding-left: 1.75rem;
+}
+
 .pl-8 {
   padding-left: 2rem;
 }
@@ -2677,6 +2681,11 @@ video {
 .text-violet-500 {
   --tw-text-opacity: 1;
   color: rgb(139 92 246 / var(--tw-text-opacity, 1));
+}
+
+.text-violet-600 {
+  --tw-text-opacity: 1;
+  color: rgb(124 58 237 / var(--tw-text-opacity, 1));
 }
 
 .text-violet-700 {
@@ -3374,6 +3383,10 @@ video {
 
   .sm\:block {
     display: block;
+  }
+
+  .sm\:w-48 {
+    width: 12rem;
   }
 
   .sm\:grid-cols-2 {

@@ -6,7 +6,7 @@ import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
 import { formatCurrency } from '../../utils/format'
 import { ordinalOf, eligibleMonths, isEligible, validateDiscountRange } from '../../services/invoices/discountRange'
-import { applyPlanDiscount, calculateMonthBilling } from '../../services/api'
+import { applyPlanDiscount, calculateMonthBilling, markMonthPaid } from '../../services/api'
 
 const PRESETS = [10, 15, 20, 25]
 
@@ -43,6 +43,8 @@ export default function ApplyDiscountModal({ isOpen, onClose, client, invoices, 
   const [head, setHead] = useState(null)
   const [percent, setPercent] = useState(15)
   const [amounts, setAmounts] = useState({}) // ordinal → base attendance gross
+  const [markPaid, setMarkPaid] = useState(false)
+  const [paidDate, setPaidDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -53,6 +55,8 @@ export default function ApplyDiscountModal({ isOpen, onClose, client, invoices, 
     setAnchor(null)
     setHead(null)
     setPercent(15)
+    setMarkPaid(false)
+    setPaidDate(format(new Date(), 'yyyy-MM-dd'))
     setError(null)
     if (eligible.length === 0) return
     setLoading(true)
@@ -108,12 +112,20 @@ export default function ApplyDiscountModal({ isOpen, onClose, client, invoices, 
 
   const handleApply = async () => {
     if (!validation.valid) return
+    if (markPaid && !paidDate) { setError('Ingresá la fecha de cobro'); return }
     const s = ymFromOrdinal(range.start)
     const e = ymFromOrdinal(range.end)
     setSubmitting(true)
     setError(null)
     try {
       await applyPlanDiscount(client.id, s.year, s.month, e.year, e.month, pct)
+      if (markPaid) {
+        // Discount is applied first, so the paid amount (null → live billing) already
+        // reflects it. Same paidDate for every selected month.
+        await Promise.all(validation.months.map(inv =>
+          markMonthPaid(client.id, inv.year, inv.month, null, null, null, paidDate)
+        ))
+      }
       await onRefresh()
       onClose()
     } catch (err) {
@@ -254,6 +266,35 @@ export default function ApplyDiscountModal({ isOpen, onClose, client, invoices, 
             </div>
           )}
 
+          {/* Optional — mark selected months as paid */}
+          {summary && (
+            <div className="rounded-xl border border-gray-200 p-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={markPaid}
+                  onChange={e => setMarkPaid(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                />
+                <span className="text-sm text-gray-700">
+                  Marcar {rangeCount === 1 ? 'el mes' : `los ${rangeCount} meses`} como cobrados
+                  <span className="block text-xs text-gray-400">Se cobran con el monto ya descontado.</span>
+                </span>
+              </label>
+              {markPaid && (
+                <div className="mt-3 pl-7">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Fecha de cobro</label>
+                  <input
+                    type="date"
+                    value={paidDate}
+                    onChange={e => setPaidDate(e.target.value)}
+                    className="w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           {error && (
             <div className="p-2.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg">{error}</div>
           )}
@@ -261,7 +302,11 @@ export default function ApplyDiscountModal({ isOpen, onClose, client, invoices, 
           <div className="flex justify-end gap-2 pt-1 border-t border-gray-100">
             <Button variant="secondary" onClick={onClose} disabled={submitting}>Cancelar</Button>
             <Button onClick={handleApply} loading={submitting} disabled={!validation.valid}>
-              {validation.valid ? `Aplicar ${pct}% a ${rangeCount} meses` : 'Aplicar descuento'}
+              {!validation.valid
+                ? 'Aplicar descuento'
+                : markPaid
+                  ? `Aplicar ${pct}% y cobrar ${rangeCount} ${rangeCount === 1 ? 'mes' : 'meses'}`
+                  : `Aplicar ${pct}% a ${rangeCount} meses`}
             </Button>
           </div>
         </div>
