@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { formatCurrency } from '../../utils/format'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useJsApiLoader } from '@react-google-maps/api'
 import { ArrowLeft, Check, Plus, Trash, Bus, MapPin } from 'iconoir-react'
 import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion, syncClientToBiller, voidPendingInvoices } from '../../services/api'
 import LocationPickerModal from './LocationPickerModal'
+import { geocodeWithGoogle, haversineKm, distanceToRange } from '../../services/clients/geocodingService'
+import { CLUB_LOCATION } from '../../services/transport/transportConstants'
 import { getPlanPricing, getPlanPriceSync } from '../../services/pricing/pricingService'
 import { getTransportPricing, getTransportPriceSync } from '../../services/pricing/transportPricingService'
 import Button from '../../components/ui/Button'
@@ -134,8 +137,16 @@ export default function AddClient() {
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [showLocationModal, setShowLocationModal] = useState(false)
+  const [geocoding, setGeocoding] = useState(false)
   const [planEffectiveFrom, setPlanEffectiveFrom] = useState('')
   const [planFloorMonth, setPlanFloorMonth] = useState('')
+  const geocoderRef = useRef(null)
+  // Street value the current coords were derived from — lets us re-geocode only when
+  // the address actually changes, preserving a manual pin correction otherwise.
+  const lastGeocodedStreetRef = useRef('')
+  const { isLoaded: mapsLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ''
+  })
 
   useEffect(() => {
     getPlanPricing()
@@ -155,6 +166,8 @@ export default function AddClient() {
         if (client.avatarUrl) {
           setAvatarPreview(client.avatarUrl)
         }
+        // Seed with the loaded street so the first blur (without an edit) keeps stored coords.
+        lastGeocodedStreetRef.current = client.address?.street?.trim() || ''
         setFormData({
           firstName: client.firstName || '',
           lastName: client.lastName || '',
@@ -216,6 +229,22 @@ export default function AddClient() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }))
     }
+  }
+
+  // On blur, geocode the typed address with Google and auto-fill coords + distance range.
+  // Skips when the street is unchanged so a manual pin correction (from the map modal) is kept.
+  const handleStreetBlur = async () => {
+    const street = formData.street?.trim()
+    if (!street || street.length < 5 || !mapsLoaded) return
+    if (street === lastGeocodedStreetRef.current) return
+    geocoderRef.current = geocoderRef.current || new window.google.maps.Geocoder()
+    setGeocoding(true)
+    const g = await geocodeWithGoogle(geocoderRef.current, street)
+    setGeocoding(false)
+    if (!g) return
+    lastGeocodedStreetRef.current = street
+    const range = distanceToRange(haversineKm(g.lat, g.lng, CLUB_LOCATION.lat, CLUB_LOCATION.lng))
+    setFormData(prev => ({ ...prev, latitude: g.lat, longitude: g.lng, distanceRange: range }))
   }
 
   const toggleDay = (day) => {
@@ -678,6 +707,7 @@ export default function AddClient() {
                     label="Dirección"
                     value={formData.street}
                     onChange={(e) => updateField('street', e.target.value)}
+                    onBlur={handleStreetBlur}
                     error={errors.street}
                     placeholder="18 de Julio 1234, Montevideo"
                     className="col-span-2"
@@ -692,7 +722,9 @@ export default function AddClient() {
                       <MapPin className="h-4 w-4" />
                       {formData.latitude != null ? 'Ajustar ubicación en el mapa' : 'Confirmar ubicación en el mapa'}
                     </button>
-                    {formData.latitude != null && (
+                    {geocoding ? (
+                      <span className="text-xs text-gray-400">Calculando ubicación…</span>
+                    ) : formData.latitude != null && (
                       <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700">
                         <Check className="h-3.5 w-3.5" />
                         Ubicación confirmada
@@ -1043,6 +1075,8 @@ export default function AddClient() {
           updateField('latitude', res.lat)
           updateField('longitude', res.lng)
           if (res.distanceRange) updateField('distanceRange', res.distanceRange)
+          // Coords now match the current street — keep them across a later blur.
+          lastGeocodedStreetRef.current = formData.street?.trim() || ''
           setShowLocationModal(false)
         }}
       />
