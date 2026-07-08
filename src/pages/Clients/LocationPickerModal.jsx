@@ -38,7 +38,6 @@ export default function LocationPickerModal({ isOpen, address, initialCoords, on
   })
 
   const geocoderRef = useRef(null)
-  const mapRef = useRef(null)
   const [coords, setCoords] = useState(null)
   const [distanceRange, setDistanceRange] = useState(null)
   const [formattedAddress, setFormattedAddress] = useState('')
@@ -117,7 +116,6 @@ export default function LocationPickerModal({ isOpen, address, initialCoords, on
               center={coords || CLUB_LOCATION}
               zoom={15}
               options={MAP_OPTIONS}
-              onLoad={map => { mapRef.current = map }}
             >
               <OverlayViewF
                 position={CLUB_LOCATION}
