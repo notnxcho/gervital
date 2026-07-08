@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency } from '../../utils/format'
-import { format, addMonths, subMonths } from 'date-fns'
+import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useAuth } from '../../context/AuthContext'
+import MonthNavigator from '../../components/ui/MonthNavigator'
 import {
   Plus,
-  NavArrowLeft,
-  NavArrowRight,
   Trash,
   Edit
 } from 'iconoir-react'
@@ -133,9 +132,6 @@ export default function CostsPage() {
       setLoading(false)
     }
   }
-
-  const goToPreviousMonth = () => setSelectedDate(subMonths(selectedDate, 1))
-  const goToNextMonth = () => setSelectedDate(addMonths(selectedDate, 1))
 
   // Month totals for summary cards.
   const variableTotal = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
@@ -283,17 +279,10 @@ export default function CostsPage() {
               <h1 className="text-2xl font-semibold text-gray-900">Costos</h1>
               <p className="text-gray-500 text-sm mt-0.5">Gestión de costos operativos</p>
             </div>
-            <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1 py-0.5 shadow-sm">
-              <button onClick={goToPreviousMonth} className="p-1.5 hover:bg-gray-100 rounded-md transition-colors" title="Mes anterior">
-                <NavArrowLeft className="w-5 h-5 text-gray-600" />
-              </button>
-              <span className="text-sm font-semibold text-gray-900 capitalize min-w-[120px] text-center">
-                {format(selectedDate, 'MMMM yyyy', { locale: es })}
-              </span>
-              <button onClick={goToNextMonth} className="p-1.5 hover:bg-gray-100 rounded-md transition-colors" title="Mes siguiente">
-                <NavArrowRight className="w-5 h-5 text-gray-600" />
-              </button>
-            </div>
+            <MonthNavigator
+              selected={{ year, month }}
+              onChange={({ year: y, month: m }) => setSelectedDate(new Date(y, m, 1))}
+            />
           </div>
 
           <div className="flex items-center gap-3">

@@ -1,108 +1,11 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
-import { NavArrowLeft, NavArrowRight } from 'iconoir-react'
+import { useState, useMemo } from 'react'
 import PlaceholderCard from './PlaceholderCard'
 import FinanceSection from './sections/FinanceSection'
 import AttendanceSection from './sections/AttendanceSection'
 import CommercialSection from './sections/CommercialSection'
 import { useAuth } from '../../context/AuthContext'
-import { TODAY, WINDOW_START, inWindow } from './monthWindow'
-
-// Navegación de mes en el header: chevrons (secuencial) + chip clickeable que abre
-// un selector de mes/año. Solo mueve el mes seleccionado dentro de la ventana de datos,
-// compartido por todas las pestañas del dashboard.
-function MonthNavigator({ selected, onChange }) {
-  const [open, setOpen] = useState(false)
-  const [viewYear, setViewYear] = useState(selected.year)
-  const ref = useRef(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [open])
-
-  const current = new Date(selected.year, selected.month, 1)
-  const atMin = current <= WINDOW_START
-  const atMax = current >= TODAY
-  const shift = (delta) => {
-    const d = new Date(selected.year, selected.month + delta, 1)
-    const clamped = d < WINDOW_START ? WINDOW_START : d > TODAY ? TODAY : d
-    onChange({ year: clamped.getFullYear(), month: clamped.getMonth() })
-  }
-
-  const toggle = () => { setViewYear(selected.year); setOpen(o => !o) }
-  const pick = (m) => {
-    if (!inWindow(viewYear, m)) return
-    onChange({ year: viewYear, month: m })
-    setOpen(false)
-  }
-
-  const minYear = WINDOW_START.getFullYear()
-  const maxYear = TODAY.getFullYear()
-  const label = format(current, 'MMMM yyyy', { locale: es })
-  const chevronCls = 'flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent'
-
-  return (
-    <div className="flex items-center gap-1" ref={ref}>
-      <button type="button" onClick={() => shift(-1)} disabled={atMin} title="Mes anterior" className={chevronCls}>
-        <NavArrowLeft className="w-5 h-5" />
-      </button>
-
-      <div className="relative">
-        <button
-          type="button"
-          onClick={toggle}
-          title="Elegir mes"
-          className="flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-700 capitalize transition-colors hover:bg-gray-100"
-        >
-          {label}
-        </button>
-
-        {open && (
-          <div className="absolute right-0 mt-2 z-20 w-64 rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
-            <div className="flex items-center justify-between mb-2">
-              <button type="button" onClick={() => setViewYear(y => y - 1)} disabled={viewYear <= minYear} className={chevronCls}>
-                <NavArrowLeft className="w-5 h-5" />
-              </button>
-              <span className="text-sm font-bold text-gray-800 tabular-nums">{viewYear}</span>
-              <button type="button" onClick={() => setViewYear(y => y + 1)} disabled={viewYear >= maxYear} className={chevronCls}>
-                <NavArrowRight className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-1">
-              {Array.from({ length: 12 }, (_, m) => {
-                const enabled = inWindow(viewYear, m)
-                const isSel = selected.year === viewYear && selected.month === m
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => pick(m)}
-                    disabled={!enabled}
-                    className={`px-2 py-1.5 text-xs font-medium rounded-lg capitalize transition-colors ${
-                      isSel ? 'bg-indigo-600 text-white'
-                        : enabled ? 'text-gray-700 hover:bg-gray-100'
-                        : 'text-gray-300 cursor-not-allowed'
-                    }`}
-                  >
-                    {format(new Date(viewYear, m, 1), 'LLL', { locale: es })}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <button type="button" onClick={() => shift(1)} disabled={atMax} title="Mes siguiente" className={chevronCls}>
-        <NavArrowRight className="w-5 h-5" />
-      </button>
-    </div>
-  )
-}
+import MonthNavigator from '../../components/ui/MonthNavigator'
+import { TODAY, WINDOW_START } from './monthWindow'
 
 // Pestañas de secciones del dashboard, cada una gated por su feature.
 const SECTIONS = [
@@ -157,7 +60,7 @@ export default function Dashboard() {
           })}
         </div>
         <div className="pb-1.5 shrink-0">
-          <MonthNavigator selected={selected} onChange={setSelected} />
+          <MonthNavigator selected={selected} onChange={setSelected} minDate={WINDOW_START} maxDate={TODAY} />
         </div>
       </div>
 
