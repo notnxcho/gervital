@@ -38,7 +38,7 @@ function fmtRelative(iso) {
 }
 
 export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, reasonsByKey = {} }) {
-  const { user } = useAuth()
+  const { user, hasAccess } = useAuth()
   const [notes, setNotes] = useState([])
   const [loadingNotes, setLoadingNotes] = useState(false)
   const [body, setBody] = useState('')
@@ -128,11 +128,13 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, r
             label="Días desde baja"
             value={card.daysSince != null ? `${card.daysSince} días` : '—'}
           />
-          <Field
-            label="MRR perdido"
-            value={card.mrrSnapshot != null ? `−${formatCurrency(card.mrrSnapshot)}` : '—'}
-            valueClass="text-rose-600"
-          />
+          {hasAccess('billing') && (
+            <Field
+              label="MRR perdido"
+              value={card.mrrSnapshot != null ? `−${formatCurrency(card.mrrSnapshot)}` : '—'}
+              valueClass="text-rose-600"
+            />
+          )}
           <Field label="Etapa actual" value={STAGE_LABEL[card.stage] || '—'} />
         </div>
 

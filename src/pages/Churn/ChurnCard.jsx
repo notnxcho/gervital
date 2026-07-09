@@ -1,5 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
 import { formatCurrency } from '../../utils/format'
+import { useAuth } from '../../context/AuthContext'
 import { TIER_HEX, planSubtitle } from './churnConstants'
 
 // Small colored badge for the deactivation reason. `info` is the resolved
@@ -20,6 +21,7 @@ function ReasonBadge({ info, reasonKey }) {
 // Draggable churn card. `overlay` renders the same visual without the drag hooks
 // (used inside DragOverlay). data shape: { type: 'churn-card', clientId, stage }.
 export default function ChurnCard({ card, onClick, overlay = false, reasonsByKey = {} }) {
+  const { hasAccess } = useAuth()
   const draggable = useDraggable({
     id: `churn-${card.clientId}`,
     data: { type: 'churn-card', clientId: card.clientId, stage: card.stage },
@@ -66,14 +68,16 @@ export default function ChurnCard({ card, onClick, overlay = false, reasonsByKey
         <ReasonBadge info={reasonsByKey[card.reason]} reasonKey={card.reason} />
       </div>
 
-      {/* Footer: days since + MRR lost */}
+      {/* Footer: days since + MRR lost (montos solo para roles con billing) */}
       <div className="flex items-center justify-between">
         <span className="text-[11px] text-gray-400">
           {card.daysSince != null ? `hace ${card.daysSince} días` : '—'}
         </span>
-        <span className="text-[12px] font-semibold text-rose-600 tabular-nums">
-          {card.mrrSnapshot != null ? `−${formatCurrency(card.mrrSnapshot)}` : '—'}
-        </span>
+        {hasAccess('billing') && (
+          <span className="text-[12px] font-semibold text-rose-600 tabular-nums">
+            {card.mrrSnapshot != null ? `−${formatCurrency(card.mrrSnapshot)}` : '—'}
+          </span>
+        )}
       </div>
     </div>
   )
