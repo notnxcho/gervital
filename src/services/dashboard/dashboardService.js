@@ -222,7 +222,11 @@ export async function getMonthInvoicePanel(year, month) {
       invoiceNumber: row.invoice_number || null,
       invoicedAt: row.invoiced_at || null,
       invoiceDate: row.invoice_date || null,
-      invoicedAmount: Number(row.invoiced_amount || 0)
+      invoicedAmount: Number(row.invoiced_amount || 0),
+      cashCollected: Number(row.cash_collected || 0),
+      promoIndex: row.promo_index != null ? Number(row.promo_index) : null,
+      promoTotal: row.promo_total != null ? Number(row.promo_total) : null,
+      promoPercent: row.promo_percent != null ? Number(row.promo_percent) : null
     }
   })
 }

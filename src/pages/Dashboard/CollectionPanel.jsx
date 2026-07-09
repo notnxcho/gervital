@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { NavArrowRight } from 'iconoir-react'
+import { NavArrowRight, Percentage } from 'iconoir-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Card from '../../components/ui/Card'
@@ -68,7 +68,7 @@ export default function CollectionPanel({ rows, loading, kpis, onBulkAction, can
     return filtered.sort((a, b) => b.amount - a.amount)
   }, [rows, tab])
 
-  const rowAmount = (r) => (tab === 'emitidas' ? r.invoicedAmount : tab === 'cobrados' ? r.paidAmount : r.amount)
+  const rowAmount = (r) => (tab === 'emitidas' ? r.invoicedAmount : tab === 'cobrados' ? r.cashCollected : r.amount)
   const totalPending = list.reduce((s, r) => s + rowAmount(r), 0)
 
   // La difuminación inferior se apaga cuando el scroll llega al final (o no hay overflow),
@@ -168,9 +168,18 @@ export default function CollectionPanel({ rows, loading, kpis, onBulkAction, can
             >
               <Avatar firstName={r.firstName} lastName={r.lastName} avatarUrl={r.avatarUrl} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate">
-                  {r.firstName} {r.lastName}
-                  {r.isDeactivated && <span className="ml-1.5 text-[10px] font-normal text-gray-400">(baja)</span>}
+                <p className="text-sm font-medium text-gray-800 truncate flex items-center gap-1.5">
+                  <span className="truncate">{r.firstName} {r.lastName}</span>
+                  {r.isDeactivated && <span className="text-[10px] font-normal text-gray-400 flex-shrink-0">(baja)</span>}
+                  {domain === 'cobranza' && r.promoTotal != null && (
+                    <span
+                      className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 flex-shrink-0"
+                      title={`Promoción${r.promoPercent != null ? ' ' + r.promoPercent + '%' : ''} · mes ${r.promoIndex} de ${r.promoTotal}`}
+                    >
+                      <Percentage width={11} height={11} />
+                      {r.promoIndex}/{r.promoTotal}
+                    </span>
+                  )}
                 </p>
                 <p className="text-[11px] text-gray-400">
                   {tab === 'pagos'
