@@ -115,7 +115,6 @@ export { getTransportPricing, getTransportPriceSync } from './pricing/transportP
 // SUPPLIERS & EXPENSES API
 // ============================================
 export {
-  SUPPLIER_CATEGORIES,
   getSuppliers,
   getSupplierById,
   createSupplier,

@@ -1,20 +1,6 @@
 import { supabase } from '../supabase/client'
 
 /**
- * Supplier categories constant
- */
-export const SUPPLIER_CATEGORIES = [
-  'Alimentación',
-  'Limpieza',
-  'Transporte',
-  'Salud',
-  'Insumos',
-  'Mantenimiento',
-  'Servicios profesionales',
-  'Otros'
-]
-
-/**
  * Get all suppliers
  * @returns {Promise<Array>}
  */
@@ -63,7 +49,7 @@ export async function createSupplier(supplierData) {
     .from('suppliers')
     .insert({
       name: supplierData.name,
-      category: supplierData.category,
+      category_id: supplierData.categoryId || null,
       contact: supplierData.contact || null,
       phone: supplierData.phone || null,
       email: supplierData.email || null,
@@ -92,7 +78,7 @@ export async function updateSupplier(id, supplierData) {
   const updateData = {}
 
   if (supplierData.name !== undefined) updateData.name = supplierData.name
-  if (supplierData.category !== undefined) updateData.category = supplierData.category
+  if (supplierData.categoryId !== undefined) updateData.category_id = supplierData.categoryId || null
   if (supplierData.contact !== undefined) updateData.contact = supplierData.contact
   if (supplierData.phone !== undefined) updateData.phone = supplierData.phone
   if (supplierData.email !== undefined) updateData.email = supplierData.email

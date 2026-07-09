@@ -14,7 +14,6 @@ import {
   createSupplier,
   updateSupplier,
   deleteSupplier,
-  SUPPLIER_CATEGORIES,
   getExpensesByMonth,
   createExpense,
   updateExpense,
@@ -191,17 +190,15 @@ export default function CostsPage() {
     expenseGroupOpts
   )
 
-  // Supplier categories come from the suppliers' own `category` string.
-  const supplierCategoryOptions = Array.from(new Set(suppliers.map(s => s.category).filter(Boolean)))
-    .sort((a, b) => a.localeCompare(b, 'es'))
-    .map(c => ({ value: c, label: c }))
+  // Suppliers reference an expense category; reuse the shared category options.
+  const supplierCategoryOptions = categoryOptions
 
   const supplierGroups = groupByCategory(
     filterItems(suppliers, supplierFilters, {
       getText: (s) => [s.name, s.contact, s.notes].filter(Boolean).join(' '),
-      getCategoryId: (s) => s.category
+      getCategoryId: (s) => s.categoryId
     }),
-    { getKey: (s) => s.category, getLabel: (s) => s.category }
+    { getKey: (s) => s.categoryId, getLabel: (s) => s.categoryName }
   )
 
   // Handlers
@@ -482,9 +479,11 @@ export default function CostsPage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <h4 className="font-semibold text-gray-900">{supplier.name}</h4>
-                        <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
-                          {supplier.category}
-                        </span>
+                        {supplier.categoryName && (
+                          <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                            {supplier.categoryName}
+                          </span>
+                        )}
                       </div>
                       <div className="flex gap-1">
                         <button
@@ -653,6 +652,7 @@ export default function CostsPage() {
         isOpen={supplierModal.open}
         onClose={() => setSupplierModal({ open: false, supplier: null })}
         supplier={supplierModal.supplier}
+        categories={categories}
         onSave={loadData}
       />
 
@@ -858,6 +858,19 @@ function CategorySelect({ value, onChange, categories }) {
   )
 }
 
+// Picking a supplier on an expense form auto-fills the description with the
+// supplier's name and the category with the supplier's own category. Clearing
+// the supplier leaves the fields untouched. Everything stays overwritable.
+function applySupplierAutofill(setForm, suppliers, supplierId) {
+  const supplier = suppliers.find(s => s.id === supplierId)
+  setForm(f => ({
+    ...f,
+    supplierId,
+    description: supplier ? supplier.name : f.description,
+    categoryId: supplier && supplier.categoryId ? supplier.categoryId : f.categoryId
+  }))
+}
+
 function SupplierSelect({ value, onChange, suppliers }) {
   return (
     <div>
@@ -908,6 +921,8 @@ function FixedExpenseModal({ isOpen, onClose, fixed, categories, suppliers, onSa
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fixed, isOpen])
 
+  const onSupplierChange = (supplierId) => applySupplierAutofill(setForm, suppliers, supplierId)
+
   const submit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -938,9 +953,9 @@ function FixedExpenseModal({ isOpen, onClose, fixed, categories, suppliers, onSa
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={fixed ? 'Editar gasto fijo' : 'Nuevo gasto fijo'}>
       <form onSubmit={submit} className="space-y-4">
+        <SupplierSelect value={form.supplierId} onChange={(e) => onSupplierChange(e.target.value)} suppliers={suppliers} />
         <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ej: Alquiler del local" required />
         <CategorySelect value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} categories={categories} />
-        <SupplierSelect value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} suppliers={suppliers} />
         <div className="grid grid-cols-2 gap-4">
           <Input label="Monto por pago" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
           <div>
@@ -1008,6 +1023,10 @@ function VariableExpenseModal({ isOpen, onClose, expense, categories, suppliers,
     }
   }, [expense, isOpen, selectedYear, selectedMonth])
 
+  // Picking a supplier auto-fills description (its name) and category (its own),
+  // both still overwritable afterwards.
+  const onSupplierChange = (supplierId) => applySupplierAutofill(setForm, suppliers, supplierId)
+
   const submit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -1037,9 +1056,9 @@ function VariableExpenseModal({ isOpen, onClose, expense, categories, suppliers,
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={expense ? 'Editar gasto variable' : 'Registrar gasto variable'}>
       <form onSubmit={submit} className="space-y-4">
+        <SupplierSelect value={form.supplierId} onChange={(e) => onSupplierChange(e.target.value)} suppliers={suppliers} />
         <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ej: Reparación de heladera" required />
         <CategorySelect value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} categories={categories} />
-        <SupplierSelect value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} suppliers={suppliers} />
         <div className="grid grid-cols-2 gap-4">
           <Input label="Monto" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
           <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
@@ -1172,6 +1191,8 @@ function ExtraordinaryExpenseModal({ isOpen, onClose, expense, categories, suppl
     }
   }, [expense, isOpen, selectedYear, selectedMonth])
 
+  const onSupplierChange = (supplierId) => applySupplierAutofill(setForm, suppliers, supplierId)
+
   const submit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -1201,9 +1222,9 @@ function ExtraordinaryExpenseModal({ isOpen, onClose, expense, categories, suppl
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={expense ? 'Editar gasto extraordinario' : 'Registrar gasto extraordinario'}>
       <form onSubmit={submit} className="space-y-4">
+        <SupplierSelect value={form.supplierId} onChange={(e) => onSupplierChange(e.target.value)} suppliers={suppliers} />
         <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ej: Reparación imprevista" required />
         <CategorySelect value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} categories={categories} />
-        <SupplierSelect value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} suppliers={suppliers} />
         <div className="grid grid-cols-2 gap-4">
           <Input label="Monto" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
           <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
@@ -1222,11 +1243,11 @@ function ExtraordinaryExpenseModal({ isOpen, onClose, expense, categories, suppl
 }
 
 // Supplier modal (directory)
-function SupplierModal({ isOpen, onClose, supplier, onSave }) {
+function SupplierModal({ isOpen, onClose, supplier, categories, onSave }) {
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
     name: '',
-    category: '',
+    categoryId: '',
     contact: '',
     phone: '',
     email: '',
@@ -1237,7 +1258,7 @@ function SupplierModal({ isOpen, onClose, supplier, onSave }) {
     if (supplier) {
       setForm({
         name: supplier.name || '',
-        category: supplier.category || '',
+        categoryId: supplier.categoryId || '',
         contact: supplier.contact || '',
         phone: supplier.phone || '',
         email: supplier.email || '',
@@ -1246,7 +1267,7 @@ function SupplierModal({ isOpen, onClose, supplier, onSave }) {
     } else {
       setForm({
         name: '',
-        category: '',
+        categoryId: '',
         contact: '',
         phone: '',
         email: '',
@@ -1288,22 +1309,11 @@ function SupplierModal({ isOpen, onClose, supplier, onSave }) {
           required
         />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Categoría
-          </label>
-          <select
-            value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            required
-          >
-            <option value="">Seleccionar categoría</option>
-            {SUPPLIER_CATEGORIES.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-        </div>
+        <CategorySelect
+          value={form.categoryId}
+          onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+          categories={categories}
+        />
 
         <Input
           label="Contacto"
