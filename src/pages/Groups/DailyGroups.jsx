@@ -520,9 +520,9 @@ export default function DailyGroups() {
             Solo lectura
           </span>
         )}
-        {/* Meal counts: global to the day, same regardless of the active shift tab */}
+        {/* Meal counts: global to the day, en un solo container con divisores */}
         {!isWeekend && (
-          <div className="flex items-center gap-3 ml-2">
+          <div className="flex items-center ml-2 bg-white border border-gray-200 rounded-lg divide-x divide-gray-200">
             <MealCountBadge label="Desayuno" count={mealCounts.breakfast} />
             <MealCountBadge label="Almuerzo" count={mealCounts.lunch} />
             <MealCountBadge label="Merienda" count={mealCounts.snack} />
@@ -654,7 +654,7 @@ export default function DailyGroups() {
 // Compact counter for one of the day's meals (just the number, not the roster).
 function MealCountBadge({ label, count }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg">
+    <div className="flex items-center gap-2 px-3 py-2">
       <span className="text-sm text-gray-500">{label}</span>
       <span className="text-base font-semibold text-gray-900 tabular-nums">{count}</span>
     </div>
