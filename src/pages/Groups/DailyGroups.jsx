@@ -48,6 +48,9 @@ function dateToStr(d) {
 export default function DailyGroups() {
   const today = useMemo(() => startOfDay(new Date()), [])
   const cleanupDone = useRef(false)
+  // Temp ids for optimistic inserts, reconciled with the server id on success
+  const tempIdRef = useRef(0)
+  const nextTempId = () => `temp-${++tempIdRef.current}`
 
   const [selectedDate, setSelectedDate] = useState(today)
   const [activeShift, setActiveShift] = useState('morning')
@@ -260,70 +263,91 @@ export default function DailyGroups() {
   // ── Slot CRUD handlers ────────────────────────────────────────────────────
 
   async function handleAddSlot() {
+    const position = timeSlots.length
+    const defaultTime = activeShift === 'morning' ? '09:00' : '15:00'
+    const name = `Horario ${position + 1}`
+    const tempId = nextTempId()
+    const snapshot = timeSlots
+    // Optimistic: mostramos el horario al instante, reconciliamos el id real al volver
+    setTimeSlots(prev => [...prev, { id: tempId, date: dateStr, shift: activeShift, name, time: defaultTime, position, activities: [] }])
     try {
-      const position = timeSlots.length
-      const defaultTime = activeShift === 'morning' ? '09:00' : '15:00'
-      await createTimeSlot(dateStr, activeShift, {
-        name: `Horario ${position + 1}`,
-        time: defaultTime,
-        position
-      })
-      await loadSlots(dateStr, activeShift, { silent: true })
+      const realId = await createTimeSlot(dateStr, activeShift, { name, time: defaultTime, position })
+      setTimeSlots(prev => prev.map(s => s.id === tempId ? { ...s, id: realId } : s))
     } catch (err) {
       console.error('Error creating time slot:', err)
+      setTimeSlots(snapshot)
     }
   }
 
   async function handleUpdateSlot(slotId, fields) {
+    const snapshot = timeSlots
+    setTimeSlots(prev => prev.map(s => s.id === slotId ? { ...s, ...fields } : s))
     try {
       await updateTimeSlot(slotId, fields)
-      await loadSlots(dateStr, activeShift, { silent: true })
     } catch (err) {
       console.error('Error updating time slot:', err)
+      setTimeSlots(snapshot)
     }
   }
 
   async function handleDeleteSlot(slotId) {
+    const snapshot = timeSlots
+    setTimeSlots(prev => prev.filter(s => s.id !== slotId))
     try {
       await deleteTimeSlot(slotId)
-      await loadSlots(dateStr, activeShift, { silent: true })
     } catch (err) {
       console.error('Error deleting time slot:', err)
+      setTimeSlots(snapshot)
     }
   }
 
   // ── Activity CRUD handlers ────────────────────────────────────────────────
 
   async function handleAddActivity(slotId) {
+    const slot = timeSlots.find(s => s.id === slotId)
+    const position = slot ? slot.activities.length : 0
+    const name = 'Nueva actividad'
+    const tempId = nextTempId()
+    const snapshot = timeSlots
+    setTimeSlots(prev => prev.map(s =>
+      s.id !== slotId ? s : { ...s, activities: [...s.activities, { id: tempId, name, responsible: null, position, clientIds: [] }] }
+    ))
     try {
-      const slot = timeSlots.find(s => s.id === slotId)
-      const position = slot ? slot.activities.length : 0
-      await createActivity(slotId, {
-        name: 'Nueva actividad',
-        responsible: null,
-        position
-      })
-      await loadSlots(dateStr, activeShift, { silent: true })
+      const realId = await createActivity(slotId, { name, responsible: null, position })
+      setTimeSlots(prev => prev.map(s =>
+        s.id !== slotId ? s : { ...s, activities: s.activities.map(a => a.id === tempId ? { ...a, id: realId } : a) }
+      ))
     } catch (err) {
       console.error('Error creating activity:', err)
+      setTimeSlots(snapshot)
     }
   }
 
   async function handleUpdateActivity(activityId, fields) {
+    const snapshot = timeSlots
+    setTimeSlots(prev => prev.map(s => ({
+      ...s,
+      activities: s.activities.map(a => a.id === activityId ? { ...a, ...fields } : a)
+    })))
     try {
       await updateActivity(activityId, fields)
-      await loadSlots(dateStr, activeShift, { silent: true })
     } catch (err) {
       console.error('Error updating activity:', err)
+      setTimeSlots(snapshot)
     }
   }
 
   async function handleDeleteActivity(activityId) {
+    const snapshot = timeSlots
+    setTimeSlots(prev => prev.map(s => ({
+      ...s,
+      activities: s.activities.filter(a => a.id !== activityId)
+    })))
     try {
       await deleteActivity(activityId)
-      await loadSlots(dateStr, activeShift, { silent: true })
     } catch (err) {
       console.error('Error deleting activity:', err)
+      setTimeSlots(snapshot)
     }
   }
 
@@ -615,7 +639,7 @@ export default function DailyGroups() {
         activeShift={activeShift}
         dateStr={dateStr}
         hasExistingData={timeSlots.length > 0}
-        onApplied={() => loadSlots(dateStr, activeShift)}
+        onApplied={() => loadSlots(dateStr, activeShift, { silent: true })}
       />
 
       <GroupsWeekTable
