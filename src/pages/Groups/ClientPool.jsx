@@ -23,6 +23,7 @@ export default function ClientPool({
 }) {
   const [search, setSearch] = useState('')
   const [showAbsences, setShowAbsences] = useState(true)
+  const [showAssignedAll, setShowAssignedAll] = useState(true)
   const [tierFilter, setTierFilter] = useState(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const filterRef = useRef(null)
@@ -37,10 +38,13 @@ export default function ClientPool({
   }, [])
 
   const term = search.toLowerCase()
-  // Los clientes ya asignados a todos los horarios se sacan de la lista (no ocupan espacio)
+  // Los clientes ya asignados a todos los horarios salen de la lista principal
+  // y pasan a su propio contenedor colapsable al final
+  const assignedToAllClients = clients.filter(c => clientsInAllSlots?.has(c.id))
   const visible = clients.filter(c => !clientsInAllSlots?.has(c.id))
   const byTier = tierFilter ? visible.filter(c => c.cognitiveLevel === tierFilter) : visible
   const filtered = search ? byTier.filter(c => matchName(c, term)) : byTier
+  const filteredAssignedToAll = search ? assignedToAllClients.filter(c => matchName(c, term)) : assignedToAllClients
   const filteredAbsent = search ? absentClients.filter(c => matchName(c, term)) : absentClients
   const filteredVacation = search ? vacationClients.filter(c => matchName(c, term)) : vacationClients
   const absenceTotal = absentClients.length + vacationClients.length
@@ -160,6 +164,33 @@ export default function ClientPool({
         ))}
         {filtered.length === 0 && (
           <p className="text-xs text-gray-400 text-center py-4">Sin resultados</p>
+        )}
+      </div>
+
+      {/* Asignados a todos los horarios: contenedor al final con su switch */}
+      <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+        <Toggle
+          id="toggle-assigned-all-pool"
+          checked={showAssignedAll}
+          onChange={setShowAssignedAll}
+          label={`Asignados a todo${assignedToAllClients.length > 0 ? ` (${assignedToAllClients.length})` : ''}`}
+        />
+
+        {showAssignedAll && (
+          <div className="mt-3 flex flex-col gap-1.5">
+            {filteredAssignedToAll.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-2">Nadie asignado a todos los horarios</p>
+            ) : (
+              filteredAssignedToAll.map(client => (
+                <PoolClientChip
+                  key={client.id}
+                  client={client}
+                  assignedToAll
+                  isRecovery={recoveryIds?.has(client.id)}
+                />
+              ))
+            )}
+          </div>
         )}
       </div>
     </div>
