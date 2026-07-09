@@ -47,8 +47,13 @@ export default function ActivityCard({
               className="text-sm font-semibold text-gray-700 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-indigo-400 focus:outline-none truncate flex-1"
             />
           )}
+          {assignedClients.length > 0 && (
+            <span className="flex-shrink-0 text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+              {assignedClients.length} {assignedClients.length === 1 ? 'cliente' : 'clientes'}
+            </span>
+          )}
           {readOnly ? (
-            activity.responsible && <span className="text-[10px] text-gray-400 flex-shrink-0">{activity.responsible}</span>
+            activity.responsible && <span className="text-sm text-gray-700 flex-shrink-0">{activity.responsible}</span>
           ) : (
             <input
               defaultValue={activity.responsible || ''}
@@ -57,7 +62,7 @@ export default function ActivityCard({
                 const val = e.target.value.trim()
                 if (val !== (activity.responsible || '')) onUpdateActivity(activity.id, { responsible: val || null })
               }}
-              className="text-[10px] text-gray-400 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-indigo-400 focus:outline-none w-24 flex-shrink-0"
+              className="text-sm text-gray-700 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-indigo-400 focus:outline-none w-32 flex-shrink-0"
             />
           )}
         </div>

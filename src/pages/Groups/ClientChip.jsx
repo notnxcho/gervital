@@ -80,9 +80,6 @@ export function AbsenceClientChip({ client, variant = 'absent' }) {
       <span className="text-sm text-gray-700 font-medium flex-1 truncate">
         {client.firstName} {client.lastName}
       </span>
-      <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${v.tag}`}>
-        {v.label}
-      </span>
     </div>
   )
 }

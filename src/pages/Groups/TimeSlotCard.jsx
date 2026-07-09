@@ -41,7 +41,7 @@ export default function TimeSlotCard({
                   const val = e.target.value
                   if (val && val !== slot.time?.slice(0, 5)) onUpdateSlot(slot.id, { time: val })
                 }}
-                className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded w-[72px] flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded w-auto min-w-[120px] flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-indigo-400"
               />
               <input
                 defaultValue={slot.name}

@@ -13,10 +13,12 @@ export default function ClientPool({
   vacationClients = []
 }) {
   const [search, setSearch] = useState('')
-  const [showAbsences, setShowAbsences] = useState(false)
+  const [showAbsences, setShowAbsences] = useState(true)
 
   const term = search.toLowerCase()
-  const filtered = search ? clients.filter(c => matchName(c, term)) : clients
+  // Los clientes ya asignados a todos los horarios se sacan de la lista (no ocupan espacio)
+  const visible = clients.filter(c => !clientsInAllSlots?.has(c.id))
+  const filtered = search ? visible.filter(c => matchName(c, term)) : visible
   const filteredAbsent = search ? absentClients.filter(c => matchName(c, term)) : absentClients
   const filteredVacation = search ? vacationClients.filter(c => matchName(c, term)) : vacationClients
   const absenceTotal = absentClients.length + vacationClients.length
@@ -33,22 +35,8 @@ export default function ClientPool({
         placeholder="Buscar..."
         className="w-full px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg mb-3 focus:outline-none focus:ring-1 focus:ring-indigo-400"
       />
-      <div className="flex flex-col gap-1.5">
-        {filtered.map(client => (
-          <PoolClientChip
-            key={client.id}
-            client={client}
-            assignedToAll={clientsInAllSlots?.has(client.id)}
-            isRecovery={recoveryIds?.has(client.id)}
-          />
-        ))}
-        {filtered.length === 0 && (
-          <p className="text-xs text-gray-400 text-center py-4">Sin resultados</p>
-        )}
-      </div>
-
-      {/* Faltas: contenedor al final de los asistentes con su switch */}
-      <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+      {/* Faltas: contenedor arriba de los asistentes con su switch */}
+      <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3">
         <Toggle
           id="toggle-absences-pool"
           checked={showAbsences}
@@ -63,15 +51,10 @@ export default function ClientPool({
             )}
 
             {filteredAbsent.length > 0 && (
-              <div>
-                <div className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">
-                  Faltas del día ({filteredAbsent.length})
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {filteredAbsent.map(client => (
-                    <AbsenceClientChip key={client.id} client={client} variant="absent" />
-                  ))}
-                </div>
+              <div className="flex flex-col gap-1.5">
+                {filteredAbsent.map(client => (
+                  <AbsenceClientChip key={client.id} client={client} variant="absent" />
+                ))}
               </div>
             )}
 
@@ -88,6 +71,19 @@ export default function ClientPool({
               </div>
             )}
           </div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        {filtered.map(client => (
+          <PoolClientChip
+            key={client.id}
+            client={client}
+            isRecovery={recoveryIds?.has(client.id)}
+          />
+        ))}
+        {filtered.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-4">Sin resultados</p>
         )}
       </div>
     </div>
