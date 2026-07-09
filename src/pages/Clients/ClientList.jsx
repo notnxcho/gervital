@@ -426,6 +426,20 @@ const ClientCard = memo(function ClientCard({ client }) {
 
       {/* Cuerpo */}
       <div className="cc-body">
+        {(client.clientType && client.clientType !== 'regular' && CLIENT_TYPE_META[client.clientType]) || client.hasActiveDiscount ? (
+          <div className="cc-labels">
+            {client.clientType && client.clientType !== 'regular' && CLIENT_TYPE_META[client.clientType] && (
+              <span className="cc-label-pill" style={{ background: CLIENT_TYPE_META[client.clientType].bg, color: CLIENT_TYPE_META[client.clientType].color }}>
+                {CLIENT_TYPE_META[client.clientType].label}
+              </span>
+            )}
+
+            {client.hasActiveDiscount && (
+              <span className="cc-label-pill" style={{ background: '#dcfce7', color: '#15803d' }}>Promoción activa</span>
+            )}
+          </div>
+        ) : null}
+
         <h3 className="cc-name">{client.firstName} {client.lastName}</h3>
         {age && <p className="cc-age">{age} años</p>}
 
@@ -445,16 +459,6 @@ const ClientCard = memo(function ClientCard({ client }) {
             </div>
 
             <div className="cc-right">
-              {client.clientType && client.clientType !== 'regular' && CLIENT_TYPE_META[client.clientType] && (
-                <span className="cc-tchip" title={CLIENT_TYPE_META[client.clientType].label} style={{ background: CLIENT_TYPE_META[client.clientType].bg, color: CLIENT_TYPE_META[client.clientType].color }}>
-                  {CLIENT_TYPE_META[client.clientType].glyph}
-                </span>
-              )}
-
-              {client.hasActiveDiscount && (
-                <span className="cc-tchip" title="Promoción activa" style={{ background: '#dcfce7', color: '#15803d' }}>%</span>
-              )}
-
               {client.plan.hasTransport && (
                 <span className="cc-tchip"><VanIcon /></span>
               )}
