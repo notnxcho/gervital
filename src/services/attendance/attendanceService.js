@@ -71,13 +71,15 @@ export async function advanceScheduledAttendance() {
  * @param {string} date - YYYY-MM-DD
  * @param {boolean} isJustified
  * @param {string} userName
+ * @param {string|null} notes - Optional free-text reason
  */
-export async function markDayAbsent(clientId, date, isJustified, userName) {
+export async function markDayAbsent(clientId, date, isJustified, userName, notes = null) {
   const { data, error } = await supabase.rpc('mark_day_absent', {
     p_client_id: clientId,
     p_date: date,
     p_is_justified: isJustified,
-    p_created_by: userName
+    p_created_by: userName,
+    p_notes: notes
   })
   if (error) throw new Error(error.message)
   if (!data.success) throw new Error(data.error || 'Error al marcar falta')
