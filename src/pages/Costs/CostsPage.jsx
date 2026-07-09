@@ -83,6 +83,7 @@ export default function CostsPage() {
   // CategoryGroup instances re-sync to `open`, without locking out individual toggles in between.
   const [fixedExpandAll, setFixedExpandAll] = useState({ open: false, version: 0 })
   const [variableExpandAll, setVariableExpandAll] = useState({ open: false, version: 0 })
+  const [supplierExpandAll, setSupplierExpandAll] = useState({ open: false, version: 0 })
   const [supplierFilters, setSupplierFilters] = useState({ query: '', categoryId: '' })
   const [selectedDate, setSelectedDate] = useState(new Date())
 
@@ -484,13 +485,19 @@ export default function CostsPage() {
           onChange={setSupplierFilters}
           categoryOptions={supplierCategoryOptions}
           searchPlaceholder="Buscar proveedor…"
+          trailing={
+            <ExpandCollapseAllButton
+              expanded={supplierExpandAll.open}
+              onClick={() => setSupplierExpandAll(s => ({ open: !s.open, version: s.version + 1 }))}
+            />
+          }
         />
 
         {supplierGroups.length === 0 ? (
           <Card className="p-6 text-center"><p className="text-gray-500">No hay proveedores</p></Card>
         ) : (
           supplierGroups.map(group => (
-            <CategoryGroup key={group.key} storageKey={`suppliers.${group.key}`} label={group.label} count={group.items.length}>
+            <CategoryGroup key={group.key} storageKey={`suppliers.${group.key}`} label={group.label} count={group.items.length} forceOpen={supplierExpandAll}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {group.items.map(supplier => (
                   <Card key={supplier.id} className="p-4">
