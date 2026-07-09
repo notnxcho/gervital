@@ -82,6 +82,7 @@ export function transformClientFromDb(dbClient) {
     clientType: dbClient.clientType || 'regular',
     // charity y trial no facturan ni cuentan para metricas de dinero
     isNonBillable: (dbClient.clientType || 'regular') !== 'regular',
+    hasActiveDiscount: dbClient.hasActiveDiscount || false,
     recoveryDaysAvailable: dbClient.recoveryDaysAvailable || 0,
     plan: dbClient.plan || {
       frequency: 1,

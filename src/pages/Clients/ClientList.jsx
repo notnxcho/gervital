@@ -451,6 +451,10 @@ const ClientCard = memo(function ClientCard({ client }) {
                 </span>
               )}
 
+              {client.hasActiveDiscount && (
+                <span className="cc-tchip" title="Promoción activa" style={{ background: '#dcfce7', color: '#15803d' }}>%</span>
+              )}
+
               {client.plan.hasTransport && (
                 <span className="cc-tchip"><VanIcon /></span>
               )}
@@ -543,6 +547,11 @@ const ClientRow = memo(function ClientRow({ client }) {
               </span>
             ))}
           </div>
+
+          {/* Promoción activa */}
+          {client.hasActiveDiscount && (
+            <span className="cr-tchip" title="Promoción activa" style={{ color: '#15803d' }}>%</span>
+          )}
 
           {/* Transporte */}
           {client.plan.hasTransport && (
