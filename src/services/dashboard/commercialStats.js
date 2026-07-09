@@ -41,7 +41,6 @@ const REASON_LABELS = {
   adaptation_motivation: 'Adaptación / motivación',
   financial: 'Motivo económico',
   logistical_family: 'Motivo logístico-familiar',
-  temporary_pause_not_resumed: 'Pausa temporal no retomada',
   other: 'Otro / sin especificar'
 }
 
@@ -52,7 +51,6 @@ const REASON_ORDER = [
   'adaptation_motivation',
   'financial',
   'logistical_family',
-  'temporary_pause_not_resumed',
   'other'
 ]
 
