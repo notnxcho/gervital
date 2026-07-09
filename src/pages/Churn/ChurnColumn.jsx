@@ -10,7 +10,7 @@ export default function ChurnColumn({ stage, label, color, cards, onCardClick, r
   })
 
   return (
-    <div className={horizontal ? 'w-full' : 'flex flex-col w-[230px] flex-shrink-0'}>
+    <div className={horizontal ? 'w-full' : 'flex flex-col flex-1 min-w-[230px]'}>
       {/* Stage header */}
       <div className="flex items-center gap-2 px-1 mb-3">
         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
