@@ -11,6 +11,7 @@ import { getPlanPricing, getPlanPriceSync } from '../../services/pricing/pricing
 import { getTransportPricing, getTransportPriceSync } from '../../services/pricing/transportPricingService'
 import Button from '../../components/ui/Button'
 import Input, { Select, Textarea, Checkbox } from '../../components/ui/Input'
+import { CLIENT_TYPES, CLIENT_TYPE_META, isNonBillableType } from '../../services/clients/clientTypes'
 import Card, { CardContent } from '../../components/ui/Card'
 import { useAuth } from '../../context/AuthContext'
 import { RepeatableRows } from './medical/RepeatableRows'
@@ -134,8 +135,8 @@ const INITIAL_FORM_DATA = {
   character: '',
   personalResources: '',
   vulnerabilities: '',
-  // Beneficencia (no genera facturación; write admin-gated)
-  isCharity: false
+  // Tipo de cliente: regular | charity | trial (write admin-gated)
+  clientType: 'regular'
 }
 
 export default function AddClient() {
@@ -230,7 +231,7 @@ export default function AddClient() {
           character: client.medicalInfo?.character || '',
           personalResources: client.medicalInfo?.personalResources || '',
           vulnerabilities: client.medicalInfo?.vulnerabilities || '',
-          isCharity: client.isCharity || false
+          clientType: client.clientType || 'regular'
         })
 
         const invoices = await getClientInvoices(id).catch(() => [])
@@ -379,7 +380,7 @@ export default function AddClient() {
         documentType: formData.documentType,
         documentNumber: formData.documentNumber,
         transferResponsible: formData.transferResponsible,
-        isCharity: formData.isCharity,
+        clientType: formData.clientType,
         plan: {
           frequency: parseInt(formData.frequency),
           schedule: formData.schedule,
@@ -438,13 +439,14 @@ export default function AddClient() {
         if (avatarFile) {
           await uploadClientAvatar(id, avatarFile).catch(console.error)
         }
-        // Beneficencia: anular facturas pendientes no emitidas ni pagadas (idempotente).
-        if (formData.isCharity) {
+        // No facturables (beneficencia / a prueba): anular facturas pendientes no
+        // emitidas ni pagadas (idempotente).
+        if (isNonBillableType(formData.clientType)) {
           await voidPendingInvoices(id).catch(err => console.warn('Void facturas falló:', err))
         }
         // Re-sync receptor en Biller: los datos fiscales (nombre/CI/dirección/email) pudieron cambiar.
-        // No se sincroniza a clientes de beneficencia (no facturan).
-        if (formData.documentNumber && !formData.isCharity) {
+        // No se sincroniza a clientes no facturables (beneficencia / a prueba).
+        if (formData.documentNumber && !isNonBillableType(formData.clientType)) {
           syncClientToBiller(id, true).catch(err => console.warn('Re-sync Biller falló:', err))
         }
         navigate(`/clientes/${id}`)
@@ -457,8 +459,8 @@ export default function AddClient() {
           await uploadClientAvatar(newClient.id, avatarFile).catch(console.error)
         }
         // Sync receptor en Biller. No bloquea el alta: el cliente ya quedó creado.
-        // No se sincroniza a clientes de beneficencia (no facturan).
-        if (newClient?.id && formData.documentNumber && !formData.isCharity) {
+        // No se sincroniza a clientes no facturables (beneficencia / a prueba).
+        if (newClient?.id && formData.documentNumber && !isNonBillableType(formData.clientType)) {
           try {
             await syncClientToBiller(newClient.id)
           } catch (err) {
@@ -973,22 +975,38 @@ export default function AddClient() {
                 </div>
               </button>
 
-              {/* Beneficencia (solo admin+) */}
+              {/* Tipo de cliente (solo admin+) */}
               {hasAccess('billing') && (
                 <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                  <Checkbox
-                    label="Cliente de beneficencia (no genera facturación)"
-                    checked={formData.isCharity}
-                    onChange={(e) => updateField('isCharity', e.target.checked)}
-                  />
-                  <p className="mt-1 ml-7 text-xs text-gray-500">
-                    Participa de la operativa (transporte, grupos, asistencia) pero no genera facturas ni impacta el dashboard financiero ni las métricas comerciales.
-                  </p>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Tipo de cliente</p>
+                  <div className="flex gap-2">
+                    {CLIENT_TYPES.map((type) => {
+                      const meta = CLIENT_TYPE_META[type]
+                      const active = formData.clientType === type
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => updateField('clientType', type)}
+                          className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${active ? 'border-transparent' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                          style={active ? { background: meta.bg, color: meta.color, borderColor: meta.color } : undefined}
+                        >
+                          {meta.glyph && <span aria-hidden>{meta.glyph}</span>}
+                          {meta.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {isNonBillableType(formData.clientType) && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Participa de la operativa (transporte, grupos, asistencia) pero no genera facturas ni impacta el dashboard financiero ni las métricas comerciales.
+                    </p>
+                  )}
                 </div>
               )}
 
               {/* Price preview */}
-              {hasAccess('billing') && !formData.isCharity && (
+              {hasAccess('billing') && !isNonBillableType(formData.clientType) && (
               <div className="bg-indigo-50 rounded-lg p-4 space-y-2">
                 <p className="text-sm text-indigo-700">Precio mensual estimado</p>
                 <p className="text-2xl font-bold text-indigo-900">

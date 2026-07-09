@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { formatCurrency } from '../../utils/format'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Phone, MapPin, Calendar, MoreVert, Trash, Check, NavArrowDown, NavArrowRight, Percentage, Heart } from 'iconoir-react'
+import { ArrowLeft, Edit, Phone, MapPin, Calendar, MoreVert, Trash, Check, NavArrowDown, NavArrowRight, Percentage, Heart, Flash } from 'iconoir-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, differenceInCalendarDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -50,6 +50,12 @@ const SCHEDULE_LABELS = {
   morning: 'Mañana',
   afternoon: 'Tarde',
   full_day: 'Día completo'
+}
+
+// Badge por tipo de cliente no facturable (regular no muestra badge).
+const CLIENT_TYPE_BADGE = {
+  charity: { Icon: Heart, label: 'Beneficencia', className: 'bg-violet-100 text-violet-700' },
+  trial: { Icon: Flash, label: 'A prueba', className: 'bg-orange-100 text-orange-700' }
 }
 
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
@@ -169,13 +175,13 @@ export default function ClientDetail() {
         getRecoveryCredits(id),
         getClientPlanVersions(id)
       ])
-      // Run setup functions (non-blocking, best-effort). Charity clients never
-      // materialize invoices, so skip ensureClientMonths for them.
+      // Run setup functions (non-blocking, best-effort). Los clientes no facturables
+      // (beneficencia / a prueba) nunca materializan facturas: skip ensureClientMonths.
       Promise.all([
         advanceScheduledAttendance().catch(() => {}),
-        clientData?.isCharity ? Promise.resolve() : ensureClientMonths(id).catch(() => {})
+        clientData?.isNonBillable ? Promise.resolve() : ensureClientMonths(id).catch(() => {})
       ]).then(() => {
-        if (clientData?.isCharity) return
+        if (clientData?.isNonBillable) return
         // Reload invoices after ensureClientMonths creates new rows
         getClientInvoices(id).then(updated => setInvoices(updated)).catch(() => {})
       })
@@ -354,12 +360,16 @@ export default function ClientDetail() {
             <h1 className="text-2xl font-bold text-gray-900">
               {client.firstName} {client.lastName}
             </h1>
-            {client.isCharity && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">
-                <Heart className="w-3.5 h-3.5" />
-                Beneficencia
-              </span>
-            )}
+            {client.clientType && CLIENT_TYPE_BADGE[client.clientType] && (() => {
+              const badge = CLIENT_TYPE_BADGE[client.clientType]
+              const BadgeIcon = badge.Icon
+              return (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}>
+                  <BadgeIcon className="w-3.5 h-3.5" />
+                  {badge.label}
+                </span>
+              )
+            })()}
           </div>
           <p className="text-sm text-gray-500">
             Cliente desde {format(new Date(client.startDate), "d 'de' MMMM, yyyy", { locale: es })}
@@ -407,7 +417,7 @@ export default function ClientDetail() {
             </Button>
             {showOptionsMenu && (
               <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1">
-                {!client.deletedAt && !client.isCharity && roleHasAccess(user?.role, 'billing') && (
+                {!client.deletedAt && !client.isNonBillable && roleHasAccess(user?.role, 'billing') && (
                   <button
                     onClick={() => { setShowOptionsMenu(false); setShowDiscountModal(true) }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
@@ -848,7 +858,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const today = new Date()
   const isPaid = invoice?.paymentStatus === 'paid'
   const isInvoiced = invoice?.invoiceStatus === 'invoiced'
-  const canViewBilling = roleHasAccess(user?.role, 'billing') && !client?.isCharity
+  const canViewBilling = roleHasAccess(user?.role, 'billing') && !client?.isNonBillable
   // Overdue: unpaid and past the 11th of the invoice's month
   const dueDate = new Date(year, month, 11, 23, 59, 59)
   const isOverdue = !isPaid && today > dueDate
