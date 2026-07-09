@@ -111,13 +111,17 @@ function getDayStyle(status, isJustified) {
   return ''
 }
 
-function getDayTooltip(status, isJustified) {
-  if (status === 'attended') return 'Asistió'
-  if (status === 'absent') return isJustified ? 'Falta justificada (+1 recupero)' : 'Falta no justificada'
-  if (status === 'vacation') return 'Vacaciones'
-  if (status === 'recovery') return 'Día recuperado'
-  if (status === 'scheduled') return 'Programado'
-  return ''
+// Returns { title, reason } — title is the status label, reason is the optional
+// free-text absence note (null when absent). Empty title => no tooltip.
+function getDayTooltip(status, isJustified, notes) {
+  let title = ''
+  if (status === 'attended') title = 'Asistió'
+  else if (status === 'absent') title = isJustified ? 'Falta justificada (+1 recupero)' : 'Falta no justificada'
+  else if (status === 'vacation') title = 'Vacaciones'
+  else if (status === 'recovery') title = 'Día recuperado'
+  else if (status === 'scheduled') title = 'Programado'
+  const reason = status === 'absent' && notes ? notes : null
+  return { title, reason }
 }
 
 export default function ClientDetail() {
@@ -927,7 +931,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     if (day < clientStart) return { status: 'not_scheduled', isJustified: false, isAssigned: false }
     // Baja: desde la fecha de baja (inclusive) el día ya no cuenta como asistencia ni es cobrable.
     if (deactDate && day >= deactDate) return { status: 'not_scheduled', isJustified: false, isAssigned: false }
-    if (rec) return { status: rec.status, isJustified: rec.isJustified ?? false, isAssigned: true }
+    if (rec) return { status: rec.status, isJustified: rec.isJustified ?? false, isAssigned: true, notes: rec.notes ?? null }
     if (day > today) return { status: 'scheduled', isJustified: false, isAssigned: true }
     return { status: 'attended', isJustified: false, isAssigned: true }
   }
@@ -1112,7 +1116,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
             {Array.from({ length: paddingDays }).map((_, i) => <div key={`pad-${i}`} className="h-7" />)}
             {days.map(day => {
               const isWeekend = getDay(day) === 0 || getDay(day) === 6
-              const { status, isJustified, isAssigned } = getDayStatus(day)
+              const { status, isJustified, isAssigned, notes } = getDayStatus(day)
               const isStartDate = format(day, 'yyyy-MM-dd') === format(clientStart, 'yyyy-MM-dd')
               // Every weekday (Mon-Fri) is clickable. Recovery still requires an
               // available credit, but that is enforced inside the recovery modal.
@@ -1128,6 +1132,16 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
                   ? 'bg-gray-50 text-gray-400 border border-dashed border-gray-200 hover:bg-blue-50 hover:text-blue-500'
                   : getDayStyle(status, isJustified)
 
+              const tip = getDayTooltip(status, isJustified, notes)
+              const isRecoverable = status === 'not_scheduled' && !isWeekend
+              const nativeTitle = isStartDate
+                ? 'Primer día'
+                : isRecoverable
+                  ? 'Recuperar día'
+                  : tip.title
+                    ? (tip.reason ? `${tip.title}\n${tip.reason}` : tip.title)
+                    : ''
+
               return (
                 <button
                   key={day.toISOString()}
@@ -1139,12 +1153,13 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
                     ${canClick ? 'hover:opacity-75 cursor-pointer' : 'cursor-default'}
                     ${isStartDate ? 'ring-2 ring-indigo-400 ring-offset-1' : ''}
                   `}
-                  title={isStartDate ? 'Primer día' : (status === 'not_scheduled' && !isWeekend ? 'Recuperar día' : getDayTooltip(status, isJustified))}
+                  title={nativeTitle}
                 >
                   {format(day, 'd')}
-                  {getDayTooltip(status, isJustified) && (
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-0.5 text-xs bg-gray-900 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                      {getDayTooltip(status, isJustified)}
+                  {tip.title && (
+                    <span className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs bg-gray-900 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 ${tip.reason ? 'max-w-[200px] whitespace-normal text-left' : 'whitespace-nowrap'}`}>
+                      <span className="font-medium block">{tip.title}</span>
+                      {tip.reason && <span className="block text-gray-300 mt-0.5">{tip.reason}</span>}
                     </span>
                   )}
                 </button>
