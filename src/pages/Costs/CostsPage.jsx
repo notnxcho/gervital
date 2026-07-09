@@ -7,7 +7,9 @@ import MonthNavigator from '../../components/ui/MonthNavigator'
 import {
   Plus,
   Trash,
-  Edit
+  Edit,
+  ExpandLines,
+  CompressLines
 } from 'iconoir-react'
 import {
   getSuppliers,
@@ -77,6 +79,10 @@ export default function CostsPage() {
   const emptyFilters = { query: '', categoryId: '', supplierId: '', minAmount: '', maxAmount: '' }
   const [variableFilters, setVariableFilters] = useState(emptyFilters)
   const [fixedFilters, setFixedFilters] = useState(emptyFilters)
+  // Bulk expand/collapse-all toggle per section. `version` bumps on each click so
+  // CategoryGroup instances re-sync to `open`, without locking out individual toggles in between.
+  const [fixedExpandAll, setFixedExpandAll] = useState({ open: false, version: 0 })
+  const [variableExpandAll, setVariableExpandAll] = useState({ open: false, version: 0 })
   const [supplierFilters, setSupplierFilters] = useState({ query: '', categoryId: '' })
   const [selectedDate, setSelectedDate] = useState(new Date())
 
@@ -388,12 +394,18 @@ export default function CostsPage() {
               supplierOptions={supplierOptions}
               showAmountRange
               searchPlaceholder="Buscar gasto fijo…"
+              trailing={
+                <ExpandCollapseAllButton
+                  expanded={fixedExpandAll.open}
+                  onClick={() => setFixedExpandAll(s => ({ open: !s.open, version: s.version + 1 }))}
+                />
+              }
             />
             {fixedGroups.length === 0 ? (
               <Card className="p-6 text-center"><p className="text-gray-500">Sin gastos fijos</p></Card>
             ) : (
               fixedGroups.map(group => (
-                <CategoryGroup key={group.key} storageKey={`fixed.${group.key}`} label={group.label} count={group.items.length} subtotal={group.subtotal}>
+                <CategoryGroup key={group.key} storageKey={`fixed.${group.key}`} label={group.label} count={group.items.length} subtotal={group.subtotal} forceOpen={fixedExpandAll}>
                   {group.items.map(f => (
                     <FixedExpenseCard
                       key={f.id}
@@ -427,12 +439,18 @@ export default function CostsPage() {
               supplierOptions={supplierOptions}
               showAmountRange
               searchPlaceholder="Buscar gasto…"
+              trailing={
+                <ExpandCollapseAllButton
+                  expanded={variableExpandAll.open}
+                  onClick={() => setVariableExpandAll(s => ({ open: !s.open, version: s.version + 1 }))}
+                />
+              }
             />
             {variableGroups.length === 0 ? (
               <Card className="p-6 text-center"><p className="text-gray-500">No hay gastos variables este mes</p></Card>
             ) : (
               variableGroups.map(group => (
-                <CategoryGroup key={group.key} storageKey={`variable.${group.key}`} label={group.label} count={group.items.length} subtotal={group.subtotal}>
+                <CategoryGroup key={group.key} storageKey={`variable.${group.key}`} label={group.label} count={group.items.length} subtotal={group.subtotal} forceOpen={variableExpandAll}>
                   {group.items.map(expense => (
                     <VariableExpenseCard
                       key={expense.id}
@@ -839,6 +857,21 @@ function VariableExpenseCard({ expense, supplierName, onEdit, onDelete }) {
         <button onClick={onDelete} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash className="w-4 h-4" /></button>
       </div>
     </Card>
+  )
+}
+
+// Bulk-toggles every CategoryGroup in a section between fully expanded/collapsed.
+function ExpandCollapseAllButton({ expanded, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={expanded ? 'Contraer todos' : 'Expandir todos'}
+      className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors shrink-0"
+    >
+      {expanded ? <CompressLines className="w-4 h-4" /> : <ExpandLines className="w-4 h-4" />}
+      <span>{expanded ? 'Contraer todos' : 'Expandir todos'}</span>
+    </button>
   )
 }
 

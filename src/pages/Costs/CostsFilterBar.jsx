@@ -1,18 +1,20 @@
 import { useState } from 'react'
-import { Search, Filter, NavArrowDown, NavArrowUp, Xmark } from 'iconoir-react'
+import { Search, Filter, Xmark } from 'iconoir-react'
 import { NONE_KEY } from '../../services/costs/costsFilters'
 
 const selectClass = 'px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent'
 
 // Reusable filter row for a costs section. Search is always visible; the
-// category/supplier/amount controls collapse behind a "Filtros" toggle.
+// category/supplier/amount controls collapse behind a "Filtros" icon toggle.
+// `trailing` renders extra actions (e.g. expand/collapse-all) next to it.
 export default function CostsFilterBar({
   filters,
   onChange,
   categoryOptions = [],
   supplierOptions = null,
   showAmountRange = false,
-  searchPlaceholder = 'Buscar…'
+  searchPlaceholder = 'Buscar…',
+  trailing = null
 }) {
   const [open, setOpen] = useState(false)
   const set = (patch) => onChange({ ...filters, ...patch })
@@ -43,17 +45,22 @@ export default function CostsFilterBar({
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
-          className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          title="Filtros"
+          aria-label="Filtros"
+          aria-expanded={open}
+          className={`relative flex items-center justify-center w-10 h-10 shrink-0 border rounded-lg transition-colors ${
+            open ? 'bg-purple-50 border-purple-300 text-purple-700' : 'border-gray-300 text-gray-500 hover:bg-gray-50'
+          }`}
         >
           <Filter className="w-4 h-4" />
-          <span>Filtros</span>
           {activeCount > 0 && (
-            <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-purple-600 text-white text-xs">
+            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-purple-600 text-white text-[10px] font-semibold">
               {activeCount}
             </span>
           )}
-          {open ? <NavArrowUp className="w-4 h-4 text-gray-400" /> : <NavArrowDown className="w-4 h-4 text-gray-400" />}
         </button>
+
+        {trailing}
       </div>
 
       {open && (

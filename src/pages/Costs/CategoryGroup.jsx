@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { NavArrowDown, NavArrowRight } from 'iconoir-react'
 import { formatCurrency } from '../../utils/format'
 
@@ -18,9 +18,23 @@ function readStoredOpen(storageKey, defaultOpen) {
 
 // Collapsible category header wrapping already-rendered item cards.
 // When `storageKey` is provided, the open/closed state persists to localStorage.
-export default function CategoryGroup({ label, count, subtotal, defaultOpen = true, storageKey, children }) {
+// `forceOpen` (optional { open, version }) lets a parent bulk-toggle every group
+// in a list: bumping `version` forces this group's open state to `open`,
+// without affecting individual per-group toggling in between bumps.
+export default function CategoryGroup({ label, count, subtotal, defaultOpen = true, storageKey, forceOpen, children }) {
   const [open, setOpen] = useState(() => readStoredOpen(storageKey, defaultOpen))
   const showSubtotal = subtotal != null
+  const skipFirstForceOpen = useRef(true)
+
+  useEffect(() => {
+    if (skipFirstForceOpen.current) {
+      skipFirstForceOpen.current = false
+      return
+    }
+    if (!forceOpen) return
+    setOpen(forceOpen.open)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceOpen?.version])
 
   useEffect(() => {
     if (!storageKey) return
