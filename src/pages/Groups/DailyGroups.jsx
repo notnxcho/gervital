@@ -72,7 +72,8 @@ export default function DailyGroups() {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
 
-  const readOnly = !isToday(selectedDate)
+  // Editable si el día es hoy o futuro; solo lectura si ya pasó
+  const readOnly = differenceInCalendarDays(today, selectedDate) > 0
   const dateStr = dateToStr(selectedDate)
   const dayName = DAY_NAMES[selectedDate.getDay()]
   const isWeekend = dayName === 'saturday' || dayName === 'sunday'
@@ -137,7 +138,7 @@ export default function DailyGroups() {
   // ── Navigation helpers ────────────────────────────────────────────────────
 
   const canGoBack = differenceInCalendarDays(today, selectedDate) < 14
-  const canGoForward = !isToday(selectedDate)
+  const canGoForward = differenceInCalendarDays(selectedDate, today) < 14
 
   function goBack() {
     if (canGoBack) setSelectedDate(prev => subDays(prev, 1))
