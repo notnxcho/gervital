@@ -28,6 +28,8 @@ export default function ChurnBoard() {
   const [selectedCard, setSelectedCard] = useState(null)
   const [reasonsByKey, setReasonsByKey] = useState({})
   const [managerOpen, setManagerOpen] = useState(false)
+  const [daysFilterEnabled, setDaysFilterEnabled] = useState(false)
+  const [maxDaysValue, setMaxDaysValue] = useState('30')
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -60,16 +62,19 @@ export default function ChurnBoard() {
     loadReasons()
   }, [loadBoard, loadReasons])
 
-  // Group cards by stage for rendering.
+  // Group cards by stage for rendering, hiding churns older than the selected threshold.
   const cardsByStage = useMemo(() => {
     const map = {}
     STAGES.forEach(s => { map[s.key] = [] })
-    cards.forEach(c => {
-      if (map[c.stage]) map[c.stage].push(c)
-      else map.new.push(c)
-    })
+    const maxDays = daysFilterEnabled && maxDaysValue ? Number(maxDaysValue) : null
+    cards
+      .filter(c => maxDays == null || c.daysSince == null || c.daysSince <= maxDays)
+      .forEach(c => {
+        if (map[c.stage]) map[c.stage].push(c)
+        else map.new.push(c)
+      })
     return map
-  }, [cards])
+  }, [cards, daysFilterEnabled, maxDaysValue])
 
   function handleDragStart({ active }) {
     const data = active.data.current
@@ -115,11 +120,34 @@ export default function ChurnBoard() {
             Recuperá clientes que se dieron de baja · disponible para todo el equipo
           </p>
         </div>
-        {user?.role === 'superadmin' && (
-          <Button variant="secondary" size="sm" onClick={() => setManagerOpen(true)}>
-            Gestionar motivos
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={daysFilterEnabled}
+              onClick={() => setDaysFilterEnabled(v => !v)}
+              className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 ${daysFilterEnabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
+            >
+              <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${daysFilterEnabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+            </button>
+            <span className={daysFilterEnabled ? 'text-gray-700' : 'text-gray-400'}>Ocultar más de</span>
+            <input
+              type="number"
+              min="1"
+              value={maxDaysValue}
+              onChange={(e) => setMaxDaysValue(e.target.value)}
+              disabled={!daysFilterEnabled}
+              className="w-12 px-1 py-0.5 text-sm text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-400"
+            />
+            <span className={daysFilterEnabled ? 'text-gray-700' : 'text-gray-400'}>días</span>
+          </div>
+          {user?.role === 'superadmin' && (
+            <Button variant="secondary" size="sm" onClick={() => setManagerOpen(true)}>
+              Gestionar motivos
+            </Button>
+          )}
+        </div>
       </div>
 
       {loading ? (
