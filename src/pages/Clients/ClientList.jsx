@@ -9,6 +9,7 @@ import { useReasonLabels } from '../../hooks/useReasonLabels'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Filters, { getActiveFiltersCount } from '../../components/ui/Filters'
+import { CLIENT_TYPE_META } from '../../services/clients/clientTypes'
 import DeactivateClientModal from './DeactivateClientModal'
 import './ClientCard.css'
 
@@ -36,13 +37,20 @@ const SCHEDULE_CONFIG = {
   full_day: { badge: 'TD', label: 'Día completo' }
 }
 
-// MOCKED RES - Condiciones médicas mostradas como punto + inicial
+// MOCKED RES - Condiciones médicas mostradas como punto + inicial.
+// Keyed on el valor `condition` de medicalHistory (migración 047 movió los flags a esa tabla)
 const MEDICAL_FLAGS = [
-  { key: 'isDiabetic', label: 'Diabético', initial: 'D', color: '#3b82f6' },
-  { key: 'isCeliac', label: 'Celíaco', initial: 'C', color: '#f59e0b' },
-  { key: 'isHypertensive', label: 'Hipertenso', initial: 'H', color: '#ef4444' },
-  { key: 'isLactoseIntolerant', label: 'Intolerante a la lactosa', initial: 'L', color: '#8b5cf6' }
+  { condition: 'diabetes', label: 'Diabético', initial: 'D', color: '#3b82f6' },
+  { condition: 'celiaquia', label: 'Celíaco', initial: 'C', color: '#f59e0b' },
+  { condition: 'hipertension', label: 'Hipertenso', initial: 'H', color: '#ef4444' },
+  { condition: 'intolerancia_lactosa', label: 'Intolerante a la lactosa', initial: 'L', color: '#8b5cf6' }
 ]
+
+// Deriva los flags visibles a partir del array medicalHistory del cliente
+const medicalFlagsFor = (client) => {
+  const conditions = new Set((client.medicalHistory || []).map(h => h.condition))
+  return MEDICAL_FLAGS.filter(f => conditions.has(f.condition))
+}
 
 // Configuración de filtros
 const FILTERS_CONFIG = [
@@ -72,12 +80,13 @@ const FILTERS_CONFIG = [
     ]
   },
   {
-    key: 'isCharity',
-    label: 'Beneficencia',
+    key: 'clientType',
+    label: 'Tipo',
     type: 'full',
     options: [
-      { value: true, label: 'Beneficencia' },
-      { value: false, label: 'Regulares' }
+      { value: 'regular', label: 'Normal' },
+      { value: 'charity', label: 'Beneficencia' },
+      { value: 'trial', label: 'A prueba' }
     ]
   },
   {
@@ -190,7 +199,7 @@ export default function ClientList() {
     cognitiveLevel: null,
     frequency: null,
     hasTransport: null,
-    isCharity: null,
+    clientType: null,
     showDeleted: null
   })
 
@@ -227,14 +236,14 @@ export default function ClientList() {
       const matchesCognitive = filters.cognitiveLevel === null || client.cognitiveLevel === filters.cognitiveLevel
       const matchesFrequency = filters.frequency === null || client.plan.frequency === filters.frequency
       const matchesTransport = filters.hasTransport === null || client.plan.hasTransport === filters.hasTransport
-      const matchesCharity = filters.isCharity === null || (!!client.isCharity) === filters.isCharity
+      const matchesType = filters.clientType === null || (client.clientType || 'regular') === filters.clientType
       // "Solo bajas": con el filtro activo se muestran únicamente los dados de baja
       const matchesDeleted = filters.showDeleted === true ? !!client.deletedAt : !client.deletedAt
 
-      return matchesSearch && matchesCognitive && matchesFrequency && matchesTransport && matchesCharity && matchesDeleted
+      return matchesSearch && matchesCognitive && matchesFrequency && matchesTransport && matchesType && matchesDeleted
     })
     return sortClients(filtered, sortBy)
-  }, [clients, search, filters.cognitiveLevel, filters.frequency, filters.hasTransport, filters.isCharity, filters.showDeleted, sortBy])
+  }, [clients, search, filters.cognitiveLevel, filters.frequency, filters.hasTransport, filters.clientType, filters.showDeleted, sortBy])
 
   const activeFiltersCount = getActiveFiltersCount(filters)
 
@@ -341,7 +350,7 @@ export default function ClientList() {
           </p>
           {activeFiltersCount > 0 && (
             <button
-              onClick={() => setFilters({ cognitiveLevel: null, frequency: null, hasTransport: null, isCharity: null, showDeleted: null })}
+              onClick={() => setFilters({ cognitiveLevel: null, frequency: null, hasTransport: null, clientType: null, showDeleted: null })}
               className="mt-2 text-purple-600 hover:text-purple-700 text-sm font-medium"
             >
               Limpiar filtros
@@ -380,7 +389,7 @@ const ClientCard = memo(function ClientCard({ client }) {
   const deactivatedLabel = isDeactivated
     ? `Baja: ${reasonLabels[client.deactivationReason] || 'Sin motivo'} · ${format(bajaDate(client), "d MMM yyyy", { locale: es })}`
     : null
-  const flags = MEDICAL_FLAGS.filter(f => client.medicalInfo?.[f.key])
+  const flags = medicalFlagsFor(client)
   const schedule = SCHEDULE_CONFIG[client.plan.schedule]
 
   return (
@@ -407,7 +416,7 @@ const ClientCard = memo(function ClientCard({ client }) {
       {flags.length > 0 && (
         <div className="cc-med-tab">
           {flags.map(f => (
-            <span key={f.key} className="cc-med">
+            <span key={f.condition} className="cc-med">
               <span className="cc-dot" style={{ background: f.color }} />
               {f.initial}
             </span>
@@ -436,8 +445,10 @@ const ClientCard = memo(function ClientCard({ client }) {
             </div>
 
             <div className="cc-right">
-              {client.isCharity && (
-                <span className="cc-tchip" title="Beneficencia" style={{ background: '#ede9fe', color: '#7c3aed' }}>♥</span>
+              {client.clientType && client.clientType !== 'regular' && CLIENT_TYPE_META[client.clientType] && (
+                <span className="cc-tchip" title={CLIENT_TYPE_META[client.clientType].label} style={{ background: CLIENT_TYPE_META[client.clientType].bg, color: CLIENT_TYPE_META[client.clientType].color }}>
+                  {CLIENT_TYPE_META[client.clientType].glyph}
+                </span>
               )}
 
               {client.plan.hasTransport && (
@@ -469,7 +480,7 @@ const ClientRow = memo(function ClientRow({ client }) {
   const deactivatedLabel = isDeactivated
     ? `Baja: ${reasonLabels[client.deactivationReason] || 'Sin motivo'} · ${format(bajaDate(client), "d MMM yyyy", { locale: es })}`
     : null
-  const flags = MEDICAL_FLAGS.filter(f => client.medicalInfo?.[f.key])
+  const flags = medicalFlagsFor(client)
   const schedule = SCHEDULE_CONFIG[client.plan.schedule]
 
   return (
@@ -496,8 +507,10 @@ const ClientRow = memo(function ClientRow({ client }) {
       <div className="cr-main">
         <span className="cr-name">
           {client.firstName} {client.lastName}
-          {client.isCharity && (
-            <span title="Beneficencia" style={{ marginLeft: 6, color: '#7c3aed' }}>♥</span>
+          {client.clientType && client.clientType !== 'regular' && CLIENT_TYPE_META[client.clientType] && (
+            <span title={CLIENT_TYPE_META[client.clientType].label} style={{ marginLeft: 6, color: CLIENT_TYPE_META[client.clientType].color }}>
+              {CLIENT_TYPE_META[client.clientType].glyph}
+            </span>
           )}
         </span>
         <span className="cr-sub">
@@ -514,7 +527,7 @@ const ClientRow = memo(function ClientRow({ client }) {
           {flags.length > 0 && (
             <div className="cr-meds">
               {flags.map(f => (
-                <span key={f.key} className="cr-meddot" style={{ background: f.color }} title={f.label} />
+                <span key={f.condition} className="cr-meddot" style={{ background: f.color }} title={f.label} />
               ))}
             </div>
           )}
