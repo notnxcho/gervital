@@ -698,11 +698,6 @@ video {
   margin-right: 1rem;
 }
 
-.mx-8 {
-  margin-left: 2rem;
-  margin-right: 2rem;
-}
-
 .mx-auto {
   margin-left: auto;
   margin-right: auto;
@@ -925,6 +920,10 @@ video {
   height: 16px;
 }
 
+.h-\[18px\] {
+  height: 18px;
+}
+
 .h-auto {
   height: auto;
 }
@@ -1049,6 +1048,10 @@ video {
   width: 13rem;
 }
 
+.w-56 {
+  width: 14rem;
+}
+
 .w-6 {
   width: 1.5rem;
 }
@@ -1065,10 +1068,6 @@ video {
   width: 1.75rem;
 }
 
-.w-72 {
-  width: 18rem;
-}
-
 .w-8 {
   width: 2rem;
 }
@@ -1079,6 +1078,10 @@ video {
 
 .w-9 {
   width: 2.25rem;
+}
+
+.w-96 {
+  width: 24rem;
 }
 
 .w-\[170px\] {
@@ -1128,6 +1131,10 @@ video {
 
 .min-w-\[180px\] {
   min-width: 180px;
+}
+
+.min-w-\[18px\] {
+  min-width: 18px;
 }
 
 .min-w-\[230px\] {
@@ -2777,6 +2784,10 @@ video {
   color: rgb(156 163 175 / var(--tw-placeholder-opacity, 1));
 }
 
+.accent-purple-600 {
+  accent-color: #9333ea;
+}
+
 .opacity-0 {
   opacity: 0;
 }
@@ -2858,10 +2869,20 @@ video {
   outline-offset: 2px;
 }
 
+.ring-1 {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
 .ring-2 {
   --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
   --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
   box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
+.ring-black\/5 {
+  --tw-ring-color: rgb(0 0 0 / 0.05);
 }
 
 .ring-indigo-200 {
@@ -3397,6 +3418,11 @@ video {
 .disabled\:text-gray-300:disabled {
   --tw-text-opacity: 1;
   color: rgb(209 213 219 / var(--tw-text-opacity, 1));
+}
+
+.disabled\:text-gray-400:disabled {
+  --tw-text-opacity: 1;
+  color: rgb(156 163 175 / var(--tw-text-opacity, 1));
 }
 
 .disabled\:opacity-30:disabled {

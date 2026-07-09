@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, memo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Plus, Search } from 'iconoir-react'
+import { Plus, Search, User, Heart, Flash } from 'iconoir-react'
 import { differenceInYears, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getClients, deactivateClient } from '../../services/api'
@@ -9,6 +9,7 @@ import { useReasonLabels } from '../../hooks/useReasonLabels'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Filters, { getActiveFiltersCount } from '../../components/ui/Filters'
+import SortMenu from '../../components/ui/SortMenu'
 import { CLIENT_TYPE_META } from '../../services/clients/clientTypes'
 import DeactivateClientModal from './DeactivateClientModal'
 import './ClientCard.css'
@@ -82,19 +83,19 @@ const FILTERS_CONFIG = [
   {
     key: 'clientType',
     label: 'Tipo',
-    type: 'full',
+    type: 'icon',
     options: [
-      { value: 'regular', label: 'Normal' },
-      { value: 'charity', label: 'Beneficencia' },
-      { value: 'trial', label: 'A prueba' }
+      { value: 'regular', label: 'Normal', icon: User },
+      { value: 'charity', label: 'Beneficencia', icon: Heart },
+      { value: 'trial', label: 'A prueba', icon: Flash }
     ]
   },
   {
     key: 'showDeleted',
     label: 'Bajas',
-    type: 'full',
+    type: 'checkbox',
     options: [
-      { value: true, label: 'Solo bajas' }
+      { value: true, label: 'Mostrar solo bajas' }
     ]
   }
 ]
@@ -264,49 +265,42 @@ export default function ClientList() {
 
   return (
     <div className="bg-gray-50 min-h-screen -mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      {/* Header: título + búsqueda (span) + filtros + orden + vista + CTA */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 shrink-0">
           <h1 className="text-2xl font-semibold text-gray-900">Clientes</h1>
           <span className="text-gray-400">–</span>
           <span className="text-gray-500">{filteredClients.length}</span>
         </div>
 
-        {/* Search and Filters */}
-        <div className="flex items-center gap-3 flex-1 max-w-3xl mx-8">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre, cedula, dirección..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-
-          <Filters
-            filters={filters}
-            onChange={setFilters}
-            config={FILTERS_CONFIG}
+        {/* Búsqueda: ocupa todo el ancho disponible */}
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, cedula, dirección..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
         </div>
 
-        <Button
-          onClick={() => navigate('/clientes/nuevo')}
-          className="bg-purple-600 hover:bg-purple-700 rounded-full px-6"
-        >
-          Alta de cliente
-          <Plus className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
+        <Filters
+          filters={filters}
+          onChange={setFilters}
+          config={FILTERS_CONFIG}
+        />
 
-      {/* Toolbar: toggle de vista + ordenamiento */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1">
+        {/* Orden */}
+        <div className="shrink-0">
+          <SortMenu value={sortBy} onChange={setSortBy} options={SORT_OPTIONS} />
+        </div>
+
+        {/* Toggle de vista */}
+        <div className="shrink-0 flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1">
           <button
             onClick={() => setViewMode('grid')}
-            className={`p-1.5 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-purple-100 text-purple-700' : 'text-gray-400 hover:text-gray-600'}`}
+            className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-purple-100 text-purple-700' : 'text-gray-400 hover:text-gray-600'}`}
             title="Vista grilla"
             aria-label="Vista grilla"
           >
@@ -314,7 +308,7 @@ export default function ClientList() {
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-purple-100 text-purple-700' : 'text-gray-400 hover:text-gray-600'}`}
+            className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-purple-100 text-purple-700' : 'text-gray-400 hover:text-gray-600'}`}
             title="Vista lista"
             aria-label="Vista lista"
           >
@@ -322,18 +316,13 @@ export default function ClientList() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-400">Ordenar por</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="py-2 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
-          >
-            {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
+        <Button
+          onClick={() => navigate('/clientes/nuevo')}
+          className="shrink-0 bg-purple-600 hover:bg-purple-700 rounded-full px-6"
+        >
+          Alta de cliente
+          <Plus className="w-4 h-4 ml-1" />
+        </Button>
       </div>
 
       {/* Loading */}
