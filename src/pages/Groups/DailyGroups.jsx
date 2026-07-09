@@ -530,24 +530,34 @@ export default function DailyGroups() {
         )}
       </div>
 
-      {/* Shift tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
-        {[
-          { key: 'morning', label: 'Mañana' },
-          { key: 'afternoon', label: 'Tarde' }
-        ].map(tab => (
+      {/* Agregar horario (izquierda) + switch de turno en la misma línea */}
+      <div className="flex items-center gap-3 mb-6">
+        {!readOnly && !isWeekend && (
           <button
-            key={tab.key}
-            onClick={() => setActiveShift(tab.key)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeShift === tab.key
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            onClick={handleAddSlot}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors"
           >
-            {tab.label}
+            + Agregar horario
           </button>
-        ))}
+        )}
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+          {[
+            { key: 'morning', label: 'Mañana' },
+            { key: 'afternoon', label: 'Tarde' }
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveShift(tab.key)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeShift === tab.key
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Main content */}
@@ -570,18 +580,6 @@ export default function DailyGroups() {
           <div className="flex gap-0 min-h-[60vh]">
             {/* Time slots area */}
             <div className="flex-1 min-w-0 pr-0">
-              {/* Add slot button (today only) */}
-              {!readOnly && (
-                <div className="mb-4">
-                  <button
-                    onClick={handleAddSlot}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors"
-                  >
-                    + Agregar horario
-                  </button>
-                </div>
-              )}
-
               {timeSlots.length === 0 ? (
                 <div className="text-center py-12 text-gray-400 text-sm border border-dashed border-gray-200 rounded-xl">
                   {readOnly
