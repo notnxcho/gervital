@@ -1547,8 +1547,9 @@ function AbsenceModal({ isOpen, onClose, date, onConfirm }) {
         </button>
 
         <div>
-          <label className="block text-sm text-gray-600 mb-1">Motivo (opcional)</label>
+          <label htmlFor="absence-reason" className="block text-sm text-gray-600 mb-1">Motivo (opcional)</label>
           <textarea
+            id="absence-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Motivo de la falta..."
