@@ -55,14 +55,14 @@ export default function TimeSlotCard({
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-xs text-gray-400">
+          <span className="text-sm text-gray-400">
             {slot.activities.length} {slot.activities.length === 1 ? 'actividad' : 'actividades'}
           </span>
           {!readOnly && (
             <>
               <button
                 onClick={() => onAddActivity(slot.id)}
-                className="text-xs text-gray-400 hover:text-indigo-600 transition-colors"
+                className="text-sm font-medium text-purple-600 hover:text-purple-700 transition-colors"
                 title="Agregar actividad"
               >
                 + Actividad
