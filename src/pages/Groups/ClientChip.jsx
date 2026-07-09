@@ -84,11 +84,24 @@ export function AbsenceClientChip({ client, variant = 'absent' }) {
   )
 }
 
-export function AssignedClientChip({ client, onRemove, readOnly, isRecovery }) {
+export function AssignedClientChip({ client, onRemove, readOnly, isRecovery, activityId, slotId }) {
   const initials = `${client.firstName?.[0] || ''}${client.lastName?.[0] || ''}`
 
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `assigned-${activityId}-${client.id}`,
+    data: { type: 'assigned-client', client, sourceActivityId: activityId, sourceSlotId: slotId },
+    disabled: readOnly
+  })
+
   return (
-    <div className="group flex items-center gap-1.5 px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm">
+    <div
+      ref={setNodeRef}
+      {...(!readOnly ? listeners : {})}
+      {...(!readOnly ? attributes : {})}
+      className={`group flex items-center gap-1.5 px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm select-none ${
+        readOnly ? '' : 'cursor-grab active:cursor-grabbing'
+      } ${isDragging ? 'opacity-40' : ''}`}
+    >
       {client.avatarUrl ? (
         <img src={client.avatarUrl} alt={initials} className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
       ) : (
@@ -105,6 +118,7 @@ export function AssignedClientChip({ client, onRemove, readOnly, isRecovery }) {
       </span>
       {!readOnly && onRemove && (
         <button
+          onPointerDown={e => e.stopPropagation()}
           onClick={onRemove}
           className="ml-auto opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-red-500 transition-opacity"
           title="Quitar"

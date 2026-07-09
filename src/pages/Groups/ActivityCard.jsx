@@ -85,6 +85,8 @@ export default function ActivityCard({
             readOnly={readOnly}
             onRemove={() => onRemoveClient(activity.id, client.id)}
             isRecovery={recoveryIds?.has(client.id)}
+            activityId={activity.id}
+            slotId={slotId}
           />
         ))}
         {assignedClients.length === 0 && (

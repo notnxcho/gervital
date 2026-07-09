@@ -374,34 +374,76 @@ export default function DailyGroups() {
 
   function handleDragStart({ active }) {
     const data = active.data.current
-    if (data?.type === 'pool-client') {
-      setDraggedClient(data.client)
+    if (data?.type !== 'pool-client' && data?.type !== 'assigned-client') return
 
-      // Find ALL slots where this client already has an assignment
-      const ids = new Set()
-      for (const slot of timeSlots) {
-        for (const activity of slot.activities) {
-          if (activity.clientIds.includes(data.client.id)) {
-            ids.add(slot.id)
-            break
-          }
+    setDraggedClient(data.client)
+
+    // Slots where this client already has an assignment are invalid drop targets
+    // (a client can only be in one activity per time slot). When moving an existing
+    // assignment, the source slot stays valid — we vacate the source activity first.
+    const ids = new Set()
+    for (const slot of timeSlots) {
+      if (data.type === 'assigned-client' && slot.id === data.sourceSlotId) continue
+      for (const activity of slot.activities) {
+        if (activity.clientIds.includes(data.client.id)) {
+          ids.add(slot.id)
+          break
         }
       }
-      setInvalidDropSlotIds(ids)
     }
+    setInvalidDropSlotIds(ids)
   }
 
   function handleDragEnd({ active, over }) {
     const client = draggedClient
+    const activeType = active.data.current?.type
     setDraggedClient(null)
     setInvalidDropSlotIds(new Set())
 
     if (!over || !client) return
 
     const overData = over.data.current
-    if (active.data.current?.type !== 'pool-client' || overData?.type !== 'activity') return
+    if (overData?.type !== 'activity') return
 
     const { activityId, slotId } = overData
+
+    if (activeType === 'assigned-client') {
+      const { sourceActivityId } = active.data.current
+      if (sourceActivityId === activityId) return // dropped back on the same activity
+
+      // Validate: client must not already be in another activity of the target slot
+      const targetSlot = timeSlots.find(s => s.id === slotId)
+      if (targetSlot) {
+        const alreadyInSlot = targetSlot.activities.some(a =>
+          a.id !== sourceActivityId && a.clientIds.includes(client.id)
+        )
+        if (alreadyInSlot) return
+      }
+
+      // Optimistic move: remove from source activity, add to target
+      const snapshot = timeSlots
+      setTimeSlots(prev => prev.map(slot => ({
+        ...slot,
+        activities: slot.activities.map(a => {
+          if (a.id === sourceActivityId) return { ...a, clientIds: a.clientIds.filter(id => id !== client.id) }
+          if (a.id === activityId) return { ...a, clientIds: [...a.clientIds, client.id] }
+          return a
+        })
+      })))
+
+      // Vaciar el origen ANTES de asignar el destino: el trigger
+      // enforce_one_activity_per_slot rechaza el insert si el cliente sigue
+      // asignado a otra actividad del mismo horario (por eso no van en paralelo)
+      removeClientFromActivity(sourceActivityId, client.id)
+        .then(() => assignClientToActivity(activityId, client.id))
+        .catch(err => {
+          console.error('Error moving client:', err)
+          setTimeSlots(snapshot)
+        })
+      return
+    }
+
+    if (activeType !== 'pool-client') return
 
     // Validate: client must not already be in another activity of the same time slot
     const targetSlot = timeSlots.find(s => s.id === slotId)
