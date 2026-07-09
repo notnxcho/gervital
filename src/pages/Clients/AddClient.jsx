@@ -7,7 +7,7 @@ import { createClient, updateClient, getClientById, uploadClientAvatar, updateCl
 import LocationPickerModal from './LocationPickerModal'
 import { geocodeWithGoogle, haversineKm, distanceToRange } from '../../services/clients/geocodingService'
 import { CLUB_LOCATION } from '../../services/transport/transportConstants'
-import { getPlanPricing, getPlanPriceSync } from '../../services/pricing/pricingService'
+import { getPlanPricing, getPlanPriceSync, calculateMonthProration } from '../../services/pricing/pricingService'
 import { getTransportPricing, getTransportPriceSync } from '../../services/pricing/transportPricingService'
 import Button from '../../components/ui/Button'
 import Input, { Select, Textarea, Checkbox } from '../../components/ui/Input'
@@ -491,30 +491,20 @@ export default function AddClient() {
     : { priceNet: 0, priceGross: 0 }
   const estimatedTotalGross = planPrice.priceGross + transportPrice.priceGross
 
-  // Prorrateo del primer mes según la fecha de inicio, con el modelo de precio por día
-  // determinístico: días estándar = 4 × frecuencia, se factura min(días desde el inicio, estándar).
+  // Prorrateo del primer mes según la fecha de inicio (misma lógica que la calculadora de planes).
   const firstMonth = (() => {
-    const DOW = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-    const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-    const days = formData.assignedDays || []
-    const freq = parseInt(formData.frequency)
-    if (!formData.startDate || days.length === 0 || !freq) return null
+    if (!formData.startDate) return null
     const start = new Date(`${formData.startDate}T00:00:00`)
     if (isNaN(start.getTime())) return null
-    const y = start.getFullYear()
-    const mo = start.getMonth()
-    const lastDay = new Date(y, mo + 1, 0).getDate()
-    let charged = 0
-    for (let dnum = 1; dnum <= lastDay; dnum++) {
-      const d = new Date(y, mo, dnum)
-      if (days.includes(DOW[d.getDay()]) && d >= start) charged++
-    }
-    const daysPerMonth = 4 * freq
-    const billed = Math.max(0, Math.min(charged, daysPerMonth))
-    const factor = billed / daysPerMonth
-    const attendance = Math.round(factor * planPrice.priceGross)
-    const transport = Math.round(factor * transportPrice.priceGross)
-    return { label: `${MONTHS[mo]} ${y}`, billed, daysPerMonth, prorated: billed < daysPerMonth, attendance, transport, total: attendance + transport }
+    return calculateMonthProration({
+      year: start.getFullYear(),
+      month: start.getMonth(),
+      startDate: formData.startDate,
+      assignedDays: formData.assignedDays,
+      frequency: parseInt(formData.frequency),
+      monthlyAttendanceGross: planPrice.priceGross,
+      monthlyTransportGross: transportPrice.priceGross
+    })
   })()
 
   if (loadingClient) {

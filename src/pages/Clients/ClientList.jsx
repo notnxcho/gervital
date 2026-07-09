@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, memo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Plus, Search, User, Heart, Flash } from 'iconoir-react'
+import { Plus, Search, User, Heart, Flash, Calculator } from 'iconoir-react'
 import { differenceInYears, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getClients, deactivateClient } from '../../services/api'
@@ -12,6 +12,7 @@ import Filters, { getActiveFiltersCount } from '../../components/ui/Filters'
 import SortMenu from '../../components/ui/SortMenu'
 import { CLIENT_TYPE_META } from '../../services/clients/clientTypes'
 import DeactivateClientModal from './DeactivateClientModal'
+import PlanCalculatorModal from './PlanCalculatorModal'
 import './ClientCard.css'
 
 // MOCKED RES - Días de la semana
@@ -188,10 +189,11 @@ function ListIcon({ size = 18 }) {
 }
 
 export default function ClientList() {
-  const { user } = useAuth()
+  const { user, hasAccess } = useAuth()
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [calculatorOpen, setCalculatorOpen] = useState(false)
   const [deactivateModal, setDeactivateModal] = useState({ open: false, client: null })
   const [deactivating, setDeactivating] = useState(false)
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('clients.viewMode') || 'grid')
@@ -316,6 +318,17 @@ export default function ClientList() {
           </button>
         </div>
 
+        {hasAccess('billing') && (
+          <Button
+            variant="secondary"
+            onClick={() => setCalculatorOpen(true)}
+            className="shrink-0 rounded-full px-5"
+          >
+            <Calculator className="w-4 h-4 mr-1" />
+            Calcular
+          </Button>
+        )}
+
         <Button
           onClick={() => navigate('/clientes/nuevo')}
           className="shrink-0 bg-purple-600 hover:bg-purple-700 rounded-full px-6"
@@ -366,6 +379,11 @@ export default function ClientList() {
         client={deactivateModal.client}
         onConfirm={handleDeactivate}
         loading={deactivating}
+      />
+
+      <PlanCalculatorModal
+        isOpen={calculatorOpen}
+        onClose={() => setCalculatorOpen(false)}
       />
     </div>
   )
