@@ -16,10 +16,9 @@ export const CAR_COLORS = [
 export const UNASSIGNED_COLOR = '#9ca3af'
 
 export const DEFAULT_FLEET = [
-  { name: 'Combi Grande', seatCount: 7 },
+  { name: 'Auto 1', seatCount: 4 },
   { name: 'Auto 2', seatCount: 4 },
-  { name: 'Auto 3', seatCount: 4 },
-  { name: 'Auto 4', seatCount: 4 }
+  { name: 'Auto 3', seatCount: 4 }
 ]
 
 export const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
