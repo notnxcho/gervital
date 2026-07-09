@@ -41,7 +41,7 @@ export default function Filters({ filters, onChange, config = [] }) {
       <button
         onClick={() => setShowFilters(!showFilters)}
         className={`
-          flex items-center gap-2 px-4 h-11 bg-white border rounded-xl transition-colors
+          flex items-center gap-2 px-4 h-11 text-sm bg-white border rounded-xl transition-colors
           ${activeFiltersCount > 0
             ? 'border-purple-300 text-purple-700'
             : 'border-gray-200 text-gray-600 hover:border-gray-300'}

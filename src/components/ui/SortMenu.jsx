@@ -21,7 +21,7 @@ export default function SortMenu({ value, onChange, options = [] }) {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-4 h-11 bg-white border border-gray-200 rounded-xl text-gray-600 hover:border-gray-300 transition-colors"
+        className="flex items-center gap-2 px-4 h-11 text-sm bg-white border border-gray-200 rounded-xl text-gray-600 hover:border-gray-300 transition-colors"
       >
         <SortDown className="w-5 h-5" />
         <span className="font-medium">Ordenar</span>
