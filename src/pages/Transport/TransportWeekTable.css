@@ -12,7 +12,7 @@
   background: #fff;
   border-radius: 14px;
   box-shadow: 0 12px 44px rgba(0, 0, 0, .26);
-  width: 100%; height: max-content; max-height: 100%;
+  width: 100%; max-width: 1200px; height: max-content; max-height: 100%;
   display: flex; flex-direction: column;
   overflow: hidden;
 }
@@ -82,7 +82,7 @@
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
-  min-width: 920px;
+  min-width: 1120px; /* corner (120) + 5 day cols (200 each) — same widths as Grupos */
 }
 
 /* Top-left corner — highest stacking */
@@ -91,7 +91,7 @@
   background: #fff;
   border-right: 1px solid #e5e7eb;
   border-bottom: 1px solid #e5e7eb;
-  min-width: 132px; width: 132px;
+  min-width: 120px; width: 120px;
 }
 
 /* Day column headers — sticky top */
@@ -101,7 +101,7 @@
   border-bottom: 1px solid #e5e7eb;
   border-right: 1px solid #f3f4f6;
   padding: 12px 14px; text-align: left;
-  min-width: 260px;
+  min-width: 200px;
 }
 .wk-day-name { font-size: 14px; font-weight: 700; }
 .wk-day-sub { font-size: 14px; color: #9ca3af; font-weight: 500; margin-top: 1px; }
@@ -114,7 +114,7 @@
   border-bottom: 1px solid #f3f4f6;
   text-align: left; padding: 12px 14px;
   vertical-align: top;
-  min-width: 132px; width: 132px;
+  min-width: 120px; width: 120px;
 }
 .wk-shift-label { font-size: 14px; font-weight: 700; line-height: 1.2; }
 .wk-shift-time { font-size: 14px; color: #9ca3af; font-weight: 600; margin-top: 2px; }
@@ -131,7 +131,7 @@
   border-bottom: 1px solid #f3f4f6;
   border-right: 1px solid #f3f4f6;
   padding: 8px; vertical-align: top;
-  min-width: 260px;
+  min-width: 200px;
 }
 .wk-table tr.wk-band td.wk-cell { background: #fcfcfd; }
 .wk-table tr.wk-band th.wk-shift { background: #fcfcfd; }

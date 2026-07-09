@@ -10,7 +10,7 @@ import { format, addDays, subDays, isToday, differenceInCalendarDays, startOfDay
 import { es } from 'date-fns/locale/es'
 import { NavArrowLeft, NavArrowRight, Calendar } from 'iconoir-react'
 import { getClients, getAttendanceForDate, getAttendanceForDateRange } from '../../services/api'
-import { classifyDay, indexAttendanceByClientId, RECOVERY_STATUS } from '../../services/attendance/dayRoster'
+import { classifyDay, buildDayRoster, indexAttendanceByClientId, RECOVERY_STATUS } from '../../services/attendance/dayRoster'
 import {
   getTimeSlotsForDate,
   createTimeSlot,
@@ -97,6 +97,18 @@ export default function DailyGroups() {
   }, [allClients, dayName, activeShift, attendanceByClientId])
 
   const shiftClients = dayClassified.present
+
+  // Meal counts: global to the day, independent of the active shift tab.
+  // Desayuno = mañana + día completo · Almuerzo = solo día completo · Merienda = tarde + día completo.
+  const mealCounts = useMemo(() => {
+    const countFor = (matchesShift) =>
+      buildDayRoster({ clients: allClients, dayName, matchesShift, attendanceByClientId }).length
+    return {
+      breakfast: countFor(c => c.plan?.schedule === 'morning' || c.plan?.schedule === 'full_day'),
+      lunch: countFor(c => c.plan?.schedule === 'full_day'),
+      snack: countFor(c => c.plan?.schedule === 'afternoon' || c.plan?.schedule === 'full_day')
+    }
+  }, [allClients, dayName, attendanceByClientId])
 
   const recoveryIds = useMemo(() => {
     const ids = new Set()
@@ -485,6 +497,15 @@ export default function DailyGroups() {
         </Button>
       </div>
 
+      {/* Meal counts: global to the day, same regardless of the active shift tab */}
+      {!isWeekend && (
+        <div className="flex items-center gap-3 mb-6">
+          <MealCountBadge label="Desayuno" count={mealCounts.breakfast} />
+          <MealCountBadge label="Almuerzo" count={mealCounts.lunch} />
+          <MealCountBadge label="Merienda" count={mealCounts.snack} />
+        </div>
+      )}
+
       {/* Shift tabs */}
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
         {[
@@ -604,6 +625,16 @@ export default function DailyGroups() {
         weekDates={weekDates}
         attendanceByDate={weekAttendanceByDate}
       />
+    </div>
+  )
+}
+
+// Compact counter for one of the day's meals (just the number, not the roster).
+function MealCountBadge({ label, count }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg">
+      <span className="text-sm text-gray-500">{label}</span>
+      <span className="text-base font-semibold text-gray-900 tabular-nums">{count}</span>
     </div>
   )
 }
