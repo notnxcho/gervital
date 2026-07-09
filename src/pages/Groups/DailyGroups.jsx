@@ -438,6 +438,38 @@ export default function DailyGroups() {
 
   const formattedDate = format(selectedDate, "EEEE d 'de' MMMM, yyyy", { locale: es })
 
+  // Toolbar arriba de la columna de horarios: switch de turno (izq) + agregar horario (der)
+  const shiftToolbar = (
+    <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        {[
+          { key: 'morning', label: 'Mañana' },
+          { key: 'afternoon', label: 'Tarde' }
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveShift(tab.key)}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeShift === tab.key
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {!readOnly && !isWeekend && (
+        <button
+          onClick={handleAddSlot}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors"
+        >
+          + Agregar horario
+        </button>
+      )}
+    </div>
+  )
+
   return (
     <div className="bg-gray-50 min-h-screen -mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8">
       {/* Page header */}
@@ -530,47 +562,16 @@ export default function DailyGroups() {
         )}
       </div>
 
-      {/* Switch de turno (izquierda) + agregar horario (derecha), spaced between */}
-      <div className="flex items-center justify-between gap-3 mb-6">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-          {[
-            { key: 'morning', label: 'Mañana' },
-            { key: 'afternoon', label: 'Tarde' }
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveShift(tab.key)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeShift === tab.key
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        {!readOnly && !isWeekend && (
-          <button
-            onClick={handleAddSlot}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors"
-          >
-            + Agregar horario
-          </button>
-        )}
-      </div>
-
       {/* Main content */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
-        </div>
-      ) : isWeekend ? (
-        <div className="text-center py-16 text-gray-400">
-          <Calendar className="w-10 h-10 mx-auto mb-3 opacity-40" />
-          <p className="text-base font-medium">No hay asistentes programados para este día</p>
-          <p className="text-sm mt-1">El club no opera los fines de semana</p>
-        </div>
+      {isWeekend ? (
+        <>
+          {shiftToolbar}
+          <div className="text-center py-16 text-gray-400">
+            <Calendar className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p className="text-base font-medium">No hay asistentes programados para este día</p>
+            <p className="text-sm mt-1">El club no opera los fines de semana</p>
+          </div>
+        </>
       ) : (
         <DndContext
           sensors={sensors}
@@ -578,9 +579,14 @@ export default function DailyGroups() {
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-0 min-h-[60vh]">
-            {/* Time slots area */}
+            {/* Time slots area: toolbar arriba + contenido */}
             <div className="flex-1 min-w-0 pr-0">
-              {timeSlots.length === 0 ? (
+              {shiftToolbar}
+              {loading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+                </div>
+              ) : timeSlots.length === 0 ? (
                 <div className="text-center py-12 text-gray-400 text-sm border border-dashed border-gray-200 rounded-xl">
                   {readOnly
                     ? 'No hubo horarios programados para este día'
@@ -609,7 +615,7 @@ export default function DailyGroups() {
               )}
             </div>
 
-            {/* Client pool sidebar */}
+            {/* Client pool sidebar (sube al tope, en línea con la toolbar) */}
             <ClientPool
               clients={shiftClients}
               clientsInAllSlots={clientsInAllSlots}
