@@ -44,6 +44,7 @@ import Tabs from '../../components/ui/Tabs'
 import Modal from '../../components/ui/Modal'
 import DeactivateClientModal from './DeactivateClientModal'
 import RecoveryCreditsModal from './RecoveryCreditsModal'
+import { MARITAL_STATUS_OPTIONS, RESIDENCE_TYPE_OPTIONS, MEDICAL_HISTORY_CONDITIONS, DIAGNOSIS_TYPE_OPTIONS, CHARACTER_OPTIONS } from '../../services/clients/medicalConstants'
 
 const SCHEDULE_LABELS = {
   morning: 'Mañana',
@@ -575,6 +576,18 @@ export default function ClientDetail() {
                   {format(new Date(client.startDate), "d 'de' MMMM, yyyy", { locale: es })}
                 </p>
               </div>
+              <div>
+                <p className="text-sm text-gray-500">Estado civil</p>
+                <p className="font-medium text-gray-900">{MARITAL_STATUS_OPTIONS.find(o => o.value === client.maritalStatus)?.label || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Tipo de domicilio</p>
+                <p className="font-medium text-gray-900">{RESIDENCE_TYPE_OPTIONS.find(o => o.value === client.residenceType)?.label || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Con quién vive</p>
+                <p className="font-medium text-gray-900">{client.livesWith || '-'}</p>
+              </div>
             </div>
           )}
           {activeTab === 'contact' && (
@@ -613,38 +626,88 @@ export default function ClientDetail() {
             </div>
           )}
           {activeTab === 'medical' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><p className="text-sm text-gray-500">Restricciones alimentarias</p><p className="font-medium text-gray-900">{client.medicalInfo?.dietaryRestrictions || '-'}</p></div>
-                <div><p className="text-sm text-gray-500">Restricciones médicas</p><p className="font-medium text-gray-900">{client.medicalInfo?.medicalRestrictions || '-'}</p></div>
-                <div><p className="text-sm text-gray-500">Restricciones de movilidad</p><p className="font-medium text-gray-900">{client.medicalInfo?.mobilityRestrictions || '-'}</p></div>
-                <div><p className="text-sm text-gray-500">Medicación</p><p className="font-medium text-gray-900">{client.medicalInfo?.medication || '-'}</p></div>
-                <div><p className="text-sm text-gray-500">Horario de medicación</p><p className="font-medium text-gray-900">{client.medicalInfo?.medicationSchedule || '-'}</p></div>
-              </div>
+            <div className="space-y-6">
+              {/* Servicio de salud */}
               <div>
-                <p className="text-sm text-gray-500">Condiciones</p>
-                {(() => {
-                  const conditions = [
-                    { active: client.medicalInfo?.isDiabetic, label: 'Diabético', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-                    { active: client.medicalInfo?.isCeliac, label: 'Celíaco', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-                    { active: client.medicalInfo?.isHypertensive, label: 'Hipertenso', color: 'bg-red-100 text-red-700 border-red-200' },
-                    { active: client.medicalInfo?.isLactoseIntolerant, label: 'Intolerante a la lactosa', color: 'bg-violet-100 text-violet-700 border-violet-200' }
-                  ].filter(c => c.active)
-                  if (conditions.length === 0) return <p className="font-medium text-gray-900">-</p>
-                  return (
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {conditions.map(c => (
-                        <span key={c.label} className={`px-2.5 py-1 rounded-lg text-xs font-medium border ${c.color}`}>
-                          {c.label}
-                        </span>
-                      ))}
-                    </div>
-                  )
-                })()}
+                <h4 className="font-medium text-gray-900 mb-3">Servicio de salud</h4>
+                <div className="grid grid-cols-2 gap-4 pl-6">
+                  <div><p className="text-sm text-gray-500">Servicio de emergencia</p><p className="font-medium text-gray-900">{client.medicalInfo?.healthEmergencyService || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Prestador de salud</p><p className="font-medium text-gray-900">{client.medicalInfo?.healthProvider || '-'}</p></div>
+                  <div className="col-span-2"><p className="text-sm text-gray-500">Observaciones</p><p className="font-medium text-gray-900">{client.medicalInfo?.healthNotes || '-'}</p></div>
+                </div>
               </div>
-              {client.medicalInfo?.notes && (
-                <div><p className="text-sm text-gray-500">Notas adicionales</p><p className="font-medium text-gray-900">{client.medicalInfo.notes}</p></div>
-              )}
+
+              {/* Tratamiento farmacológico */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-3">Tratamiento farmacológico</h4>
+                <div className="space-y-2 pl-6">
+                  {client.medications?.length ? (
+                    client.medications.map((m, i) => (
+                      <p key={i} className="font-medium text-gray-900">
+                        {[m.name || '-', m.schedule || '-', m.dose || '-', m.indicatedFor || '-'].join(' — ')}
+                      </p>
+                    ))
+                  ) : (
+                    <p className="font-medium text-gray-900">-</p>
+                  )}
+                  <div className="pt-2"><p className="text-sm text-gray-500">Observaciones</p><p className="font-medium text-gray-900">{client.medicalInfo?.medicationNotes || '-'}</p></div>
+                </div>
+              </div>
+
+              {/* Antecedentes */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-3">Antecedentes</h4>
+                <div className="space-y-2 pl-6">
+                  {client.medicalHistory?.length ? (
+                    client.medicalHistory.map((h, i) => {
+                      const label = MEDICAL_HISTORY_CONDITIONS.find(c => c.value === h.condition)?.label || h.condition
+                      return (
+                        <p key={i} className="font-medium text-gray-900">
+                          {label}{h.comment ? ` (${h.comment})` : ''}
+                        </p>
+                      )
+                    })
+                  ) : (
+                    <p className="font-medium text-gray-900">-</p>
+                  )}
+                  <div className="pt-2"><p className="text-sm text-gray-500">Observaciones</p><p className="font-medium text-gray-900">{client.medicalInfo?.historyNotes || '-'}</p></div>
+                </div>
+              </div>
+
+              {/* Diagnóstico */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-3">Diagnóstico</h4>
+                <div className="space-y-2 pl-6">
+                  {client.diagnoses?.length ? (
+                    client.diagnoses.map((d, i) => {
+                      const label = DIAGNOSIS_TYPE_OPTIONS.find(x => x.value === d.diagnosisType)?.label || d.diagnosisType || '-'
+                      return (
+                        <p key={i} className="font-medium text-gray-900">
+                          {label}{d.behaviorDisorder ? ` — ${d.behaviorDisorder}` : ''}
+                        </p>
+                      )
+                    })
+                  ) : (
+                    <p className="font-medium text-gray-900">-</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Historia de vida */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-3">Historia de vida</h4>
+                <div className="grid grid-cols-2 gap-4 pl-6">
+                  <div><p className="text-sm text-gray-500">Nivel educativo</p><p className="font-medium text-gray-900">{client.medicalInfo?.educationLevel || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Ocupación</p><p className="font-medium text-gray-900">{client.medicalInfo?.occupation || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Intereses significativos</p><p className="font-medium text-gray-900">{client.medicalInfo?.significantInterests || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Vínculos significativos</p><p className="font-medium text-gray-900">{client.medicalInfo?.significantBonds || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Gustos musicales</p><p className="font-medium text-gray-900">{client.medicalInfo?.musicTaste || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Comidas preferidas</p><p className="font-medium text-gray-900">{client.medicalInfo?.favoriteFoods || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Carácter</p><p className="font-medium text-gray-900">{CHARACTER_OPTIONS.find(o => o.value === client.medicalInfo?.character)?.label || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Recursos personales</p><p className="font-medium text-gray-900">{client.medicalInfo?.personalResources || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Vulnerabilidades</p><p className="font-medium text-gray-900">{client.medicalInfo?.vulnerabilities || '-'}</p></div>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
