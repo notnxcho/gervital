@@ -530,16 +530,8 @@ export default function DailyGroups() {
         )}
       </div>
 
-      {/* Agregar horario (izquierda) + switch de turno en la misma línea */}
-      <div className="flex items-center gap-3 mb-6">
-        {!readOnly && !isWeekend && (
-          <button
-            onClick={handleAddSlot}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors"
-          >
-            + Agregar horario
-          </button>
-        )}
+      {/* Switch de turno (izquierda) + agregar horario (derecha), spaced between */}
+      <div className="flex items-center justify-between gap-3 mb-6">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
           {[
             { key: 'morning', label: 'Mañana' },
@@ -558,6 +550,14 @@ export default function DailyGroups() {
             </button>
           ))}
         </div>
+        {!readOnly && !isWeekend && (
+          <button
+            onClick={handleAddSlot}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors"
+          >
+            + Agregar horario
+          </button>
+        )}
       </div>
 
       {/* Main content */}
