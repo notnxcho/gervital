@@ -1196,8 +1196,8 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
         isOpen={modal === 'absence'}
         onClose={closeModal}
         date={selectedDate}
-        onConfirm={(isJustified) =>
-          withProcessing(() => markDayAbsent(client.id, selectedDate, isJustified, user?.name))
+        onConfirm={(isJustified, notes) =>
+          withProcessing(() => markDayAbsent(client.id, selectedDate, isJustified, user?.name, notes))
         }
       />
 
@@ -1469,37 +1469,90 @@ function InvoiceModal({ isOpen, onClose, onConfirm }) {
 // AbsenceModal
 // ============================================================
 function AbsenceModal({ isOpen, onClose, date, onConfirm }) {
+  const [selected, setSelected] = useState(null) // null | true (justified) | false
+  const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const handleSelect = async (isJustified) => {
+  // Reset on open/close
+  useEffect(() => {
+    if (isOpen) {
+      setSelected(null)
+      setReason('')
+      setSubmitting(false)
+    }
+  }, [isOpen])
+
+  const handleConfirm = async () => {
+    if (selected === null) return
     setSubmitting(true)
     try {
-      await onConfirm(isJustified)
+      await onConfirm(selected, reason.trim() || null)
     } finally {
       setSubmitting(false)
     }
   }
+
+  // Static Tailwind classes only — the JIT does NOT detect interpolated class names
+  // like `border-${color}-400`, so both variants are written out in full.
+  const baseOption = 'w-full p-4 rounded-lg border text-left transition-colors'
+  const justifiedClass = selected === true
+    ? `${baseOption} border-green-400 bg-green-50 ring-1 ring-green-300`
+    : `${baseOption} border-gray-200 hover:bg-green-50`
+  const unjustifiedClass = selected === false
+    ? `${baseOption} border-red-400 bg-red-50 ring-1 ring-red-300`
+    : `${baseOption} border-gray-200 hover:bg-red-50`
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Registrar falta — ${date ? format(new Date(date), "d 'de' MMMM", { locale: es }) : ''}`}>
       <div className="space-y-3">
         <p className="text-sm text-gray-600">El cliente no asistió. ¿Fue una falta justificada?</p>
         <button
-          onClick={() => handleSelect(true)}
+          type="button"
+          onClick={() => setSelected(true)}
           disabled={submitting}
-          className="w-full p-4 rounded-lg border border-green-200 text-left hover:bg-green-50 transition-colors"
+          className={justifiedClass}
         >
-          <p className="font-medium text-gray-900">Justificada</p>
+          <p className="font-medium text-gray-900 flex items-center gap-1.5">
+            {selected === true && <Check className="w-4 h-4 text-green-600" />}
+            Justificada
+          </p>
           <p className="text-sm text-gray-500 mt-0.5">El cliente gana 1 día de recupero</p>
         </button>
         <button
-          onClick={() => handleSelect(false)}
+          type="button"
+          onClick={() => setSelected(false)}
           disabled={submitting}
-          className="w-full p-4 rounded-lg border border-red-200 text-left hover:bg-red-50 transition-colors"
+          className={unjustifiedClass}
         >
-          <p className="font-medium text-gray-900">No justificada</p>
+          <p className="font-medium text-gray-900 flex items-center gap-1.5">
+            {selected === false && <Check className="w-4 h-4 text-red-600" />}
+            No justificada
+          </p>
           <p className="text-sm text-gray-500 mt-0.5">Sin crédito de recupero</p>
         </button>
+
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">Motivo (opcional)</label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Motivo de la falta..."
+            rows={2}
+            disabled={submitting}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-indigo-400"
+          />
+        </div>
+
+        <div className="flex justify-end pt-1">
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={selected === null || submitting}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Guardando...' : 'Confirmar falta'}
+          </button>
+        </div>
       </div>
     </Modal>
   )
