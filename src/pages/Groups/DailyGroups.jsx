@@ -442,9 +442,18 @@ export default function DailyGroups() {
     <div className="bg-gray-50 min-h-screen -mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8">
       {/* Page header */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Grupos del día</h1>
-          <p className="text-sm text-gray-500 mt-0.5 capitalize">{formattedDate}</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Grupos del día</h1>
+            <p className="text-sm text-gray-500 mt-0.5 capitalize">{formattedDate}</p>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => setShowWeek(true)}
+          >
+            <Calendar className="w-4 h-4" />
+            Ver semana
+          </Button>
         </div>
         <div className="flex items-center gap-3">
           {!readOnly && (
@@ -511,24 +520,15 @@ export default function DailyGroups() {
             Solo lectura
           </span>
         )}
-        <Button
-          variant="secondary"
-          onClick={() => setShowWeek(true)}
-          className="ml-2"
-        >
-          <Calendar className="w-4 h-4" />
-          Vista semanal
-        </Button>
+        {/* Meal counts: global to the day, same regardless of the active shift tab */}
+        {!isWeekend && (
+          <div className="flex items-center gap-3 ml-2">
+            <MealCountBadge label="Desayuno" count={mealCounts.breakfast} />
+            <MealCountBadge label="Almuerzo" count={mealCounts.lunch} />
+            <MealCountBadge label="Merienda" count={mealCounts.snack} />
+          </div>
+        )}
       </div>
-
-      {/* Meal counts: global to the day, same regardless of the active shift tab */}
-      {!isWeekend && (
-        <div className="flex items-center gap-3 mb-6">
-          <MealCountBadge label="Desayuno" count={mealCounts.breakfast} />
-          <MealCountBadge label="Almuerzo" count={mealCounts.lunch} />
-          <MealCountBadge label="Merienda" count={mealCounts.snack} />
-        </div>
-      )}
 
       {/* Shift tabs */}
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">

@@ -49,7 +49,7 @@ export default function ActivityCard({
           )}
           {assignedClients.length > 0 && (
             <span className="flex-shrink-0 text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-              {assignedClients.length} {assignedClients.length === 1 ? 'cliente' : 'clientes'}
+              {assignedClients.length} {assignedClients.length === 1 ? 'persona' : 'personas'}
             </span>
           )}
           {readOnly ? (
