@@ -1,4 +1,30 @@
-import { prorateInvoiceLines } from './invoiceAmounts'
+import { prorateInvoiceLines, billableTotal } from './invoiceAmounts'
+
+describe('billableTotal', () => {
+  test('not paid: the live amount', () => {
+    expect(billableTotal({ paymentStatus: 'pending', paidAmount: 0, liveAmount: 12000 })).toBe(12000)
+  })
+
+  test('paid a different amount: the collected amount', () => {
+    expect(billableTotal({ paymentStatus: 'paid', paidAmount: 9000, liveAmount: 12000 })).toBe(9000)
+  })
+
+  test('paid the same amount: unchanged', () => {
+    expect(billableTotal({ paymentStatus: 'paid', paidAmount: 12000, liveAmount: 12000 })).toBe(12000)
+  })
+
+  test('paid but paidAmount null: falls back to live', () => {
+    expect(billableTotal({ paymentStatus: 'paid', paidAmount: null, liveAmount: 12000 })).toBe(12000)
+  })
+
+  test('paid 0: collected is 0', () => {
+    expect(billableTotal({ paymentStatus: 'paid', paidAmount: 0, liveAmount: 12000 })).toBe(0)
+  })
+
+  test('missing live amount coerces to 0', () => {
+    expect(billableTotal({ paymentStatus: 'pending', paidAmount: null, liveAmount: undefined })).toBe(0)
+  })
+})
 
 describe('prorateInvoiceLines', () => {
   test('not paid: defaults to live calc, rounded', () => {

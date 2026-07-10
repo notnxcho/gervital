@@ -31,3 +31,11 @@ export function prorateInvoiceLines({ paymentStatus, paidAmount, liveAttGross, l
   const attGross = Math.round(paid) - transGross
   return { attGross, transGross }
 }
+
+// Monto total a facturar de un cliente/mes: el COBRADO si el mes ya se cobró
+// (aunque haya diferido del cálculo), si no el cálculo en vivo. Es la versión
+// "un solo número" de prorateInvoiceLines, para listados (panel de cobranza, bulk).
+export function billableTotal({ paymentStatus, paidAmount, liveAmount }) {
+  if (paymentStatus === 'paid' && paidAmount != null) return Number(paidAmount)
+  return Number(liveAmount) || 0
+}

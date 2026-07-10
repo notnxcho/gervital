@@ -178,8 +178,6 @@ export default function BulkInvoiceModal({
             <div className="px-3 py-6 text-center text-sm text-gray-400">Sin resultados</div>
           ) : visible.map((it) => {
             const selectable = it.runStatus !== 'skipped' && !running
-            // Al facturar, el monto por defecto es el COBRADO si el mes ya se cobró.
-            const displayAmount = !isPay && it.paymentStatus === 'paid' ? it.paidAmount : it.amount
             return (
               <label key={it.id} className={`flex items-center gap-3 px-3 py-3 text-sm ${it.runStatus === 'skipped' ? 'opacity-60' : selectable ? 'cursor-pointer hover:bg-gray-50' : ''}`}>
                 <input type="checkbox" checked={it.selected} disabled={!selectable}
@@ -204,7 +202,7 @@ export default function BulkInvoiceModal({
                     className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-gray-50 flex-shrink-0"
                   />
                 )}
-                <span className="text-gray-600 whitespace-nowrap">{formatCurrency(displayAmount)}</span>
+                <span className="text-gray-600 whitespace-nowrap">{formatCurrency(it.amount)}</span>
                 <RowStatus item={it} isPay={isPay} />
               </label>
             )

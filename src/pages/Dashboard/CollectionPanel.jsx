@@ -7,6 +7,7 @@ import Card from '../../components/ui/Card'
 import SemiCircleGauge from './SemiCircleGauge'
 import { formatCurrency, formatCompact } from '../../utils/format'
 import { promoCashRow } from '../../services/promotions/promotionsView'
+import { billableTotal } from '../../services/invoices/invoiceAmounts'
 
 const DOMAINS = [
   { id: 'cobranza', label: 'Cobranza' },
@@ -69,7 +70,12 @@ export default function CollectionPanel({ rows, loading, kpis, onBulkAction, can
     return filtered.sort((a, b) => b.amount - a.amount)
   }, [rows, tab])
 
-  const rowAmount = (r) => (tab === 'emitidas' ? r.invoicedAmount : tab === 'cobrados' ? r.cashCollected : r.amount)
+  const rowAmount = (r) =>
+    tab === 'emitidas' ? r.invoicedAmount
+    : tab === 'cobrados' ? r.cashCollected
+    // Facturar = lo cobrado si el mes ya se cobró (aunque haya diferido del cálculo).
+    : tab === 'facturas' ? billableTotal({ paymentStatus: r.paymentStatus, paidAmount: r.paidAmount, liveAmount: r.amount })
+    : r.amount
   const totalPending = list.reduce((s, r) => s + rowAmount(r), 0)
 
   // La difuminación inferior se apaga cuando el scroll llega al final (o no hay overflow),

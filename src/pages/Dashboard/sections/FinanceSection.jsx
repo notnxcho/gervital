@@ -12,6 +12,7 @@ import ExpensesByCategoryCard from '../ExpensesByCategoryCard'
 import { getDashboardFinanceSeries, getMonthInvoicePanel } from '../../../services/dashboard/dashboardService'
 import { deriveKpis, breakevenAnalysis, lineRevenueKpis, extendedFinanceKpis, expensesByCategory } from '../../../services/dashboard/financeSeries'
 import { getClients } from '../../../services/clients/clientService'
+import { billableTotal } from '../../../services/invoices/invoiceAmounts'
 import { getExpensesByMonth } from '../../../services/expenses/expenseService'
 import { getFixedExpenses } from '../../../services/expenses/fixedExpenseService'
 import { getExtraordinaryByMonth } from '../../../services/expenses/extraordinaryExpenseService'
@@ -146,10 +147,17 @@ export default function FinanceSection({ selected, onSelectMonth }) {
       mode === 'pay' ? r.paymentStatus !== 'paid' : r.invoiceStatus !== 'invoiced'
     )
     const rows = candidates.map(r => {
+      // Al facturar, el monto es el cobrado si el mes ya se cobró (regla: facturar = lo cobrado).
+      const amount = mode === 'emit'
+        ? billableTotal({ paymentStatus: r.paymentStatus, paidAmount: r.paidAmount, liveAmount: r.amount })
+        : r.amount
       const eligibility = (mode === 'emit' && !r.documentNumber) ? 'sin CI'
-        : r.amount <= 0 ? 'monto 0'
+        : amount <= 0 ? 'monto 0'
         : 'listo'
-      return { id: r.id, name: `${r.firstName} ${r.lastName}`, transferResponsible: r.transferResponsible, amount: r.amount, eligibility }
+      return {
+        id: r.id, name: `${r.firstName} ${r.lastName}`, transferResponsible: r.transferResponsible,
+        amount, paymentStatus: r.paymentStatus, paidAmount: r.paidAmount, eligibility
+      }
     })
     setBulkMode(mode)
     setBulkRows(rows)
