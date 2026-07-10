@@ -978,6 +978,10 @@ video {
   height: 1px;
 }
 
+.max-h-48 {
+  max-height: 12rem;
+}
+
 .max-h-56 {
   max-height: 14rem;
 }
@@ -2198,6 +2202,10 @@ video {
 
 .to-indigo-100 {
   --tw-gradient-to: #e0e7ff var(--tw-gradient-to-position);
+}
+
+.object-contain {
+  object-fit: contain;
 }
 
 .object-cover {
@@ -3574,6 +3582,10 @@ video {
 
 .disabled\:opacity-50:disabled {
   opacity: 0.5;
+}
+
+.disabled\:opacity-60:disabled {
+  opacity: 0.6;
 }
 
 .disabled\:hover\:bg-transparent:hover:disabled {

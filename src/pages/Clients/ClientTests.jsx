@@ -11,12 +11,55 @@ function fmtDate(d) {
   return d ? format(new Date(`${d}T12:00:00`), 'd MMM yyyy', { locale: es }) : '—'
 }
 
-// Mini gráfico de evolución del puntaje (pure SVG). points asc por fecha.
-function ScoreTrend({ points, maxScore }) {
-  if (points.length < 2) return null
+// Unidad del campo que aporta el puntaje manual (ej. TUG → "s").
+function manualUnit(test) {
+  const f = test.fields.find(x => x.name === test.scoring.manualScoreField)
+  return f?.unit || ''
+}
+
+// Texto de resumen de una instancia según la forma del test.
+function summarizeInstance(test, inst) {
+  const maxScore = getMaxScore(test)
+  // Tests con subescalas o derivados (Goldberg, Tinetti, TMT)
+  if (inst.subscores && (test.scoring.subscales || test.id === 'tmt')) {
+    if (test.id === 'tmt') {
+      const a = inst.subscores.tmt_a?.score
+      const b = inst.subscores.tmt_b?.score
+      return `A ${a ?? '—'}s · B ${b ?? '—'}s`
+    }
+    const parts = (test.scoring.subscales || []).map(s => {
+      const sub = inst.subscores[s.name]
+      return `${s.label} ${sub?.score ?? '—'}/${s.max}`
+    })
+    if (inst.rawScore != null) parts.push(`Total ${inst.rawScore}${maxScore != null ? `/${maxScore}` : ''}`)
+    return parts.join(' · ')
+  }
+  // Puntaje único (enum-sum o manual)
+  if (inst.rawScore != null) {
+    const unit = manualUnit(test)
+    const base = maxScore != null ? `${inst.rawScore}/${maxScore}` : `${inst.rawScore}${unit ? ` ${unit}` : ''}`
+    return inst.interpretationLabel ? `${base} · ${inst.interpretationLabel}` : base
+  }
+  return inst.interpretationLabel || 's/puntaje'
+}
+
+// Serie temporal a graficar: total si existe; si no, depresión (Goldberg) o TMT-B.
+function trendValues(list) {
+  return list.map(i => {
+    if (i.rawScore != null) return Number(i.rawScore)
+    if (i.subscores?.depresion) return i.subscores.depresion.score
+    if (i.subscores?.tmt_b) return i.subscores.tmt_b.score
+    return null
+  }).filter(v => v != null)
+}
+
+// Mini gráfico de evolución (pure SVG).
+function ScoreTrend({ values, max }) {
+  if (values.length < 2) return null
   const W = 320, H = 80, P = 8
-  const xs = points.map((_, i) => P + (i * (W - 2 * P)) / (points.length - 1))
-  const ys = points.map(p => H - P - ((p.score / maxScore) * (H - 2 * P)))
+  const top = max || Math.max(...values, 1)
+  const xs = values.map((_, i) => P + (i * (W - 2 * P)) / (values.length - 1))
+  const ys = values.map(v => H - P - ((v / top) * (H - 2 * P)))
   const path = xs.map((x, i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${ys[i].toFixed(1)}`).join(' ')
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-20">
@@ -48,7 +91,6 @@ export default function ClientTests({ clientId, instances, administeredBy, canMu
         {TESTS_CATALOG.map(test => {
           const list = instancesFor(test.id)
           const last = list[0]
-          const maxScore = getMaxScore(test)
           return (
             <button
               key={test.id}
@@ -60,7 +102,7 @@ export default function ClientTests({ clientId, instances, administeredBy, canMu
                 <p className="text-sm text-gray-500">{test.domain}</p>
                 <p className="text-sm mt-1">
                   {last
-                    ? <span className="text-gray-700">Último: <span className="font-medium">{last.rawScore}/{maxScore}</span> · {last.interpretationLabel || 's/interpretación'} · {fmtDate(last.administeredAt)}</span>
+                    ? <span className="text-gray-700">Último: <span className="font-medium">{summarizeInstance(test, last)}</span> · {fmtDate(last.administeredAt)}</span>
                     : <span className="text-gray-400">Sin evaluaciones</span>}
                 </p>
               </div>
@@ -74,8 +116,8 @@ export default function ClientTests({ clientId, instances, administeredBy, canMu
 
   // ── Drill-down de un test ──
   const list = instancesFor(selectedTest.id)
-  const maxScore = getMaxScore(selectedTest)
-  const trendPoints = [...list].reverse().map(i => ({ score: Number(i.rawScore) }))
+  const values = trendValues([...list].reverse())
+  const trendMax = getMaxScore(selectedTest)
 
   return (
     <div>
@@ -95,10 +137,10 @@ export default function ClientTests({ clientId, instances, administeredBy, canMu
         <p className="text-sm text-gray-500">{selectedTest.domain} · {selectedTest.scoring.range}</p>
       </div>
 
-      {trendPoints.length >= 2 && (
+      {values.length >= 2 && (
         <div className="mb-4 rounded-xl border border-gray-200 p-3">
           <p className="text-xs text-gray-500 mb-1">Evolución del puntaje</p>
-          <ScoreTrend points={trendPoints} maxScore={maxScore} />
+          <ScoreTrend values={values} max={trendMax} />
         </div>
       )}
 
@@ -109,9 +151,8 @@ export default function ClientTests({ clientId, instances, administeredBy, canMu
           {list.map(inst => (
             <li key={inst.id} className="flex items-center justify-between rounded-xl border border-gray-200 p-3">
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900">{inst.rawScore}/{maxScore}</span>
-                  {inst.interpretationLabel && <span className="px-2 py-0.5 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">{inst.interpretationLabel}</span>}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-gray-900">{summarizeInstance(selectedTest, inst)}</span>
                   {inst.isGenesis && <span className="px-2 py-0.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Inicial</span>}
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">{fmtDate(inst.administeredAt)}{inst.administeredBy ? ` · ${inst.administeredBy}` : ''}</p>
