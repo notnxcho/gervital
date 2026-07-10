@@ -33,7 +33,11 @@ function buildEffectiveOptions() {
   return opts
 }
 
-const netOf = (gross) => Math.round((Number(gross) || 0) / 1.22)
+// IVA por tipo: planes 22%, transporte 10% (mínimo). El neto en edición se previsualiza
+// con la tasa correcta; en lectura se muestra el neto almacenado (autoritativo).
+const PLAN_IVA_RATE = 1.22
+const TRANSPORT_IVA_RATE = 1.10
+const netFromGross = (gross, rate) => Math.round((Number(gross) || 0) / rate)
 
 export default function PlanPricingManager() {
   const [planData, setPlanData] = useState([])
@@ -67,15 +71,15 @@ export default function PlanPricingManager() {
   }
 
   // Precio vigente del mes actual para cada celda (lo que se muestra por defecto).
-  const planGross = (freq, schedule) => getPlanPriceSync(planData, freq, schedule, viewYear, viewMonth).priceGross
-  const transportGross = (freq, range) => getTransportPriceSync(transportData, freq, range, viewYear, viewMonth).priceGross
+  const planPrice = (freq, schedule) => getPlanPriceSync(planData, freq, schedule, viewYear, viewMonth)
+  const transportPrice = (freq, range) => getTransportPriceSync(transportData, freq, range, viewYear, viewMonth)
 
   const startEdit = () => {
     const plan = {}
     const transport = {}
     FREQUENCIES.forEach(f => {
-      SCHEDULES.forEach(s => { plan[`${f}|${s.id}`] = String(planGross(f, s.id)) })
-      DISTANCE_RANGES.forEach(r => { transport[`${f}|${r.id}`] = String(transportGross(f, r.id)) })
+      SCHEDULES.forEach(s => { plan[`${f}|${s.id}`] = String(planPrice(f, s.id).priceGross) })
+      DISTANCE_RANGES.forEach(r => { transport[`${f}|${r.id}`] = String(transportPrice(f, r.id).priceGross) })
     })
     setDraft({ plan, transport })
     setError('')
@@ -130,7 +134,7 @@ export default function PlanPricingManager() {
           <h2 className="text-lg font-semibold text-gray-900">Precios de planes y transporte</h2>
           <p className="text-sm text-gray-500 mt-1">
             {editing
-              ? 'Ingresá los precios con IVA. El neto se calcula automáticamente (÷1,22).'
+              ? 'Ingresá los precios con IVA. El neto se calcula automáticamente (planes ÷1,22 · transporte ÷1,10).'
               : `Vigentes en ${MONTH_NAMES[viewMonth]} ${viewYear}.`}
           </p>
         </div>
@@ -181,7 +185,9 @@ export default function PlanPricingManager() {
                   <td key={s.id} className="py-2 px-4">
                     <PriceCell
                       editing={editing}
-                      value={editing ? draft.plan[`${f}|${s.id}`] : planGross(f, s.id)}
+                      value={editing ? draft.plan[`${f}|${s.id}`] : planPrice(f, s.id).priceGross}
+                      net={planPrice(f, s.id).priceNet}
+                      rate={PLAN_IVA_RATE}
                       onChange={(v) => setPlanCell(f, s.id, v)}
                     />
                   </td>
@@ -210,7 +216,9 @@ export default function PlanPricingManager() {
                   <td key={r.id} className="py-2 px-4">
                     <PriceCell
                       editing={editing}
-                      value={editing ? draft.transport[`${f}|${r.id}`] : transportGross(f, r.id)}
+                      value={editing ? draft.transport[`${f}|${r.id}`] : transportPrice(f, r.id).priceGross}
+                      net={transportPrice(f, r.id).priceNet}
+                      rate={TRANSPORT_IVA_RATE}
                       onChange={(v) => setTransportCell(f, r.id, v)}
                     />
                   </td>
@@ -224,8 +232,9 @@ export default function PlanPricingManager() {
   )
 }
 
-// Celda: en lectura muestra gross (grande) + neto (chico, gris); en edición input de gross.
-function PriceCell({ editing, value, onChange }) {
+// Celda: en lectura muestra gross (grande) + neto almacenado (chico, gris); en edición
+// input de gross con previsualización de neto usando la tasa de IVA de esa tabla.
+function PriceCell({ editing, value, net, rate, onChange }) {
   if (editing) {
     return (
       <div>
@@ -236,14 +245,14 @@ function PriceCell({ editing, value, onChange }) {
           onChange={(e) => onChange(e.target.value)}
           className="w-28 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
-        <div className="text-xs text-gray-400 mt-1">neto {formatCurrency(netOf(value))}</div>
+        <div className="text-xs text-gray-400 mt-1">neto {formatCurrency(netFromGross(value, rate))}</div>
       </div>
     )
   }
   return (
     <div>
       <div className="text-gray-900">{formatCurrency(value)}</div>
-      <div className="text-xs text-gray-400">neto {formatCurrency(netOf(value))}</div>
+      <div className="text-xs text-gray-400">neto {formatCurrency(net)}</div>
     </div>
   )
 }
