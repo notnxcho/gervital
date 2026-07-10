@@ -16,6 +16,9 @@ import Card, { CardContent } from '../../components/ui/Card'
 import { useAuth } from '../../context/AuthContext'
 import { RepeatableRows } from './medical/RepeatableRows'
 import { MARITAL_STATUS_OPTIONS, RESIDENCE_TYPE_OPTIONS, CHARACTER_OPTIONS, DIAGNOSIS_TYPE_OPTIONS, MEDICAL_HISTORY_CONDITIONS } from '../../services/clients/medicalConstants'
+import { TESTS_CATALOG, getMaxScore } from '../../services/clients/testsCatalog'
+import { computeScore } from '../../services/clients/testScoring'
+import { createTestInstance } from '../../services/api'
 
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
 
@@ -74,11 +77,14 @@ const DOCUMENT_TYPE_OPTIONS = [
   { value: 'otro', label: 'Otro' }
 ]
 
-const STEPS = [
+const BASE_STEPS = [
   { id: 1, title: 'Datos personales y contacto' },
   { id: 2, title: 'Plan y asistencia' },
   { id: 3, title: 'Información médica' }
 ]
+const TESTS_STEP = { id: 4, title: 'Evaluaciones iniciales' }
+
+const DEFAULT_TESTS = TESTS_CATALOG.filter(t => t.defaultOnCreate)
 
 // MOCKED RES - Estado inicial del formulario
 const INITIAL_FORM_DATA = {
@@ -136,14 +142,18 @@ const INITIAL_FORM_DATA = {
   personalResources: '',
   vulnerabilities: '',
   // Tipo de cliente: regular | charity | trial (write admin-gated)
-  clientType: 'regular'
+  clientType: 'regular',
+  // Evaluaciones iniciales (solo alta): { [testId]: { answers } }
+  testInstances: {}
 }
 
 export default function AddClient() {
   const navigate = useNavigate()
-  const { hasAccess } = useAuth()
+  const { hasAccess, user } = useAuth()
   const { id } = useParams()
   const isEditMode = Boolean(id)
+  const STEPS = isEditMode ? BASE_STEPS : [...BASE_STEPS, TESTS_STEP]
+  const LAST_STEP = STEPS[STEPS.length - 1].id
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState({})
@@ -291,6 +301,16 @@ export default function AddClient() {
     }))
   }
 
+  const setTestAnswer = (testId, fieldName, value) => {
+    setFormData(prev => ({
+      ...prev,
+      testInstances: {
+        ...prev.testInstances,
+        [testId]: { answers: { ...(prev.testInstances[testId]?.answers || {}), [fieldName]: value } }
+      }
+    }))
+  }
+
   const toggleDay = (day) => {
     setFormData(prev => ({
       ...prev,
@@ -365,7 +385,7 @@ export default function AddClient() {
   }
 
   const handleSubmit = async () => {
-    if (!validateStep(3)) return
+    if (!validateStep(LAST_STEP)) return
     
     setLoading(true)
     try {
@@ -457,6 +477,24 @@ export default function AddClient() {
         }
         if (avatarFile && newClient?.id) {
           await uploadClientAvatar(newClient.id, avatarFile).catch(console.error)
+        }
+        // Instancias génesis de los tests completados en el paso 4 (best-effort).
+        if (newClient?.id) {
+          for (const test of DEFAULT_TESTS) {
+            const answers = formData.testInstances[test.id]?.answers || {}
+            if (Object.keys(answers).length === 0) continue
+            const { rawScore, interpretationLabel, scoreVersion } = computeScore(test, answers)
+            await createTestInstance(newClient.id, {
+              testId: test.id,
+              administeredAt: formData.startDate || new Date().toISOString().split('T')[0],
+              administeredBy: user?.name,
+              isGenesis: true,
+              answers,
+              rawScore,
+              interpretationLabel,
+              scoreVersion
+            }).catch(err => console.warn('No se pudo guardar la evaluación inicial:', err))
+          }
         }
         // Sync receptor en Biller. No bloquea el alta: el cliente ya quedó creado.
         // No se sincroniza a clientes no facturables (beneficencia / a prueba).
@@ -1207,6 +1245,44 @@ export default function AddClient() {
             </div>
           )}
 
+          {/* Step 4: Evaluaciones iniciales (solo alta) */}
+          {currentStep === 4 && (
+            <div className="space-y-8">
+              <p className="text-sm text-gray-500">
+                Opcional. Cargá la evaluación inicial de cada test. Podés dejarlos vacíos y cargarlos después desde el detalle del cliente.
+              </p>
+              {DEFAULT_TESTS.map(test => {
+                const answers = formData.testInstances[test.id]?.answers || {}
+                const { rawScore, interpretationLabel, isComplete } = computeScore(test, answers)
+                const maxScore = getMaxScore(test)
+                const anyAnswered = Object.keys(answers).length > 0
+                return (
+                  <div key={test.id}>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">{test.name}</h3>
+                    <p className="text-sm text-gray-500 mb-4">{test.domain}</p>
+                    <div className="space-y-4">
+                      {test.fields.map(field => (
+                        <Select
+                          key={field.name}
+                          label={field.label}
+                          value={answers[field.name] ?? ''}
+                          onChange={e => setTestAnswer(test.id, field.name, e.target.value)}
+                          options={[{ value: '', label: 'Seleccionar…' }, ...field.options.map(o => ({ value: o.value, label: `${o.label} (${o.score})` }))]}
+                        />
+                      ))}
+                    </div>
+                    {anyAnswered && (
+                      <div className="mt-3 bg-indigo-50 rounded-lg p-3 flex items-center justify-between">
+                        <span className="text-sm text-indigo-700">Puntaje: <span className="font-bold text-indigo-900">{rawScore}/{maxScore}</span></span>
+                        <span className="text-sm font-medium text-indigo-900">{isComplete ? interpretationLabel : 'Incompleto'}</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           {/* Navigation buttons */}
           <div className="flex justify-between mt-8 pt-6 border-t border-gray-200">
             <Button
@@ -1216,7 +1292,7 @@ export default function AddClient() {
               {currentStep === 1 ? 'Cancelar' : 'Anterior'}
             </Button>
             
-            {currentStep < 3 ? (
+            {currentStep < LAST_STEP ? (
               <Button onClick={handleNext}>
                 Siguiente
               </Button>
