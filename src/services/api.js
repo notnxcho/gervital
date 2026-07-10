@@ -35,6 +35,16 @@ export {
 } from './clients/clientService'
 
 // ============================================
+// CLIENT TEST INSTANCES API
+// ============================================
+export {
+  getClientTestInstances,
+  createTestInstance,
+  updateTestInstance,
+  deleteTestInstance
+} from './clients/testInstanceService'
+
+// ============================================
 // CLIENT AVATARS API
 // ============================================
 export {
