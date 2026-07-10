@@ -155,6 +155,9 @@ export default function AddClient() {
   const STEPS = isEditMode ? BASE_STEPS : [...BASE_STEPS, TESTS_STEP]
   const LAST_STEP = STEPS[STEPS.length - 1].id
   const [currentStep, setCurrentStep] = useState(1)
+  // Step más lejano desbloqueado. En edición todos los steps son navegables desde el inicio
+  // (los datos ya están cargados); en alta se desbloquean al avanzar con "Siguiente".
+  const [maxStepReached, setMaxStepReached] = useState(isEditMode ? LAST_STEP : 1)
   const [formData, setFormData] = useState(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
@@ -376,12 +379,19 @@ export default function AddClient() {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => prev + 1)
+      const next = currentStep + 1
+      setCurrentStep(next)
+      setMaxStepReached(prev => Math.max(prev, next))
     }
   }
 
   const handleBack = () => {
     setCurrentStep(prev => prev - 1)
+  }
+
+  // Navegación por clic en el indicador: solo a steps ya desbloqueados.
+  const goToStep = (target) => {
+    if (target <= maxStepReached) setCurrentStep(target)
   }
 
   const handleSubmit = async () => {
@@ -582,14 +592,21 @@ export default function AddClient() {
         <div className="flex items-center justify-between">
           {STEPS.map((step, index) => (
             <div key={step.id} className="flex items-center">
-              <div className="flex items-center">
+              <button
+                type="button"
+                onClick={() => goToStep(step.id)}
+                disabled={step.id > maxStepReached}
+                className={`flex items-center ${step.id <= maxStepReached ? 'cursor-pointer' : 'cursor-default'}`}
+              >
                 <div className={`
-                  w-10 h-10 rounded-full flex items-center justify-center font-medium text-sm
-                  ${currentStep > step.id 
-                    ? 'bg-indigo-600 text-white' 
-                    : currentStep === step.id 
-                      ? 'bg-indigo-600 text-white' 
-                      : 'bg-gray-200 text-gray-600'}
+                  w-10 h-10 rounded-full flex items-center justify-center font-medium text-sm transition-colors
+                  ${currentStep > step.id
+                    ? 'bg-indigo-600 text-white'
+                    : currentStep === step.id
+                      ? 'bg-indigo-600 text-white'
+                      : step.id <= maxStepReached
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : 'bg-gray-200 text-gray-600'}
                 `}>
                   {currentStep > step.id ? <Check className="w-5 h-5" /> : step.id}
                 </div>
@@ -598,7 +615,7 @@ export default function AddClient() {
                 }`}>
                   {step.title}
                 </span>
-              </div>
+              </button>
               {index < STEPS.length - 1 && (
                 <div className={`w-24 h-0.5 mx-4 ${
                   currentStep > step.id ? 'bg-indigo-600' : 'bg-gray-200'
