@@ -78,11 +78,11 @@ const DOCUMENT_TYPE_OPTIONS = [
 ]
 
 const BASE_STEPS = [
-  { id: 1, title: 'Datos personales y contacto' },
-  { id: 2, title: 'Plan y asistencia' },
-  { id: 3, title: 'Información médica' }
+  { id: 1, title: 'Datos personales y contacto', shortTitle: 'Datos' },
+  { id: 2, title: 'Plan y asistencia', shortTitle: 'Plan' },
+  { id: 3, title: 'Información médica', shortTitle: 'Médica' }
 ]
-const TESTS_STEP = { id: 4, title: 'Evaluaciones iniciales' }
+const TESTS_STEP = { id: 4, title: 'Evaluaciones iniciales', shortTitle: 'Tests' }
 
 const DEFAULT_TESTS = TESTS_CATALOG.filter(t => t.defaultOnCreate)
 
@@ -587,42 +587,54 @@ export default function AddClient() {
         </div>
       </div>
 
-      {/* Steps indicator */}
+      {/* Steps indicator — riel de progreso continuo + nodos navegables */}
       <div className="mb-8">
-        <div className="flex items-center justify-between">
-          {STEPS.map((step, index) => (
-            <div key={step.id} className="flex items-center">
-              <button
-                type="button"
-                onClick={() => goToStep(step.id)}
-                disabled={step.id > maxStepReached}
-                className={`flex items-center ${step.id <= maxStepReached ? 'cursor-pointer' : 'cursor-default'}`}
-              >
-                <div className={`
-                  w-10 h-10 rounded-full flex items-center justify-center font-medium text-sm transition-colors
-                  ${currentStep > step.id
-                    ? 'bg-indigo-600 text-white'
-                    : currentStep === step.id
-                      ? 'bg-indigo-600 text-white'
-                      : step.id <= maxStepReached
-                        ? 'bg-indigo-100 text-indigo-700'
-                        : 'bg-gray-200 text-gray-600'}
-                `}>
-                  {currentStep > step.id ? <Check className="w-5 h-5" /> : step.id}
-                </div>
-                <span className={`ml-3 text-sm font-medium ${
-                  currentStep >= step.id ? 'text-gray-900' : 'text-gray-500'
-                }`}>
-                  {step.title}
-                </span>
-              </button>
-              {index < STEPS.length - 1 && (
-                <div className={`w-24 h-0.5 mx-4 ${
-                  currentStep > step.id ? 'bg-indigo-600' : 'bg-gray-200'
-                }`} />
-              )}
-            </div>
-          ))}
+        <p className="mb-3 text-xs font-medium uppercase tracking-wide text-indigo-500">
+          Paso {currentStep} de {STEPS.length} · {STEPS.find(s => s.id === currentStep)?.title}
+        </p>
+        <div className="flex items-start">
+          {STEPS.map((step, index) => {
+            const isDone = currentStep > step.id
+            const isCurrent = currentStep === step.id
+            const isReachable = step.id <= maxStepReached
+            const trackFilled = currentStep > step.id
+            return (
+              <div key={step.id} className="flex flex-1 items-start last:flex-none">
+                {/* Nodo + label */}
+                <button
+                  type="button"
+                  onClick={() => goToStep(step.id)}
+                  disabled={!isReachable}
+                  className={`group flex flex-col items-center gap-2 ${isReachable ? 'cursor-pointer' : 'cursor-default'}`}
+                  title={step.title}
+                >
+                  <span className={`
+                    flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-all duration-200
+                    ${isCurrent
+                      ? 'bg-indigo-600 text-white ring-4 ring-indigo-100 shadow-sm'
+                      : isDone
+                        ? 'bg-indigo-600 text-white group-hover:bg-indigo-700'
+                        : isReachable
+                          ? 'border-2 border-indigo-300 bg-white text-indigo-600 group-hover:border-indigo-500'
+                          : 'border-2 border-transparent bg-gray-100 text-gray-400'}
+                  `}>
+                    {isDone ? <Check className="h-5 w-5" /> : step.id}
+                  </span>
+                  <span className={`text-xs font-medium transition-colors ${
+                    isCurrent ? 'text-indigo-700' : isReachable ? 'text-gray-600 group-hover:text-gray-900' : 'text-gray-400'
+                  }`}>
+                    {step.shortTitle}
+                  </span>
+                </button>
+                {/* Riel hacia el próximo nodo (se llena según el avance) */}
+                {index < STEPS.length - 1 && (
+                  <div className="mx-2 mt-5 h-1 flex-1 overflow-hidden rounded-full bg-gray-200">
+                    <div className={`h-full rounded-full bg-indigo-600 transition-all duration-300 ${trackFilled ? 'w-full' : 'w-0'}`} />
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 
