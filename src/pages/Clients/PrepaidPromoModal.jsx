@@ -92,17 +92,17 @@ export default function PrepaidPromoModal({ isOpen, onClose, client, invoices, o
   const pct = Number(percent)
   const summary = useMemo(() => {
     if (!validation.valid) return null
-    let beforeAtt = 0, transTotal = 0
+    // Round per month so the displayed rows always sum to the total shown below.
+    let beforeAtt = 0, afterAtt = 0, prepaidTotal = 0
     const rows = validation.months.map(inv => {
       const t = totals[ordinalOf(inv.year, inv.month)] || { attBase: 0, trans: 0 }
       const attAfter = Math.round(t.attBase * (1 - pct / 100))
       const monthTotal = attAfter + t.trans
       beforeAtt += t.attBase
-      transTotal += t.trans
+      afterAtt += attAfter
+      prepaidTotal += monthTotal
       return { key: `${inv.year}-${inv.month}`, label: monthLabel(inv.year, inv.month), monthTotal }
     })
-    const afterAtt = Math.round(beforeAtt * (1 - pct / 100))
-    const prepaidTotal = afterAtt + transTotal
     return { rows, prepaidTotal, savings: beforeAtt - afterAtt }
   }, [validation, totals, pct])
 

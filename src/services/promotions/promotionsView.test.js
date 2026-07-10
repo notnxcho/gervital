@@ -7,7 +7,7 @@ import {
 const promo = (over) => ({
   id: 'p', clientId: 'c', discountPercent: 15,
   startYear: 2026, startMonth: 5, endYear: 2026, endMonth: 7, // 2026-06 .. 2026-08
-  paidDate: '2026-06-05', paidAmount: 30000, ...over
+  paidDate: '2026-06-05', paidAmount: 30000, discountAmount: 4500, ...over
 })
 
 describe('promoOrdinal', () => {
@@ -69,15 +69,15 @@ describe('promoKpis', () => {
   test('cash del periodo suma solo paidDate en el mes ref; descuento y conteos', () => {
     const promos = [
       // 2026-06..2026-08, pagada en junio -> activa en ref y su pago cae en el mes ref
-      promo({ id: 'a', paidDate: '2026-06-05', paidAmount: 30000, discountPercent: 15 }),
+      promo({ id: 'a', paidDate: '2026-06-05', paidAmount: 30000, discountAmount: 4500 }),
       // 2026-02..2026-04, ya termino antes del ref -> historical, no activa
       promo({
-        id: 'b', paidDate: '2026-05-20', paidAmount: 20000, discountPercent: 10,
+        id: 'b', paidDate: '2026-05-20', paidAmount: 20000, discountAmount: 2000,
         startYear: 2026, startMonth: 1, endYear: 2026, endMonth: 3
       }),
       // 2026-10..2026-12, arranca despues del ref -> upcoming, no activa
       promo({
-        id: 'c', paidDate: '2026-10-01', paidAmount: 0, discountPercent: 20,
+        id: 'c', paidDate: '2026-10-01', paidAmount: 0, discountAmount: 6000,
         startYear: 2026, startMonth: 9, endYear: 2026, endMonth: 11
       })
     ]
@@ -86,8 +86,8 @@ describe('promoKpis', () => {
     expect(k.activeCount).toBe(1) // solo 'a' esta activa en el ref ('b' ya termino, 'c' no empezo)
     expect(k.prepaidCashInPeriod).toBe(30000) // solo 'a' tiene paidDate en el mes de ref (2026-06)
     expect(k.upcomingCount).toBe(1) // solo 'c' arranca en el futuro
-    // descuento de 'a' (unica activa): bruto = 30000 / (1 - 0.15) = 35294.117...; ahorro = bruto - 30000
-    expect(k.totalDiscountGranted).toBe(5294)
+    // descuento otorgado = discountAmount de las promos activas -> solo 'a' (ahorro real de asistencia)
+    expect(k.totalDiscountGranted).toBe(4500)
   })
 })
 

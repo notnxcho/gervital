@@ -40,15 +40,9 @@ export function promoKpis(promos, refYear, refMonth) {
   const prepaidCashInPeriod = (promos || [])
     .filter(p => paidOrdinal(p.paidDate) === ref)
     .reduce((s, p) => s + (Number(p.paidAmount) || 0), 0)
-  // Descuento otorgado: suma del ahorro de cada promo activa (aprox: paidAmount es el neto
-  // cobrado; el bruto sin dto = paidAmount / (1 - pct/100), el ahorro = bruto - paidAmount).
-  const totalDiscountGranted = active.reduce((s, p) => {
-    const pct = Number(p.discountPercent) || 0
-    const paid = Number(p.paidAmount) || 0
-    if (pct <= 0) return s
-    const gross = paid / (1 - pct / 100)
-    return s + (gross - paid)
-  }, 0)
+  // Descuento otorgado: ahorro REAL (solo asistencia) guardado en la promo al crearla.
+  // No se reconstruye desde paidAmount porque ese total incluye transporte sin descuento.
+  const totalDiscountGranted = active.reduce((s, p) => s + (Number(p.discountAmount) || 0), 0)
   return {
     activeCount: active.length,
     prepaidCashInPeriod,

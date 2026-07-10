@@ -37,7 +37,7 @@ export async function createPrepaidPromo(clientId, startYear, startMonth, endYea
 export async function getPromotions() {
   const [promoRes, clientsRes] = await Promise.all([
     supabase.from('promotions').select('*').order('start_year', { ascending: false }).order('start_month', { ascending: false }),
-    supabase.from('clients_full').select('id, firstName, lastName, avatarUrl')
+    supabase.from('clients_full').select('id, firstName, lastName')
   ])
   if (promoRes.error) throw new Error(promoRes.error.message)
   if (clientsRes.error) throw new Error(clientsRes.error.message)
@@ -50,8 +50,8 @@ export async function getPromotions() {
       clientId: p.client_id,
       firstName: c.firstName || '',
       lastName: c.lastName || '',
-      avatarUrl: c.avatarUrl || null,
       discountPercent: Number(p.discount_percent) || 0,
+      discountAmount: Number(p.discount_amount) || 0,
       startYear: p.start_year,
       startMonth: p.start_month,
       endYear: p.end_year,
