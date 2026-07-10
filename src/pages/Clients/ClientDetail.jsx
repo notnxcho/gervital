@@ -894,9 +894,9 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     return attendance.find(a => a.date === dateStr)?.status === 'recovery'
   }).length
 
-  const planPrice = getPlanPriceSync(pricingData, plan.frequency, plan.schedule)
+  const planPrice = getPlanPriceSync(pricingData, plan.frequency, plan.schedule, year, month)
   const transportPrice = plan.hasTransport && plan.distanceRange
-    ? getTransportPriceSync(transportPricingData, plan.frequency, plan.distanceRange)
+    ? getTransportPriceSync(transportPricingData, plan.frequency, plan.distanceRange, year, month)
     : { priceNet: 0, priceGross: 0 }
   // Modelo de precio por día determinístico: días estándar = 4 × frecuencia (mes = 4 semanas).
   // Se factura min(díasCobrables, díasEstándar) → un mes completo nunca supera la mensualidad,
@@ -909,8 +909,12 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   const proration = daysPerMonth > 0 ? billedDays / daysPerMonth : 0
   const liveChargeableAmount = Math.round(proration * planPrice.priceGross * discountFactor) + Math.round(proration * transportPrice.priceGross)
 
-  // If paid: use snapshot from invoice; otherwise live calculation
-  const displayAmount = isPaid ? (invoice.paidAmount ?? invoice.chargeableAmount) : liveChargeableAmount
+  // Finalizado (cobrado o facturado): usar el snapshot del invoice, nunca live.
+  // Así un cambio de precio del mes corriente no altera meses ya cobrados/facturados.
+  const isFinalized = isPaid || isInvoiced
+  const displayAmount = isFinalized
+    ? (invoice.paidAmount ?? invoice.chargeableAmount)
+    : liveChargeableAmount
   // Descuento por vacaciones sobre los días facturados (0 si el día extra del mes lo absorbe).
   const billedWithoutVacation = Math.max(0, Math.min(plannedDays, daysPerMonth))
   const vacationPct = billedWithoutVacation > billedDays

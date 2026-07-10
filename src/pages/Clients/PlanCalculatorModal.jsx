@@ -98,9 +98,9 @@ export default function PlanCalculatorModal({ isOpen, onClose }) {
   }
 
   const frequency = assignedDays.length
-  const planPrice = getPlanPriceSync(pricingData, frequency, schedule)
+  const planPrice = getPlanPriceSync(pricingData, frequency, schedule, viewYear, viewMonth)
   const transportPrice = hasTransport && distanceRange
-    ? getTransportPriceSync(transportPricingData, frequency, distanceRange)
+    ? getTransportPriceSync(transportPricingData, frequency, distanceRange, viewYear, viewMonth)
     : { priceNet: 0, priceGross: 0 }
   const monthlyGross = planPrice.priceGross + transportPrice.priceGross
 

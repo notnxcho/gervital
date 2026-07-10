@@ -477,16 +477,23 @@ export default function AddClient() {
     }
   }
 
+  const previewDate = formData.startDate ? new Date(`${formData.startDate}T00:00:00`) : new Date()
+  const previewYear = isNaN(previewDate.getTime()) ? new Date().getFullYear() : previewDate.getFullYear()
+  const previewMonth = isNaN(previewDate.getTime()) ? new Date().getMonth() : previewDate.getMonth()
   const planPrice = getPlanPriceSync(
     pricingData,
     parseInt(formData.frequency),
-    formData.schedule
+    formData.schedule,
+    previewYear,
+    previewMonth
   )
   const transportPrice = formData.hasTransport && formData.distanceRange
     ? getTransportPriceSync(
         transportPricingData,
         parseInt(formData.frequency),
-        formData.distanceRange
+        formData.distanceRange,
+        previewYear,
+        previewMonth
       )
     : { priceNet: 0, priceGross: 0 }
   const estimatedTotalGross = planPrice.priceGross + transportPrice.priceGross
