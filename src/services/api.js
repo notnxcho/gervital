@@ -44,6 +44,10 @@ export {
   deleteTestInstance
 } from './clients/testInstanceService'
 
+export {
+  uploadTestAttachment
+} from './clients/testAttachmentService'
+
 // ============================================
 // CLIENT AVATARS API
 // ============================================
