@@ -78,8 +78,10 @@ export default function ClientTests({ clientId, instances, administeredBy, canMu
     .sort((a, b) => (a.administeredAt < b.administeredAt ? 1 : -1)) // desc
 
   const selectedTest = TESTS_CATALOG.find(t => t.id === selectedTestId)
-  const usedTests = TESTS_CATALOG.filter(t => instancesFor(t.id).length > 0)
-  const availableTests = TESTS_CATALOG.filter(t => instancesFor(t.id).length === 0)
+  // Siempre visibles: los obligatorios (defaultOnCreate) + cualquiera con evaluaciones cargadas.
+  const shownTests = TESTS_CATALOG.filter(t => t.defaultOnCreate || instancesFor(t.id).length > 0)
+  // Agregables: los opcionales que el cliente todavía no tiene.
+  const availableTests = TESTS_CATALOG.filter(t => !t.defaultOnCreate && instancesFor(t.id).length === 0)
 
   // Test que alimenta el modal: el elegido en el drill-down, o el que se está agregando.
   const modalTest = modal?.test || selectedTest
@@ -100,10 +102,7 @@ export default function ClientTests({ clientId, instances, administeredBy, canMu
   if (!selectedTest) {
     content = (
       <div className="space-y-3">
-        {usedTests.length === 0 && (
-          <p className="text-sm text-gray-400">Este cliente no tiene tests cargados todavía.</p>
-        )}
-        {usedTests.map(test => {
+        {shownTests.map(test => {
           const last = instancesFor(test.id)[0]
           return (
             <button
@@ -114,8 +113,10 @@ export default function ClientTests({ clientId, instances, administeredBy, canMu
               <div>
                 <p className="font-semibold text-gray-900">{test.name}</p>
                 <p className="text-sm text-gray-500">{test.domain}</p>
-                <p className="text-sm mt-1 text-gray-700">
-                  Último: <span className="font-medium">{summarizeInstance(test, last)}</span> · {fmtDate(last.administeredAt)}
+                <p className="text-sm mt-1">
+                  {last
+                    ? <span className="text-gray-700">Último: <span className="font-medium">{summarizeInstance(test, last)}</span> · {fmtDate(last.administeredAt)}</span>
+                    : <span className="text-gray-400">Sin evaluaciones</span>}
                 </p>
               </div>
               <NavArrowRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
