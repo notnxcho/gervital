@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { Edit, Trash, Check, Xmark } from 'iconoir-react'
 import { useAuth } from '../../context/AuthContext'
-import { getChurnNotes, addChurnNote } from '../../services/churn/churnService'
+import { getChurnNotes, addChurnNote, updateChurnNote, deleteChurnNote } from '../../services/churn/churnService'
 import { reactivateClient } from '../../services/clients/clientService'
 import { formatCurrency } from '../../utils/format'
 import Modal from '../../components/ui/Modal'
@@ -44,6 +45,9 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, r
   const [body, setBody] = useState('')
   const [saving, setSaving] = useState(false)
   const [reactivating, setReactivating] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editBody, setEditBody] = useState('')
+  const [busyNoteId, setBusyNoteId] = useState(null)
 
   const clientId = card?.clientId
 
@@ -63,6 +67,8 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, r
   useEffect(() => {
     if (isOpen && clientId) {
       setBody('')
+      setEditingId(null)
+      setEditBody('')
       loadNotes(clientId)
     }
   }, [isOpen, clientId, loadNotes])
@@ -83,6 +89,46 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, r
       console.error('Error adding churn note:', err)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const startEdit = (note) => {
+    setEditingId(note.id)
+    setEditBody(note.body)
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditBody('')
+  }
+
+  const handleSaveEdit = async (noteId) => {
+    const trimmed = editBody.trim()
+    if (!trimmed) return
+    setBusyNoteId(noteId)
+    try {
+      await updateChurnNote(noteId, trimmed)
+      cancelEdit()
+      await loadNotes(clientId)
+    } catch (err) {
+      console.error('Error updating churn note:', err)
+    } finally {
+      setBusyNoteId(null)
+    }
+  }
+
+  const handleDeleteNote = async (noteId) => {
+    const ok = window.confirm('¿Eliminar esta nota? Esta acción no se puede deshacer.')
+    if (!ok) return
+    setBusyNoteId(noteId)
+    try {
+      await deleteChurnNote(noteId)
+      if (editingId === noteId) cancelEdit()
+      await loadNotes(clientId)
+    } catch (err) {
+      console.error('Error deleting churn note:', err)
+    } finally {
+      setBusyNoteId(null)
     }
   }
 
@@ -151,16 +197,77 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, r
             ) : notes.length === 0 ? (
               <p className="text-sm text-gray-400 py-2">Todavía no hay notas.</p>
             ) : (
-              notes.map(note => (
-                <div key={note.id} className="bg-gray-50 border border-gray-100 rounded-xl p-3">
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.body}</p>
-                  <div className="flex items-center gap-2 mt-1.5 text-[11px] text-gray-400">
-                    <span className="font-medium text-gray-500">{note.authorName || 'Sistema'}</span>
-                    <span>·</span>
-                    <span>{fmtRelative(note.createdAt)}</span>
+              notes.map(note => {
+                const canManage = !!user?.id && note.authorId === user.id
+                const isEditing = editingId === note.id
+                const noteBusy = busyNoteId === note.id
+                return (
+                  <div key={note.id} className="group bg-gray-50 border border-gray-100 rounded-xl p-3">
+                    {isEditing ? (
+                      <>
+                        <textarea
+                          value={editBody}
+                          onChange={(e) => setEditBody(e.target.value)}
+                          rows={3}
+                          autoFocus
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                        />
+                        <div className="flex justify-end gap-1.5 mt-2">
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            disabled={noteBusy}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-500 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                          >
+                            <Xmark width={14} height={14} /> Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEdit(note.id)}
+                            disabled={noteBusy || !editBody.trim()}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-indigo-600 rounded-lg hover:bg-indigo-50 disabled:opacity-50"
+                          >
+                            <Check width={14} height={14} /> Guardar
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap flex-1">{note.body}</p>
+                          {canManage && (
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => startEdit(note)}
+                                disabled={noteBusy}
+                                title="Editar nota"
+                                className="p-1 text-gray-400 rounded-md hover:bg-gray-200 hover:text-gray-600 disabled:opacity-50"
+                              >
+                                <Edit width={14} height={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteNote(note.id)}
+                                disabled={noteBusy}
+                                title="Eliminar nota"
+                                className="p-1 text-gray-400 rounded-md hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+                              >
+                                <Trash width={14} height={14} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1.5 text-[11px] text-gray-400">
+                          <span className="font-medium text-gray-500">{note.authorName || 'Sistema'}</span>
+                          <span>·</span>
+                          <span>{fmtRelative(note.createdAt)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>

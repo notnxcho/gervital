@@ -60,12 +60,12 @@ export async function assignChurn(clientId, userId) {
 /**
  * Notes for a churn follow-up, newest first.
  * @param {string} clientId
- * @returns {Promise<Array<{id, body, createdAt, authorName}>>}
+ * @returns {Promise<Array<{id, body, createdAt, authorId, authorName}>>}
  */
 export async function getChurnNotes(clientId) {
   const { data, error } = await supabase
     .from('churn_followup_notes')
-    .select('id, body, created_at, author:users(name)')
+    .select('id, body, created_at, author_id, author:users(name)')
     .eq('client_id', clientId)
     .order('created_at', { ascending: false })
 
@@ -75,6 +75,7 @@ export async function getChurnNotes(clientId) {
     id: n.id,
     body: n.body,
     createdAt: n.created_at,
+    authorId: n.author_id,
     authorName: n.author?.name || null
   }))
 }
@@ -89,6 +90,33 @@ export async function addChurnNote(clientId, authorId, body) {
   const { error } = await supabase
     .from('churn_followup_notes')
     .insert({ client_id: clientId, author_id: authorId, body })
+
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Update the body of a churn follow-up note.
+ * @param {string} noteId
+ * @param {string} body
+ */
+export async function updateChurnNote(noteId, body) {
+  const { error } = await supabase
+    .from('churn_followup_notes')
+    .update({ body })
+    .eq('id', noteId)
+
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Delete a churn follow-up note.
+ * @param {string} noteId
+ */
+export async function deleteChurnNote(noteId) {
+  const { error } = await supabase
+    .from('churn_followup_notes')
+    .delete()
+    .eq('id', noteId)
 
   if (error) throw new Error(error.message)
 }
