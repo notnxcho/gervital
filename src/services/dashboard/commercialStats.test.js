@@ -21,8 +21,8 @@ const client = (over = {}) => ({
 
 // pricing fixture (getPlanPriceSync shape)
 const pricing = [
-  { frequency: 2, schedule: 'morning', priceNet: 1000, priceGross: 1220 },
-  { frequency: 3, schedule: 'full_day', priceNet: 2000, priceGross: 2440 }
+  { frequency: 2, schedule: 'morning', priceNet: 1000, priceGross: 1220, effectiveYear: 2000, effectiveMonth: 0 },
+  { frequency: 3, schedule: 'full_day', priceNet: 2000, priceGross: 2440, effectiveYear: 2000, effectiveMonth: 0 }
 ]
 
 describe('baseComposition', () => {

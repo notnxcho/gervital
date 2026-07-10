@@ -1,13 +1,13 @@
 import { supabase } from '../supabase/client'
 
 /**
- * Get all plan pricing rows.
- * @returns {Promise<Array<{frequency, schedule, priceNet, priceGross}>>}
+ * Get all plan pricing rows (todas las versiones por mes de vigencia).
+ * @returns {Promise<Array<{frequency, schedule, priceNet, priceGross, effectiveYear, effectiveMonth}>>}
  */
 export async function getPlanPricing() {
   const { data, error } = await supabase
     .from('plan_pricing')
-    .select('frequency, schedule, price_net, price_gross')
+    .select('frequency, schedule, price_net, price_gross, effective_year, effective_month')
     .order('frequency', { ascending: true })
     .order('schedule', { ascending: true })
 
@@ -17,18 +17,26 @@ export async function getPlanPricing() {
     frequency: p.frequency,
     schedule: p.schedule,
     priceNet: Number(p.price_net),
-    priceGross: Number(p.price_gross)
+    priceGross: Number(p.price_gross),
+    effectiveYear: p.effective_year,
+    effectiveMonth: p.effective_month
   }))
 }
 
 /**
- * Lookup plan price (gross + net) from cached pricing array.
+ * Lookup plan price for a target month: version vigente = mayor (effYear,effMonth) <= (year,month).
+ * year/month opcionales → default mes actual.
  * @returns {{priceNet: number, priceGross: number}}
  */
-export function getPlanPriceSync(pricingData, frequency, schedule) {
-  const plan = pricingData.find(p => p.frequency === frequency && p.schedule === schedule)
-  if (!plan) return { priceNet: 0, priceGross: 0 }
-  return { priceNet: plan.priceNet, priceGross: plan.priceGross }
+export function getPlanPriceSync(pricingData, frequency, schedule, year, month) {
+  const now = new Date()
+  const targetYm = (year ?? now.getFullYear()) * 12 + (month ?? now.getMonth())
+  const match = pricingData
+    .filter(p => p.frequency === frequency && p.schedule === schedule)
+    .filter(p => (p.effectiveYear * 12 + p.effectiveMonth) <= targetYm)
+    .sort((a, b) => (b.effectiveYear * 12 + b.effectiveMonth) - (a.effectiveYear * 12 + a.effectiveMonth))[0]
+  if (!match) return { priceNet: 0, priceGross: 0 }
+  return { priceNet: match.priceNet, priceGross: match.priceGross }
 }
 
 /**
@@ -87,4 +95,23 @@ export function calculateMonthProration({
     transport,
     total: attendance + transport
   }
+}
+
+/**
+ * Persist a new price version effective from (effectiveYear, effectiveMonth). Superadmin only.
+ * @param {number} effectiveYear
+ * @param {number} effectiveMonth - 0-indexed
+ * @param {Array<{frequency, schedule, price_gross}>} planPrices
+ * @param {Array<{frequency, distance_range, price_gross}>} transportPrices
+ */
+export async function setPricing(effectiveYear, effectiveMonth, planPrices, transportPrices) {
+  const { data, error } = await supabase.rpc('set_pricing', {
+    p_effective_year: effectiveYear,
+    p_effective_month: effectiveMonth,
+    p_plan_prices: planPrices,
+    p_transport_prices: transportPrices
+  })
+  if (error) throw new Error(error.message)
+  if (!data.success) throw new Error(data.error || 'No se pudieron guardar los precios')
+  return data
 }

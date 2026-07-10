@@ -108,7 +108,7 @@ export {
 // ============================================
 // PRICING API (plan + transport)
 // ============================================
-export { getPlanPricing, getPlanPriceSync, calculateProration } from './pricing/pricingService'
+export { getPlanPricing, getPlanPriceSync, calculateProration, setPricing } from './pricing/pricingService'
 export { getTransportPricing, getTransportPriceSync } from './pricing/transportPricingService'
 
 // ============================================
