@@ -3,6 +3,7 @@ import PlaceholderCard from './PlaceholderCard'
 import FinanceSection from './sections/FinanceSection'
 import AttendanceSection from './sections/AttendanceSection'
 import CommercialSection from './sections/CommercialSection'
+import PromotionsSection from './sections/PromotionsSection'
 import { useAuth } from '../../context/AuthContext'
 import MonthNavigator from '../../components/ui/MonthNavigator'
 import { TODAY, WINDOW_START } from './monthWindow'
@@ -11,7 +12,8 @@ import { TODAY, WINDOW_START } from './monthWindow'
 const SECTIONS = [
   { id: 'finanzas', label: 'Finanzas', feature: 'dashboard_financials', Component: FinanceSection },
   { id: 'asistencia', label: 'Asistencia', feature: 'statistics', Component: AttendanceSection },
-  { id: 'comercial', label: 'Comercial', feature: 'dashboard_financials', Component: CommercialSection }
+  { id: 'comercial', label: 'Comercial', feature: 'dashboard_financials', Component: CommercialSection },
+  { id: 'promociones', label: 'Promociones', feature: 'promotions', Component: PromotionsSection }
 ]
 
 export default function Dashboard() {
