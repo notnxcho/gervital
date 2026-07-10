@@ -1,4 +1,4 @@
-import { Trash } from 'iconoir-react'
+import { Trash, Clock } from 'iconoir-react'
 import ActivityCard from './ActivityCard'
 
 export default function TimeSlotCard({
@@ -27,22 +27,26 @@ export default function TimeSlotCard({
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {readOnly ? (
             <>
-              <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded flex-shrink-0">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg flex-shrink-0">
+                <Clock className="w-4 h-4 text-gray-500" />
                 {slot.time?.slice(0, 5)}
               </span>
               <span className="text-sm font-semibold text-gray-700 truncate">{slot.name}</span>
             </>
           ) : (
             <>
-              <input
-                type="time"
-                defaultValue={slot.time?.slice(0, 5)}
-                onBlur={e => {
-                  const val = e.target.value
-                  if (val && val !== slot.time?.slice(0, 5)) onUpdateSlot(slot.id, { time: val })
-                }}
-                className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded w-auto min-w-[120px] flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-              />
+              <div className="inline-flex items-center gap-1.5 bg-gray-100 rounded-lg px-2.5 py-1 flex-shrink-0">
+                <Clock className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                <input
+                  type="time"
+                  defaultValue={slot.time?.slice(0, 5)}
+                  onBlur={e => {
+                    const val = e.target.value
+                    if (val && val !== slot.time?.slice(0, 5)) onUpdateSlot(slot.id, { time: val })
+                  }}
+                  className="text-sm font-semibold text-gray-700 bg-transparent w-[92px] focus:outline-none [&::-webkit-calendar-picker-indicator]:hidden"
+                />
+              </div>
               <input
                 defaultValue={slot.name}
                 onBlur={e => {

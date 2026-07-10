@@ -1086,6 +1086,10 @@ video {
   width: 8rem;
 }
 
+.w-36 {
+  width: 9rem;
+}
+
 .w-4 {
   width: 1rem;
 }
@@ -1154,8 +1158,8 @@ video {
   width: 340px;
 }
 
-.w-auto {
-  width: auto;
+.w-\[92px\] {
+  width: 92px;
 }
 
 .w-fit {
@@ -1173,10 +1177,6 @@ video {
 
 .min-w-0 {
   min-width: 0px;
-}
-
-.min-w-\[120px\] {
-  min-width: 120px;
 }
 
 .min-w-\[140px\] {
@@ -3217,6 +3217,15 @@ video {
   scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
 }
 
+.placeholder\:font-normal::placeholder {
+  font-weight: 400;
+}
+
+.placeholder\:text-gray-400::placeholder {
+  --tw-text-opacity: 1;
+  color: rgb(156 163 175 / var(--tw-text-opacity, 1));
+}
+
 .last\:flex-none:last-child {
   flex: none;
 }
@@ -3759,4 +3768,8 @@ video {
   .xl\:overflow-y-auto {
     overflow-y: auto;
   }
+}
+
+.\[\&\:\:-webkit-calendar-picker-indicator\]\:hidden::-webkit-calendar-picker-indicator {
+  display: none;
 }

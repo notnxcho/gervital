@@ -53,7 +53,7 @@ export default function DailyGroups() {
   const nextTempId = () => `temp-${++tempIdRef.current}`
 
   const [selectedDate, setSelectedDate] = useState(today)
-  const [activeShift, setActiveShift] = useState('morning')
+  const [activeShift, setActiveShift] = useState('afternoon')
   const [loading, setLoading] = useState(true)
   const [allClients, setAllClients] = useState([])
   const [attendanceByClientId, setAttendanceByClientId] = useState(new Map())
@@ -623,7 +623,7 @@ export default function DailyGroups() {
         >
           <div className="flex gap-0 min-h-[60vh]">
             {/* Time slots area: toolbar arriba + contenido */}
-            <div className="flex-1 min-w-0 pr-0">
+            <div className="flex-1 min-w-0 pr-4">
               {shiftToolbar}
               {loading ? (
                 <div className="flex items-center justify-center py-16">

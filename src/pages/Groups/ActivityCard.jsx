@@ -1,5 +1,5 @@
 import { useDroppable } from '@dnd-kit/core'
-import { Trash } from 'iconoir-react'
+import { Trash, User } from 'iconoir-react'
 import { AssignedClientChip } from './ClientChip'
 
 export default function ActivityCard({
@@ -48,21 +48,26 @@ export default function ActivityCard({
             />
           )}
           {assignedClients.length > 0 && (
-            <span className="flex-shrink-0 text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-              {assignedClients.length} {assignedClients.length === 1 ? 'persona' : 'personas'}
+            <span className="flex-shrink-0 inline-flex items-center gap-1 text-sm font-semibold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-full tabular-nums">
+              <User className="w-4 h-4 text-gray-500" />
+              {assignedClients.length}
             </span>
           )}
           {readOnly ? (
-            activity.responsible && <span className="text-sm text-gray-700 flex-shrink-0">{activity.responsible}</span>
+            activity.responsible && (
+              <span className="flex-shrink-0 text-sm font-semibold text-gray-900 bg-white border border-gray-300 px-2.5 py-1 rounded-lg">
+                {activity.responsible}
+              </span>
+            )
           ) : (
             <input
               defaultValue={activity.responsible || ''}
-              placeholder="Responsable"
+              placeholder="Referente"
               onBlur={e => {
                 const val = e.target.value.trim()
                 if (val !== (activity.responsible || '')) onUpdateActivity(activity.id, { responsible: val || null })
               }}
-              className="text-sm text-gray-700 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-indigo-400 focus:outline-none w-32 flex-shrink-0"
+              className="text-sm font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg px-2.5 py-1 w-36 flex-shrink-0 focus:outline-none focus:border-indigo-400 placeholder:font-normal placeholder:text-gray-400"
             />
           )}
         </div>
