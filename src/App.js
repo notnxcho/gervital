@@ -6,7 +6,7 @@ import Dashboard from './pages/Dashboard/Dashboard'
 import ClientList from './pages/Clients/ClientList'
 import ClientDetail from './pages/Clients/ClientDetail'
 import AddClient from './pages/Clients/AddClient'
-import AccessList from './pages/Access/AccessList'
+import Gerencia from './pages/Management/Gerencia'
 import CostsPage from './pages/Costs/CostsPage'
 import DailyGroups from './pages/Groups/DailyGroups'
 import TransportScheduler from './pages/Transport/TransportScheduler'
@@ -34,7 +34,7 @@ function App() {
             <Route path="transporte" element={<TransportScheduler />} />
             <Route path="bajas" element={<ChurnBoard />} />
             <Route element={<RequireRole feature="users" />}>
-              <Route path="accesos" element={<AccessList />} />
+              <Route path="gerencia" element={<Gerencia />} />
             </Route>
             <Route path="costos" element={<CostsPage />} />
           </Route>

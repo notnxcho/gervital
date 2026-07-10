@@ -27,7 +27,7 @@ export default function Navbar() {
     { to: '/transporte', label: 'Transporte', icon: Bus, access: 'clients' },
     { to: '/bajas', label: 'Bajas', icon: UserXmark, access: 'clients' },
     { to: '/costos', label: 'Costos', icon: Shop, access: 'suppliers' },
-    { to: '/accesos', label: 'Accesos', icon: Settings, access: 'users' }
+    { to: '/gerencia', label: 'Gerencia', icon: Settings, access: 'users' }
   ]
 
   return (
