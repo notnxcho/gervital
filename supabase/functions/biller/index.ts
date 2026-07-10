@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       if (!client.document_number) return json({ error: 'El cliente no tiene documento cargado' }, 422)
 
       const { data: existing } = await admin.from('monthly_invoices')
-        .select('biller_id').eq('client_id', clientId).eq('year', year).eq('month', month).maybeSingle()
+        .select('biller_id, payment_status, paid_amount').eq('client_id', clientId).eq('year', year).eq('month', month).maybeSingle()
       if (existing?.biller_id) return json({ error: 'La factura de este mes ya fue emitida' }, 409)
 
       const { data: billing, error: billErr } = await admin.rpc('calculate_month_billing', { p_client_id: clientId, p_year: year, p_month: month })
@@ -95,10 +95,32 @@ Deno.serve(async (req) => {
       const plan = await resolvePlan(admin, clientId, year, month)
       if (!plan) return json({ error: 'Plan no encontrado' }, 422)
 
-      // Montos finales: override del modal si vino, si no el cálculo del server.
-      const attGross = body.attendanceAmount != null ? Number(body.attendanceAmount) : Number(billing.attendanceChargeableGross)
+      // Default de línea = lo COBRADO prorrateado si el mes ya se cobró; si no, el cálculo del server.
+      // Espejo de prorateInvoiceLines en src/services/invoices/invoiceAmounts.js (Deno no puede importar de src/).
+      const liveAtt = Number(billing.attendanceChargeableGross) || 0
+      const liveTrans = billing.hasTransport ? (Number(billing.transportChargeableGross) || 0) : 0
+      const liveTotal = liveAtt + liveTrans
+      const paid = existing?.payment_status === 'paid' && existing?.paid_amount != null ? Number(existing.paid_amount) : null
+      let baseAtt: number
+      let baseTrans: number
+      if (paid == null) {
+        baseAtt = Math.round(liveAtt)
+        baseTrans = Math.round(liveTrans)
+      } else if (paid <= 0) {
+        baseAtt = 0
+        baseTrans = 0
+      } else if (liveTotal <= 0) {
+        baseAtt = Math.round(paid)
+        baseTrans = 0
+      } else {
+        baseTrans = liveTrans > 0 ? Math.round((paid * liveTrans) / liveTotal) : 0
+        baseAtt = Math.round(paid) - baseTrans
+      }
+
+      // Montos finales: override del modal si vino, si no el default (cobrado prorrateado / cálculo).
+      const attGross = body.attendanceAmount != null ? Number(body.attendanceAmount) : baseAtt
       const transGross = billing.hasTransport
-        ? (body.transportAmount != null ? Number(body.transportAmount) : Number(billing.transportChargeableGross))
+        ? (body.transportAmount != null ? Number(body.transportAmount) : baseTrans)
         : 0
       const totalGross = attGross + transGross
       if (totalGross <= 0) return json({ error: 'Monto a facturar es 0' }, 422)

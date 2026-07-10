@@ -7,6 +7,7 @@ import Input, { Textarea } from '../../components/ui/Input'
 import { lastBusinessDayOfMonth } from '../../utils/date'
 import { buildTransportConcepto } from '../../services/transport/transportConstants'
 import { emitInvoice, checkDgiStatus, voidInvoice, getInvoicePdf, calculateMonthBilling } from '../../services/api'
+import { prorateInvoiceLines } from '../../services/invoices/invoiceAmounts'
 
 const SCHEDULE_LABEL = { morning: 'Mañana', afternoon: 'Tarde', full_day: 'Día completo' }
 const DOC_TYPE_LABEL = { ci: 'CI', rut: 'RUT', dni: 'DNI', pasaporte: 'Pasaporte', otro: 'Doc' }
@@ -68,17 +69,25 @@ export default function EmitInvoiceModal({
     const freq = plan?.frequency ?? client?.plan?.frequency ?? ''
     const sched = plan?.schedule ?? client?.plan?.schedule ?? ''
     const dtoSuffix = billing.discountPercent > 0 ? ` (${billing.discountPercent}% dto)` : ''
+    // Default = lo cobrado (prorrateado) si el mes ya se cobró; si no, el cálculo en vivo.
+    const { attGross, transGross } = prorateInvoiceLines({
+      paymentStatus: invoice?.paymentStatus,
+      paidAmount: invoice?.paidAmount,
+      liveAttGross: billing.attendanceChargeableGross,
+      liveTransGross: billing.transportChargeableGross,
+      hasTransport: billing.hasTransport
+    })
     setAttConcepto(`Plan ${freq} días x semana – ${SCHEDULE_LABEL[sched] ?? sched}${dtoSuffix}`)
-    setAttAmount(String(Math.round(Number(billing.attendanceChargeableGross) || 0)))
+    setAttAmount(String(attGross))
     setTransConcepto(buildTransportConcepto(client?.address?.distanceRange))
-    setTransAmount(String(Math.round(Number(billing.transportChargeableGross) || 0)))
+    setTransAmount(String(transGross))
     setAdenda(defaultAdenda(discountedDays))
     const defEmision = format(lastBusinessDayOfMonth(year, month), 'yyyy-MM-dd')
     setFechaEmision(defEmision)
     setFechaVencimiento(defEmision) // vencimiento = emisión por defecto
     setVencTouched(false)
     setError(null)
-  }, [isOpen, isInvoiced, billing, plan, client, discountedDays, year, month])
+  }, [isOpen, isInvoiced, billing, plan, client, discountedDays, year, month, invoice])
 
   const attNum = Number(attAmount) || 0
   const transNum = hasTransport ? (Number(transAmount) || 0) : 0
