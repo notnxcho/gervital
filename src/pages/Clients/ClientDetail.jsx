@@ -32,7 +32,8 @@ import {
   uploadClientAvatar,
   deleteClientAvatar,
   getClientPlanVersions,
-  removePlanDiscount
+  removePlanDiscount,
+  getClientTestInstances
 } from '../../services/api'
 import { useAuth, roleHasAccess } from '../../context/AuthContext'
 import { useReasonLabels } from '../../hooks/useReasonLabels'
@@ -44,6 +45,7 @@ import Tabs from '../../components/ui/Tabs'
 import Modal from '../../components/ui/Modal'
 import DeactivateClientModal from './DeactivateClientModal'
 import RecoveryCreditsModal from './RecoveryCreditsModal'
+import ClientTests from './ClientTests'
 import { MARITAL_STATUS_OPTIONS, RESIDENCE_TYPE_OPTIONS, MEDICAL_HISTORY_CONDITIONS, DIAGNOSIS_TYPE_OPTIONS, CHARACTER_OPTIONS } from '../../services/clients/medicalConstants'
 
 const SCHEDULE_LABELS = {
@@ -147,6 +149,7 @@ export default function ClientDetail() {
   const [recoveryModalOpen, setRecoveryModalOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [planHistoryOpen, setPlanHistoryOpen] = useState(false)
+  const [testInstances, setTestInstances] = useState([])
 
   const optionsMenuRef = useRef(null)
   const avatarInputRef = useRef(null)
@@ -170,14 +173,15 @@ export default function ClientDetail() {
     setLoading(true)
     try {
       // Advance past scheduled days and ensure future months exist (parallel with data fetching)
-      const [clientData, attendanceData, invoicesData, pricing, transportPricing, recoveryData, planVersions] = await Promise.all([
+      const [clientData, attendanceData, invoicesData, pricing, transportPricing, recoveryData, planVersions, testData] = await Promise.all([
         getClientById(id),
         getClientAttendance(id),
         getClientInvoices(id),
         getPlanPricing(),
         getTransportPricing(),
         getRecoveryCredits(id),
-        getClientPlanVersions(id)
+        getClientPlanVersions(id),
+        getClientTestInstances(id)
       ])
       // Run setup functions (non-blocking, best-effort). Los clientes no facturables
       // (beneficencia / a prueba) nunca materializan facturas: skip ensureClientMonths.
@@ -194,6 +198,7 @@ export default function ClientDetail() {
       setRecoveryCredits(recoveryData)
       setAttendance(attendanceData)
       setInvoices(invoicesData)
+      setTestInstances(testData)
       setPricingData(pricing)
       setTransportPricingData(transportPricing)
     } catch (error) {
@@ -273,7 +278,8 @@ export default function ClientDetail() {
   const tabs = [
     { id: 'general', label: 'Información General' },
     { id: 'contact', label: 'Contacto y Dirección' },
-    { id: 'medical', label: 'Información Médica' }
+    { id: 'medical', label: 'Información Médica' },
+    { id: 'tests', label: 'Tests' }
   ]
 
   if (loading) {
@@ -723,6 +729,15 @@ export default function ClientDetail() {
                 </div>
               </div>
             </div>
+          )}
+          {activeTab === 'tests' && (
+            <ClientTests
+              clientId={id}
+              instances={testInstances}
+              administeredBy={user?.name}
+              canMutate={!client.deletedAt}
+              onRefresh={loadClientData}
+            />
           )}
         </CardContent>
       </Card>
