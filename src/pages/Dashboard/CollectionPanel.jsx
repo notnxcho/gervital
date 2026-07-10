@@ -6,6 +6,7 @@ import { es } from 'date-fns/locale'
 import Card from '../../components/ui/Card'
 import SemiCircleGauge from './SemiCircleGauge'
 import { formatCurrency, formatCompact } from '../../utils/format'
+import { promoCashRow } from '../../services/promotions/promotionsView'
 
 const DOMAINS = [
   { id: 'cobranza', label: 'Cobranza' },
@@ -191,7 +192,18 @@ export default function CollectionPanel({ rows, loading, kpis, onBulkAction, can
                         : `${r.invoiceNumber || 's/n'} · ${formatInvoiceDate(r.invoiceDate || r.invoicedAt)}`}
                 </p>
               </div>
-              <span className="text-sm font-semibold tabular-nums text-gray-900">{formatCurrency(rowAmount(r))}</span>
+              {(() => {
+                const promo = promoCashRow(r)
+                if (tab === 'cobrados' && promo.struck) {
+                  return (
+                    <span className="flex items-center gap-1.5 tabular-nums flex-shrink-0">
+                      <span className="text-xs text-gray-400 line-through opacity-60">{formatCurrency(promo.notional)}</span>
+                      <span className="text-sm font-semibold text-gray-900">{formatCurrency(0)}</span>
+                    </span>
+                  )
+                }
+                return <span className="text-sm font-semibold tabular-nums text-gray-900">{formatCurrency(rowAmount(r))}</span>
+              })()}
               <NavArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
             </button>
           ))

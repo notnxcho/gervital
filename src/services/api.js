@@ -98,6 +98,14 @@ export {
 } from './invoices/invoiceService'
 
 // ============================================
+// PROMOTIONS API
+// ============================================
+export {
+  createPrepaidPromo,
+  getPromotions
+} from './promotions/promotionService'
+
+// ============================================
 // BILLER API (facturación electrónica)
 // ============================================
 export {

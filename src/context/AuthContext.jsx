@@ -11,6 +11,7 @@ const FEATURE_ROLES = {
   salaries: ['superadmin'],
   dashboard_financials: ['superadmin'],
   users: ['superadmin'],
+  promotions: ['superadmin'],
   statistics: ['admin', 'superadmin'],
   expense_settings: ['admin', 'superadmin']
 }

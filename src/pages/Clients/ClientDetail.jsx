@@ -39,6 +39,7 @@ import { useAuth, roleHasAccess } from '../../context/AuthContext'
 import { useReasonLabels } from '../../hooks/useReasonLabels'
 import EmitInvoiceModal from './EmitInvoiceModal'
 import ApplyDiscountModal from './ApplyDiscountModal'
+import PrepaidPromoModal from './PrepaidPromoModal'
 import Button from '../../components/ui/Button'
 import Card, { CardContent, CardHeader } from '../../components/ui/Card'
 import Tabs from '../../components/ui/Tabs'
@@ -141,6 +142,7 @@ export default function ClientDetail() {
   const [activeTab, setActiveTab] = useState('general')
   const [showOptionsMenu, setShowOptionsMenu] = useState(false)
   const [showDiscountModal, setShowDiscountModal] = useState(false)
+  const [showPromoModal, setShowPromoModal] = useState(false)
   const [deactivateModal, setDeactivateModal] = useState(false)
   const [deactivating, setDeactivating] = useState(false)
   const [reactivating, setReactivating] = useState(false)
@@ -434,6 +436,15 @@ export default function ClientDetail() {
                   >
                     <Percentage className="w-4 h-4" />
                     Aplicar descuento
+                  </button>
+                )}
+                {!client.deletedAt && !client.isNonBillable && roleHasAccess(user?.role, 'promotions') && (
+                  <button
+                    onClick={() => { setShowOptionsMenu(false); setShowPromoModal(true) }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <Percentage className="w-4 h-4" />
+                    Promo prepaga
                   </button>
                 )}
                 {!client.deletedAt && (
@@ -827,6 +838,14 @@ export default function ClientDetail() {
       <ApplyDiscountModal
         isOpen={showDiscountModal}
         onClose={() => setShowDiscountModal(false)}
+        client={client}
+        invoices={invoices}
+        onRefresh={loadClientData}
+      />
+
+      <PrepaidPromoModal
+        isOpen={showPromoModal}
+        onClose={() => setShowPromoModal(false)}
         client={client}
         invoices={invoices}
         onRefresh={loadClientData}
