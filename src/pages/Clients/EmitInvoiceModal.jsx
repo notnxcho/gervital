@@ -208,7 +208,7 @@ export default function EmitInvoiceModal({
             <div className="col-span-2">
               <Input label="Concepto (plan)" value={attConcepto} onChange={e => setAttConcepto(e.target.value)} />
             </div>
-            <Input label="Monto (IVA 22%)" type="number" value={attAmount} onChange={e => setAttAmount(e.target.value)} />
+            <Input label="Monto (IVA 22% incl.)" type="number" value={attAmount} onChange={e => setAttAmount(e.target.value)} />
           </div>
 
           {/* Línea transporte (solo si tiene) */}
@@ -217,7 +217,7 @@ export default function EmitInvoiceModal({
               <div className="col-span-2">
                 <Input label="Concepto (transporte)" value={transConcepto} onChange={e => setTransConcepto(e.target.value)} />
               </div>
-              <Input label="Monto (IVA 10%)" type="number" value={transAmount} onChange={e => setTransAmount(e.target.value)} />
+              <Input label="Monto (IVA 10% incl.)" type="number" value={transAmount} onChange={e => setTransAmount(e.target.value)} />
             </div>
           )}
 
