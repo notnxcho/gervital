@@ -33,7 +33,8 @@ export async function createExpense(expenseData) {
       year: expenseData.year,
       month: expenseData.month,
       date: expenseData.date,
-      notes: expenseData.notes || null
+      notes: expenseData.notes || null,
+      is_one_off: expenseData.isOneOff || false
     })
     .select()
     .single()
@@ -51,6 +52,7 @@ export async function updateExpense(id, expenseData) {
   if (expenseData.month !== undefined) updateData.month = expenseData.month
   if (expenseData.date !== undefined) updateData.date = expenseData.date
   if (expenseData.notes !== undefined) updateData.notes = expenseData.notes
+  if (expenseData.isOneOff !== undefined) updateData.is_one_off = expenseData.isOneOff
 
   const { data, error } = await supabase
     .from('expenses')
@@ -77,6 +79,7 @@ function transformExpense(expense) {
     year: expense.year,
     month: expense.month,
     date: expense.date,
-    notes: expense.notes
+    notes: expense.notes,
+    isOneOff: expense.is_one_off ?? expense.isOneOff ?? false
   }
 }

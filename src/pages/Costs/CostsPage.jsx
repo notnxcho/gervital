@@ -9,7 +9,8 @@ import {
   Trash,
   Edit,
   ExpandLines,
-  CompressLines
+  CompressLines,
+  InfoCircle
 } from 'iconoir-react'
 import {
   getSuppliers,
@@ -1048,7 +1049,7 @@ function FixedExpenseModal({ isOpen, onClose, fixed, categories, suppliers, onSa
 // Variable expense modal (one-off)
 function VariableExpenseModal({ isOpen, onClose, expense, categories, suppliers, selectedYear, selectedMonth, onSave }) {
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ supplierId: '', categoryId: '', description: '', amount: '', date: '', notes: '' })
+  const [form, setForm] = useState({ supplierId: '', categoryId: '', description: '', amount: '', date: '', notes: '', isOneOff: false })
 
   useEffect(() => {
     if (expense) {
@@ -1058,11 +1059,12 @@ function VariableExpenseModal({ isOpen, onClose, expense, categories, suppliers,
         description: expense.description || '',
         amount: expense.amount?.toString() || '',
         date: expense.date || '',
-        notes: expense.notes || ''
+        notes: expense.notes || '',
+        isOneOff: expense.isOneOff || false
       })
     } else {
       const defaultDate = new Date(selectedYear, selectedMonth, 1)
-      setForm({ supplierId: '', categoryId: '', description: '', amount: '', date: format(defaultDate, 'yyyy-MM-dd'), notes: '' })
+      setForm({ supplierId: '', categoryId: '', description: '', amount: '', date: format(defaultDate, 'yyyy-MM-dd'), notes: '', isOneOff: false })
     }
   }, [expense, isOpen, selectedYear, selectedMonth])
 
@@ -1081,6 +1083,7 @@ function VariableExpenseModal({ isOpen, onClose, expense, categories, suppliers,
       amount: parseFloat(form.amount),
       date: form.date,
       notes: form.notes,
+      isOneOff: form.isOneOff,
       year: expenseDate.getFullYear(),
       month: expenseDate.getMonth()
     }
@@ -1110,6 +1113,16 @@ function VariableExpenseModal({ isOpen, onClose, expense, categories, suppliers,
           <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
           <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
         </div>
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" checked={form.isOneOff} onChange={(e) => setForm({ ...form, isOneOff: e.target.checked })} className="rounded border-gray-300 text-purple-600 focus:ring-purple-500" />
+          <span className="text-sm text-gray-700">Gasto único</span>
+          <span className="group relative inline-flex">
+            <InfoCircle className="w-4 h-4 text-gray-400" />
+            <span className="pointer-events-none absolute left-1/2 bottom-full mb-2 -translate-x-1/2 w-56 rounded-lg bg-gray-900 text-white text-xs px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              Un gasto único no aparecerá en "Copiar del mes pasado" de gastos variables.
+            </span>
+          </span>
+        </label>
         <div className="flex gap-3 justify-end pt-4">
           <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
           <Button type="submit" loading={loading}>{expense ? 'Guardar cambios' : 'Registrar gasto'}</Button>
@@ -1134,7 +1147,7 @@ function CopyLastMonthVariablesModal({ isOpen, onClose, year, month, onSaved }) 
     if (!isOpen) return
     setLoading(true)
     getExpensesByMonth(prevYear, prevMonth)
-      .then(data => setRows(data.map(e => ({
+      .then(data => setRows(data.filter(e => !e.isOneOff).map(e => ({
         include: true,
         description: e.description,
         categoryId: e.categoryId,
