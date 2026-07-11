@@ -192,8 +192,11 @@ export default function CostsPage() {
     expenseGroupOpts
   )
 
+  // Hide finalized templates (no upcoming payment for the viewed month).
+  const activeFixedExpenses = fixedExpenses.filter(f => nextPayment(f, year, month) != null)
+
   const fixedGroups = groupByCategory(
-    filterItems(fixedExpenses, fixedFilters, expenseAccessors),
+    filterItems(activeFixedExpenses, fixedFilters, expenseAccessors),
     expenseGroupOpts
   )
 
