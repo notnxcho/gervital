@@ -73,6 +73,15 @@ const FILTERS_CONFIG = [
     ]
   },
   {
+    key: 'schedule',
+    label: 'Horario',
+    options: [
+      { value: 'morning', label: 'Mañana' },
+      { value: 'afternoon', label: 'Tarde' },
+      { value: 'full_day', label: 'Día completo' }
+    ]
+  },
+  {
     key: 'hasTransport',
     label: 'Transporte',
     type: 'full',
@@ -200,6 +209,7 @@ export default function ClientList() {
   const [filters, setFilters] = useState({
     cognitiveLevel: null,
     frequency: null,
+    schedule: null,
     hasTransport: null,
     clientType: null,
     showDeleted: null
@@ -237,15 +247,16 @@ export default function ClientList() {
 
       const matchesCognitive = filters.cognitiveLevel === null || client.cognitiveLevel === filters.cognitiveLevel
       const matchesFrequency = filters.frequency === null || client.plan.frequency === filters.frequency
+      const matchesSchedule = filters.schedule === null || client.plan.schedule === filters.schedule
       const matchesTransport = filters.hasTransport === null || client.plan.hasTransport === filters.hasTransport
       const matchesType = filters.clientType === null || (client.clientType || 'regular') === filters.clientType
       // "Solo bajas": con el filtro activo se muestran únicamente los dados de baja
       const matchesDeleted = filters.showDeleted === true ? !!client.deletedAt : !client.deletedAt
 
-      return matchesSearch && matchesCognitive && matchesFrequency && matchesTransport && matchesType && matchesDeleted
+      return matchesSearch && matchesCognitive && matchesFrequency && matchesSchedule && matchesTransport && matchesType && matchesDeleted
     })
     return sortClients(filtered, sortBy)
-  }, [clients, search, filters.cognitiveLevel, filters.frequency, filters.hasTransport, filters.clientType, filters.showDeleted, sortBy])
+  }, [clients, search, filters.cognitiveLevel, filters.frequency, filters.schedule, filters.hasTransport, filters.clientType, filters.showDeleted, sortBy])
 
   const activeFiltersCount = getActiveFiltersCount(filters)
 
@@ -351,7 +362,7 @@ export default function ClientList() {
           </p>
           {activeFiltersCount > 0 && (
             <button
-              onClick={() => setFilters({ cognitiveLevel: null, frequency: null, hasTransport: null, clientType: null, showDeleted: null })}
+              onClick={() => setFilters({ cognitiveLevel: null, frequency: null, schedule: null, hasTransport: null, clientType: null, showDeleted: null })}
               className="mt-2 text-purple-600 hover:text-purple-700 text-sm font-medium"
             >
               Limpiar filtros
