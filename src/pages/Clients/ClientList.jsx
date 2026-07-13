@@ -94,7 +94,6 @@ const FILTERS_CONFIG = [
   {
     key: 'showDeleted',
     label: 'Bajas',
-    type: 'checkbox',
     options: [
       { value: true, label: 'Mostrar solo bajas' }
     ]
