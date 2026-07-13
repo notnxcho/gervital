@@ -135,7 +135,7 @@ export default function BulkInvoiceModal({
 
   return (
     <>
-    <Modal isOpen={isOpen} onClose={requestClose} title={`${isPay ? 'Marcar cobrado' : 'Facturar'} — ${monthLabel}`} size="xl">
+    <Modal isOpen={isOpen} onClose={requestClose} title={`${isPay ? 'Marcar cobrado' : 'Facturar'} — ${monthLabel}`} size="lg">
       <div className="space-y-4">
         {/* Progreso */}
         {runTotal > 0 && (
