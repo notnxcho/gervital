@@ -13,6 +13,39 @@ export function haversineKm(lat1, lng1, lat2, lng2) {
 }
 
 /**
+ * Driving route distance in km between two points, via Google Distance Matrix.
+ * Resolves to the road distance in km, or null on any failure (API not enabled,
+ * ZERO_RESULTS, network error, missing service) so callers can fall back to haversine.
+ * @param {google.maps.DistanceMatrixService} service
+ * @param {{lat:number,lng:number}} origin
+ * @param {{lat:number,lng:number}} destination
+ */
+export async function routeDistanceKm(service, origin, destination) {
+  if (!service || !origin || !destination) return null
+  return new Promise(resolve => {
+    try {
+      service.getDistanceMatrix(
+        {
+          origins: [origin],
+          destinations: [destination],
+          travelMode: 'DRIVING'
+        },
+        (res, status) => {
+          const el = status === 'OK' && res?.rows?.[0]?.elements?.[0]
+          if (el && el.status === 'OK' && el.distance?.value != null) {
+            resolve(el.distance.value / 1000)
+          } else {
+            resolve(null)
+          }
+        }
+      )
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
+/**
  * Determine the distance range bucket from a distance in km.
  */
 export function distanceToRange(km) {

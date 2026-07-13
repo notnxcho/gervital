@@ -9,7 +9,8 @@ import {
   distanceToRange,
   resolveInitialCenter,
   geocodeWithGoogle,
-  reverseGeocode
+  reverseGeocode,
+  routeDistanceKm
 } from '../../services/clients/geocodingService'
 
 const DISTANCE_LABELS = { '0_to_2km': '0 a 2 km', '2_to_5km': '2 a 5 km', '5_to_10km': '5 a 10 km' }
@@ -38,13 +39,18 @@ export default function LocationPickerModal({ isOpen, address, initialCoords, on
   })
 
   const geocoderRef = useRef(null)
+  const distanceMatrixRef = useRef(null)
   const [coords, setCoords] = useState(null)
   const [distanceRange, setDistanceRange] = useState(null)
+  const [computingDistance, setComputingDistance] = useState(false)
   const [formattedAddress, setFormattedAddress] = useState('')
   const [status, setStatus] = useState('idle') // idle | loading | ready | not_found
 
-  const computeRange = useCallback((lat, lng) => {
-    const km = haversineKm(lat, lng, CLUB_LOCATION.lat, CLUB_LOCATION.lng)
+  // Driving route distance to the club, falling back to straight-line if routing fails.
+  const computeRange = useCallback(async (lat, lng) => {
+    distanceMatrixRef.current = distanceMatrixRef.current || new window.google.maps.DistanceMatrixService()
+    const routeKm = await routeDistanceKm(distanceMatrixRef.current, CLUB_LOCATION, { lat, lng })
+    const km = routeKm != null ? routeKm : haversineKm(lat, lng, CLUB_LOCATION.lat, CLUB_LOCATION.lng)
     return distanceToRange(km)
   }, [])
 
@@ -77,9 +83,13 @@ export default function LocationPickerModal({ isOpen, address, initialCoords, on
       }
       if (cancelled) return
       setCoords(center)
-      setDistanceRange(computeRange(center.lat, center.lng))
       setFormattedAddress(foundLabel)
       setStatus(!stored && !geocoded ? 'not_found' : 'ready')
+      setComputingDistance(true)
+      const range = await computeRange(center.lat, center.lng)
+      if (cancelled) return
+      setDistanceRange(range)
+      setComputingDistance(false)
     }
     run()
     return () => { cancelled = true }
@@ -89,8 +99,12 @@ export default function LocationPickerModal({ isOpen, address, initialCoords, on
     const lat = e.latLng.lat()
     const lng = e.latLng.lng()
     setCoords({ lat, lng })
-    setDistanceRange(computeRange(lat, lng))
     setStatus('ready')
+    setComputingDistance(true)
+    computeRange(lat, lng).then(range => {
+      setDistanceRange(range)
+      setComputingDistance(false)
+    })
     const label = await reverseGeocode(geocoderRef.current, { lat, lng })
     if (label) setFormattedAddress(label)
   }, [computeRange])
@@ -156,7 +170,11 @@ export default function LocationPickerModal({ isOpen, address, initialCoords, on
             <div className="text-xs uppercase tracking-wide text-gray-400">El pin está en</div>
             <div className="text-sm text-gray-900">{formattedAddress || address || 'Ubicación sin descripción'}</div>
             <div className="mt-2 flex items-center gap-2">
-              {distanceRange && (
+              {computingDistance ? (
+                <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-500">
+                  Calculando distancia…
+                </span>
+              ) : distanceRange && (
                 <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                   Distancia al club: {DISTANCE_LABELS[distanceRange]}
                 </span>
@@ -167,7 +185,7 @@ export default function LocationPickerModal({ isOpen, address, initialCoords, on
 
           <div className="mt-5 flex justify-end gap-3">
             <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-            <Button onClick={handleConfirm} disabled={!coords}>Confirmar ubicación</Button>
+            <Button onClick={handleConfirm} disabled={!coords || computingDistance}>Confirmar ubicación</Button>
           </div>
         </div>
       )}

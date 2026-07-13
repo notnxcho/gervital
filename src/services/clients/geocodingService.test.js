@@ -1,6 +1,13 @@
-import { haversineKm, distanceToRange, resolveInitialCenter } from './geocodingService'
+import { haversineKm, distanceToRange, resolveInitialCenter, routeDistanceKm } from './geocodingService'
 
 const CLUB = { lat: -34.8969, lng: -56.1470 }
+const PIN = { lat: -34.9, lng: -56.15 }
+
+// Build a mock DistanceMatrixService whose callback receives (res, status).
+const mockService = (res, status) => ({
+  getDistanceMatrix: (_req, cb) => cb(res, status)
+})
+const okRes = meters => ({ rows: [{ elements: [{ status: 'OK', distance: { value: meters } }] }] })
 
 describe('haversineKm', () => {
   test('distance to itself is zero', () => {
@@ -28,6 +35,35 @@ describe('distanceToRange', () => {
   test('5 km boundary falls into 5_to_10km', () => {
     expect(distanceToRange(5)).toBe('5_to_10km')
     expect(distanceToRange(50)).toBe('5_to_10km')
+  })
+})
+
+describe('routeDistanceKm', () => {
+  test('returns road distance in km (meters / 1000) on OK', async () => {
+    const km = await routeDistanceKm(mockService(okRes(3400), 'OK'), CLUB, PIN)
+    expect(km).toBe(3.4)
+  })
+
+  test('null on top-level non-OK status', async () => {
+    const km = await routeDistanceKm(mockService(okRes(3400), 'OVER_QUERY_LIMIT'), CLUB, PIN)
+    expect(km).toBeNull()
+  })
+
+  test('null on element-level ZERO_RESULTS', async () => {
+    const res = { rows: [{ elements: [{ status: 'ZERO_RESULTS' }] }] }
+    const km = await routeDistanceKm(mockService(res, 'OK'), CLUB, PIN)
+    expect(km).toBeNull()
+  })
+
+  test('null when the service throws', async () => {
+    const throwing = { getDistanceMatrix: () => { throw new Error('boom') } }
+    const km = await routeDistanceKm(throwing, CLUB, PIN)
+    expect(km).toBeNull()
+  })
+
+  test('null when service or points are missing', async () => {
+    expect(await routeDistanceKm(null, CLUB, PIN)).toBeNull()
+    expect(await routeDistanceKm(mockService(okRes(100), 'OK'), null, PIN)).toBeNull()
   })
 })
 

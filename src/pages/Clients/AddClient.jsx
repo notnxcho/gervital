@@ -5,7 +5,7 @@ import { useJsApiLoader } from '@react-google-maps/api'
 import { ArrowLeft, Check, Plus, Trash, Bus, MapPin } from 'iconoir-react'
 import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion, syncClientToBiller, voidPendingInvoices } from '../../services/api'
 import LocationPickerModal from './LocationPickerModal'
-import { geocodeWithGoogle, haversineKm, distanceToRange } from '../../services/clients/geocodingService'
+import { geocodeWithGoogle, haversineKm, distanceToRange, routeDistanceKm } from '../../services/clients/geocodingService'
 import { CLUB_LOCATION } from '../../services/transport/transportConstants'
 import { getPlanPricing, getPlanPriceSync, calculateMonthProration } from '../../services/pricing/pricingService'
 import { getTransportPricing, getTransportPriceSync } from '../../services/pricing/transportPricingService'
@@ -171,6 +171,7 @@ export default function AddClient() {
   const [planEffectiveFrom, setPlanEffectiveFrom] = useState('')
   const [planFloorMonth, setPlanFloorMonth] = useState('')
   const geocoderRef = useRef(null)
+  const distanceMatrixRef = useRef(null)
   // Street value the current coords were derived from — lets us re-geocode only when
   // the address actually changes, preserving a manual pin correction otherwise.
   const lastGeocodedStreetRef = useRef('')
@@ -283,8 +284,10 @@ export default function AddClient() {
     setGeocoding(false)
     if (!g) return
     lastGeocodedStreetRef.current = street
-    const range = distanceToRange(haversineKm(g.lat, g.lng, CLUB_LOCATION.lat, CLUB_LOCATION.lng))
-    setFormData(prev => ({ ...prev, latitude: g.lat, longitude: g.lng, distanceRange: range }))
+    distanceMatrixRef.current = distanceMatrixRef.current || new window.google.maps.DistanceMatrixService()
+    const routeKm = await routeDistanceKm(distanceMatrixRef.current, CLUB_LOCATION, { lat: g.lat, lng: g.lng })
+    const km = routeKm != null ? routeKm : haversineKm(g.lat, g.lng, CLUB_LOCATION.lat, CLUB_LOCATION.lng)
+    setFormData(prev => ({ ...prev, latitude: g.lat, longitude: g.lng, distanceRange: distanceToRange(km) }))
   }
 
   // Antecedentes: estado derivado de formData.medicalHistory ([{condition, comment}])
