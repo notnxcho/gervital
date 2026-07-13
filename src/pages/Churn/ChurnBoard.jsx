@@ -209,6 +209,7 @@ export default function ChurnBoard() {
         isOpen={!!selectedCard}
         onClose={() => setSelectedCard(null)}
         onReactivated={loadBoard}
+        onUpdated={loadBoard}
         reasonsByKey={reasonsByKey}
       />
 

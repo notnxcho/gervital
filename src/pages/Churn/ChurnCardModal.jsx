@@ -3,7 +3,7 @@ import { format, formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Edit, Trash, Check, Xmark } from 'iconoir-react'
 import { useAuth } from '../../context/AuthContext'
-import { getChurnNotes, addChurnNote, updateChurnNote, deleteChurnNote } from '../../services/churn/churnService'
+import { getChurnNotes, addChurnNote, updateChurnNote, deleteChurnNote, updateDeactivationDetails } from '../../services/churn/churnService'
 import { reactivateClient } from '../../services/clients/clientService'
 import { formatCurrency } from '../../utils/format'
 import Modal from '../../components/ui/Modal'
@@ -38,7 +38,7 @@ function fmtRelative(iso) {
   }
 }
 
-export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, reasonsByKey = {} }) {
+export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, onUpdated, reasonsByKey = {} }) {
   const { user, hasAccess } = useAuth()
   const [notes, setNotes] = useState([])
   const [loadingNotes, setLoadingNotes] = useState(false)
@@ -48,6 +48,14 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, r
   const [editingId, setEditingId] = useState(null)
   const [editBody, setEditBody] = useState('')
   const [busyNoteId, setBusyNoteId] = useState(null)
+
+  // Discrete deactivation reason + its note (separate from the follow-up notes below).
+  const [reason, setReason] = useState('')
+  const [reasonNote, setReasonNote] = useState('')
+  const [editingReason, setEditingReason] = useState(false)
+  const [reasonDraft, setReasonDraft] = useState('')
+  const [reasonNoteDraft, setReasonNoteDraft] = useState('')
+  const [savingReason, setSavingReason] = useState(false)
 
   const clientId = card?.clientId
 
@@ -69,13 +77,51 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, r
       setBody('')
       setEditingId(null)
       setEditBody('')
+      setReason(card?.reason || '')
+      setReasonNote(card?.deactivationNotes || '')
+      setEditingReason(false)
       loadNotes(clientId)
     }
-  }, [isOpen, clientId, loadNotes])
+  }, [isOpen, clientId, card?.reason, card?.deactivationNotes, loadNotes])
 
   if (!card) return null
 
-  const reasonCfg = reasonsByKey[card.reason] || { label: card.reason || 'Sin motivo', color: '#94a3b8', description: '' }
+  const reasonCfg = reasonsByKey[reason] || { label: reason || 'Sin motivo', color: '#94a3b8', description: '' }
+
+  // Active reasons for the dropdown, sorted; keep the current one even if now inactive.
+  const activeReasons = Object.values(reasonsByKey)
+    .filter(r => r.isActive)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+  const reasonOptions = reasonDraft && !activeReasons.some(r => r.key === reasonDraft)
+    ? [reasonsByKey[reasonDraft] || { key: reasonDraft, label: reasonDraft }, ...activeReasons]
+    : activeReasons
+
+  const startEditReason = () => {
+    setReasonDraft(reason)
+    setReasonNoteDraft(reasonNote)
+    setEditingReason(true)
+  }
+
+  const cancelEditReason = () => setEditingReason(false)
+
+  const reasonNoteRequired = reasonDraft === 'other'
+
+  const handleSaveReason = async () => {
+    const trimmedNote = reasonNoteDraft.trim()
+    if (!reasonDraft || (reasonNoteRequired && !trimmedNote)) return
+    setSavingReason(true)
+    try {
+      await updateDeactivationDetails(clientId, { reason: reasonDraft, notes: trimmedNote })
+      setReason(reasonDraft)
+      setReasonNote(trimmedNote)
+      setEditingReason(false)
+      onUpdated?.()
+    } catch (err) {
+      console.error('Error updating deactivation details:', err)
+    } finally {
+      setSavingReason(false)
+    }
+  }
 
   const handleAddNote = async () => {
     const trimmed = body.trim()
@@ -162,13 +208,75 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, r
           <p className="text-sm text-gray-500 -mt-1">{planSubtitle(card)}</p>
         )}
 
+        {/* Motivo de baja: motivo discreto + su nota, editables. Separado de las
+            "Notas" de seguimiento de más abajo. */}
+        <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Motivo de baja</p>
+            {!editingReason && (
+              <button
+                type="button"
+                onClick={startEditReason}
+                title="Editar motivo"
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-500 rounded-lg hover:bg-gray-200"
+              >
+                <Edit width={14} height={14} /> Editar
+              </button>
+            )}
+          </div>
+
+          {editingReason ? (
+            <div className="mt-2 space-y-2">
+              <select
+                value={reasonDraft}
+                onChange={(e) => setReasonDraft(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                {reasonOptions.map(r => (
+                  <option key={r.key} value={r.key}>{r.label}</option>
+                ))}
+              </select>
+              <textarea
+                value={reasonNoteDraft}
+                onChange={(e) => setReasonNoteDraft(e.target.value)}
+                rows={3}
+                placeholder={reasonNoteRequired ? 'Nota obligatoria para "Otro / sin especificar"…' : 'Nota del motivo (opcional)…'}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+              />
+              <div className="flex justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={cancelEditReason}
+                  disabled={savingReason}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-500 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                >
+                  <Xmark width={14} height={14} /> Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveReason}
+                  disabled={savingReason || !reasonDraft || (reasonNoteRequired && !reasonNoteDraft.trim())}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-indigo-600 rounded-lg hover:bg-indigo-50 disabled:opacity-50"
+                >
+                  <Check width={14} height={14} /> Guardar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-1.5">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: reasonCfg.color }} />
+                <span className="text-sm font-medium text-gray-900" title={reasonCfg.description || ''}>{reasonCfg.label}</span>
+              </div>
+              {reasonNote
+                ? <p className="text-sm text-gray-700 whitespace-pre-wrap mt-1.5">{reasonNote}</p>
+                : <p className="text-sm text-gray-400 mt-1.5">Sin nota</p>}
+            </div>
+          )}
+        </div>
+
         {/* Details grid */}
         <div className="grid grid-cols-2 gap-4">
-          <Field
-            label="Motivo"
-            value={<span title={reasonCfg.description || ''}>{reasonCfg.label}</span>}
-            valueClass=""
-          />
           <Field label="Fecha de baja" value={fmtDate(card.deactivationDate)} />
           <Field
             label="Días desde baja"

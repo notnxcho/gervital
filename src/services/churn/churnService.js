@@ -18,6 +18,7 @@ export async function getChurnBoard() {
     schedule: r.schedule,
     stage: r.stage,
     reason: r.reason,
+    deactivationNotes: r.deactivation_notes,
     deactivationDate: r.deactivation_date,
     mrrSnapshot: Number(r.mrr_snapshot) || 0,
     assignedTo: r.assigned_to,
@@ -53,6 +54,22 @@ export async function assignChurn(clientId, userId) {
     .from('churn_followups')
     .update({ assigned_to: userId })
     .eq('client_id', clientId)
+
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Update the discrete deactivation reason and its note for a churned client.
+ * Keeps clients + churn_followups in sync via the update_deactivation_details RPC.
+ * @param {string} clientId
+ * @param {{reason: string, notes?: string}} payload
+ */
+export async function updateDeactivationDetails(clientId, { reason, notes }) {
+  const { error } = await supabase.rpc('update_deactivation_details', {
+    p_client_id: clientId,
+    p_reason: reason,
+    p_notes: notes || null
+  })
 
   if (error) throw new Error(error.message)
 }

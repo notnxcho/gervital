@@ -241,7 +241,8 @@ export {
   updateChurnStage,
   assignChurn,
   getChurnNotes,
-  addChurnNote
+  addChurnNote,
+  updateDeactivationDetails
 } from './churn/churnService'
 
 // ============================================
