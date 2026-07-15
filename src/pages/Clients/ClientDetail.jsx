@@ -120,10 +120,10 @@ function getDayTooltip(status, isJustified, notes) {
   let title = ''
   if (status === 'attended') title = 'Asistió'
   else if (status === 'absent') title = isJustified ? 'Falta justificada (+1 recupero)' : 'Falta no justificada'
-  else if (status === 'vacation') title = 'Vacaciones'
+  else if (status === 'vacation') title = 'Falta justificada'
   else if (status === 'recovery') title = 'Día recuperado'
   else if (status === 'scheduled') title = 'Programado'
-  const reason = status === 'absent' && notes ? notes : null
+  const reason = (status === 'absent' || status === 'vacation') && notes ? notes : null
   return { title, reason }
 }
 
@@ -760,7 +760,7 @@ export default function ClientDetail() {
           Asistencia y facturación
         </h2>
         <p className="text-sm text-gray-500 mt-1">
-          Desliza para ver todos los meses. Haz clic en un día para registrar ausencias o vacaciones.
+          Desliza para ver todos los meses. Haz clic en un día para registrar ausencias o faltas justificadas.
         </p>
       </div>
 
@@ -770,7 +770,7 @@ export default function ClientDetail() {
           { color: 'bg-green-500', label: 'Asistió' },
           { color: 'bg-red-500', label: 'Falta no justificada' },
           { color: 'bg-red-300', label: 'Falta justificada (+recupero)' },
-          { color: 'bg-orange-400', label: 'Vacaciones' },
+          { color: 'bg-orange-400', label: 'Falta justificada' },
           { color: 'bg-blue-500', label: 'Día recuperado' },
           { color: 'bg-gray-200', label: 'Programado' }
         ].map(item => (
@@ -1273,11 +1273,11 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
         onClose={closeModal}
         date={selectedDate}
         isPaid={isPaid}
-        onConfirmSingle={() =>
-          withProcessing(() => markDayVacation(client.id, selectedDate, user?.name))
+        onConfirmSingle={(notes) =>
+          withProcessing(() => markDayVacation(client.id, selectedDate, user?.name, notes))
         }
-        onConfirmRange={(from, to) =>
-          withProcessing(() => markVacationRange(client.id, from, to, user?.name))
+        onConfirmRange={(from, to, notes) =>
+          withProcessing(() => markVacationRange(client.id, from, to, user?.name, notes))
         }
       />
 
@@ -1285,8 +1285,8 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
       <ConfirmModal
         isOpen={modal === 'undoVacation'}
         onClose={closeModal}
-        title="Quitar vacación"
-        message={`¿Quitar vacaciones del ${selectedDate ? format(new Date(selectedDate), "d 'de' MMMM", { locale: es }) : ''}?${isPaid ? ' El mes ya fue cobrado — se descontará 1 día de recupero.' : ''}`}
+        title="Quitar falta justificada"
+        message={`¿Quitar la falta justificada del ${selectedDate ? format(new Date(selectedDate), "d 'de' MMMM", { locale: es }) : ''}?${isPaid ? ' El mes ya fue cobrado — se descontará 1 día de recupero.' : ''}`}
         confirmLabel="Sí, quitar"
         onConfirm={() =>
           withProcessing(() => unmarkDayVacation(client.id, selectedDate, user?.name))
@@ -1383,7 +1383,7 @@ function PaymentModal({ isOpen, onClose, clientId, year, month, liveAmount, user
             </div>
             {billing.vacationDays > 0 && (
               <div className="flex justify-between text-orange-600">
-                <span>Vacaciones:</span><span>-{billing.vacationDays} días</span>
+                <span>Faltas justificadas:</span><span>-{billing.vacationDays} días</span>
               </div>
             )}
             <div className="flex justify-between font-medium text-gray-800 border-t border-gray-200 pt-1">
@@ -1613,28 +1613,38 @@ function AbsenceModal({ isOpen, onClose, date, onConfirm }) {
 }
 
 // ============================================================
-// VacationModal
+// VacationModal — "Marcar falta justificada" (día futuro)
 // ============================================================
+// Motivos discretos + "Otro" (texto libre). El motivo se guarda en attendance_records.notes.
+const JUSTIFIED_ABSENCE_REASONS = ['Vacaciones', 'Enfermo/a', 'Invierno', 'Cita médica']
+
 function VacationModal({ isOpen, onClose, date, isPaid, onConfirmSingle, onConfirmRange }) {
   const [tab, setTab] = useState('single')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [reasonChoice, setReasonChoice] = useState(null) // preset label | 'Otro' | null
+  const [otherText, setOtherText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!isOpen) { setTab('single'); setFromDate(''); setToDate(''); setError('') }
+    if (!isOpen) { setTab('single'); setFromDate(''); setToDate(''); setReasonChoice(null); setOtherText(''); setError('') }
     else if (date) { setFromDate(date); setToDate(date) }
   }, [isOpen, date])
 
+  const isOther = reasonChoice === 'Otro'
+  const resolvedReason = isOther ? otherText.trim() : reasonChoice
+  const reasonValid = !!resolvedReason
+
   const handleSubmit = async () => {
+    if (!reasonValid) { setError(isOther ? 'Escribe el motivo' : 'Selecciona un motivo'); return }
     if (tab === 'range' && (!fromDate || !toDate)) { setError('Selecciona ambas fechas'); return }
     if (tab === 'range' && fromDate > toDate) { setError('La fecha de inicio debe ser anterior al fin'); return }
     setSubmitting(true)
     setError('')
     try {
-      if (tab === 'single') await onConfirmSingle()
-      else await onConfirmRange(fromDate, toDate)
+      if (tab === 'single') await onConfirmSingle(resolvedReason)
+      else await onConfirmRange(fromDate, toDate, resolvedReason)
     } catch (e) {
       setError(e.message)
       setSubmitting(false)
@@ -1642,13 +1652,43 @@ function VacationModal({ isOpen, onClose, date, isPaid, onConfirmSingle, onConfi
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Marcar vacaciones">
+    <Modal isOpen={isOpen} onClose={onClose} title="Marcar falta justificada">
       <div className="space-y-4">
         {isPaid && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-            El mes ya fue cobrado — se acreditará 1 día de recupero por cada día de vacación marcado.
+            El mes ya fue cobrado — se acreditará 1 día de recupero por cada día marcado.
           </div>
         )}
+
+        {/* Motivo */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Motivo</label>
+          <div className="flex flex-wrap gap-2">
+            {[...JUSTIFIED_ABSENCE_REASONS, 'Otro'].map(r => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setReasonChoice(r)}
+                disabled={submitting}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${reasonChoice === r
+                  ? 'bg-orange-500 text-white border-orange-500'
+                  : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300'}`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          {isOther && (
+            <input
+              type="text"
+              value={otherText}
+              onChange={e => setOtherText(e.target.value)}
+              placeholder="Especifica el motivo..."
+              disabled={submitting}
+              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+          )}
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
@@ -1688,8 +1728,8 @@ function VacationModal({ isOpen, onClose, date, isPaid, onConfirmSingle, onConfi
 
         <div className="flex gap-3 justify-end pt-2 border-t border-gray-200">
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSubmit} loading={submitting} className="bg-orange-500 hover:bg-orange-600">
-            Confirmar vacaciones
+          <Button onClick={handleSubmit} loading={submitting} disabled={!reasonValid} className="bg-orange-500 hover:bg-orange-600">
+            Confirmar falta justificada
           </Button>
         </div>
       </div>

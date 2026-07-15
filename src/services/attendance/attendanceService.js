@@ -104,20 +104,22 @@ export async function unmarkDayAbsent(clientId, date, userName) {
 }
 
 /**
- * Mark a future assigned day as vacation
+ * Mark a future assigned day as a justified absence (stored as status 'vacation')
  * @param {string} clientId
  * @param {string} date - YYYY-MM-DD
  * @param {string} userName
+ * @param {string|null} notes - Reason (preset label or free text)
  * @returns {Promise<{success: boolean, creditEarned: boolean}>}
  */
-export async function markDayVacation(clientId, date, userName) {
+export async function markDayVacation(clientId, date, userName, notes = null) {
   const { data, error } = await supabase.rpc('mark_day_vacation', {
     p_client_id: clientId,
     p_date: date,
-    p_created_by: userName
+    p_created_by: userName,
+    p_notes: notes
   })
   if (error) throw new Error(error.message)
-  if (!data.success) throw new Error(data.error || 'Error al marcar vacación')
+  if (!data.success) throw new Error(data.error || 'Error al marcar falta justificada')
   return data
 }
 
@@ -140,22 +142,24 @@ export async function unmarkDayVacation(clientId, date, userName) {
 }
 
 /**
- * Mark a range of assigned days as vacation
+ * Mark a range of assigned days as justified absences (stored as status 'vacation')
  * @param {string} clientId
  * @param {string} fromDate - YYYY-MM-DD
  * @param {string} toDate - YYYY-MM-DD
  * @param {string} userName
+ * @param {string|null} notes - Reason (preset label or free text) applied to the whole range
  * @returns {Promise<{success: boolean, daysMarked: number}>}
  */
-export async function markVacationRange(clientId, fromDate, toDate, userName) {
+export async function markVacationRange(clientId, fromDate, toDate, userName, notes = null) {
   const { data, error } = await supabase.rpc('mark_vacation_range', {
     p_client_id: clientId,
     p_from_date: fromDate,
     p_to_date: toDate,
-    p_created_by: userName
+    p_created_by: userName,
+    p_notes: notes
   })
   if (error) throw new Error(error.message)
-  if (!data.success) throw new Error(data.error || 'Error al marcar rango de vacaciones')
+  if (!data.success) throw new Error(data.error || 'Error al marcar rango de faltas justificadas')
   return data
 }
 
