@@ -859,7 +859,7 @@ export default function ClientDetail() {
 // ============================================================
 function MonthCard({ client, year, month, invoice, attendance, pricingData, transportPricingData, user, onRefresh }) {
   const [processing, setProcessing] = useState(false)
-  // Modal state: null | 'payment' | 'undoPayment' | 'invoice' | 'absence' | 'undoAbsence' | 'vacation' | 'undoVacation' | 'recovery' | 'undoRecovery'
+  // Modal state: null | 'payment' | 'undoPayment' | 'invoice' | 'absence' | 'undoAbsence' | 'undoVacation' | 'recovery' | 'undoRecovery'
   const [modal, setModal] = useState(null)
   const [selectedDate, setSelectedDate] = useState(null)
   const [selectedRecord, setSelectedRecord] = useState(null)
@@ -969,7 +969,10 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     if (day < clientStart) return { status: 'not_scheduled', isJustified: false, isAssigned: false }
     // Baja: desde la fecha de baja (inclusive) el día ya no cuenta como asistencia ni es cobrable.
     if (deactDate && day >= deactDate) return { status: 'not_scheduled', isJustified: false, isAssigned: false }
-    if (rec) return { status: rec.status, isJustified: rec.isJustified ?? false, isAssigned: true, notes: rec.notes ?? null }
+    // 'scheduled' es un placeholder derivado de la fecha, no una decisión del usuario. Un registro
+    // 'scheduled' persistido para hoy/pasado (ej: quedó de deshacer una vacación futura que ya llegó)
+    // no debe congelar el estado: se ignora y se deriva por fecha (hoy y pasado => 'attended').
+    if (rec && rec.status !== 'scheduled') return { status: rec.status, isJustified: rec.isJustified ?? false, isAssigned: true, notes: rec.notes ?? null }
     if (day > today) return { status: 'scheduled', isJustified: false, isAssigned: true }
     return { status: 'attended', isJustified: false, isAssigned: true }
   }
@@ -985,16 +988,11 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     setSelectedRecord({ status, isJustified })
 
     if (isAssigned) {
-      if (day >= today) {
-        // Future assigned day
-        if (status === 'scheduled') setModal('vacation')
-        else if (status === 'vacation') setModal('undoVacation')
-      } else {
-        // Past assigned day
-        if (status === 'attended') setModal('absence')
-        else if (status === 'absent') setModal('undoAbsence')
-        else if (status === 'vacation') setModal('undoVacation')
-      }
+      // Flujo único: cualquier día asignado sin falta (futuro 'scheduled' o pasado 'attended')
+      // abre el modal de falta; los ya marcados abren el "deshacer" correspondiente.
+      if (status === 'scheduled' || status === 'attended') setModal('absence')
+      else if (status === 'vacation') setModal('undoVacation')
+      else if (status === 'absent') setModal('undoAbsence')
     } else {
       // Non-assigned day: always open the recovery modal (it reports when there
       // are no available recovery credits).
@@ -1244,14 +1242,19 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
         userRole={user?.role}
       />
 
-      {/* ── AbsenceModal ── */}
+      {/* ── AbsenceModal (flujo único justificada/injustificada, pasado o futuro) ── */}
       <AbsenceModal
         isOpen={modal === 'absence'}
         onClose={closeModal}
         date={selectedDate}
-        onConfirm={(isJustified, notes) =>
-          withProcessing(() => markDayAbsent(client.id, selectedDate, isJustified, user?.name, notes))
-        }
+        isPaid={isPaid}
+        onConfirm={({ type, reason, range }) => {
+          if (type === 'unjustified')
+            return withProcessing(() => markDayAbsent(client.id, selectedDate, false, user?.name, reason))
+          if (range)
+            return withProcessing(() => markVacationRange(client.id, range.from, range.to, user?.name, reason))
+          return withProcessing(() => markDayVacation(client.id, selectedDate, user?.name, reason))
+        }}
       />
 
       {/* ── Undo absence ── */}
@@ -1265,20 +1268,6 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
           withProcessing(() => unmarkDayAbsent(client.id, selectedDate, user?.name))
         }
         loading={processing}
-      />
-
-      {/* ── VacationModal ── */}
-      <VacationModal
-        isOpen={modal === 'vacation'}
-        onClose={closeModal}
-        date={selectedDate}
-        isPaid={isPaid}
-        onConfirmSingle={(notes) =>
-          withProcessing(() => markDayVacation(client.id, selectedDate, user?.name, notes))
-        }
-        onConfirmRange={(from, to, notes) =>
-          withProcessing(() => markVacationRange(client.id, from, to, user?.name, notes))
-        }
       />
 
       {/* ── Undo vacation ── */}
@@ -1519,218 +1508,174 @@ function InvoiceModal({ isOpen, onClose, onConfirm }) {
 }
 
 // ============================================================
-// AbsenceModal
+// AbsenceModal — flujo único de falta (justificada / injustificada), pasado o futuro
 // ============================================================
-function AbsenceModal({ isOpen, onClose, date, onConfirm }) {
-  const [selected, setSelected] = useState(null) // null | true (justified) | false
-  const [reason, setReason] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
-  // Reset on open/close
-  useEffect(() => {
-    if (isOpen) {
-      setSelected(null)
-      setReason('')
-      setSubmitting(false)
-    }
-  }, [isOpen])
-
-  const handleConfirm = async () => {
-    if (selected === null) return
-    setSubmitting(true)
-    try {
-      await onConfirm(selected, reason.trim() || null)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  // Static Tailwind classes only — the JIT does NOT detect interpolated class names
-  // like `border-${color}-400`, so both variants are written out in full.
-  const baseOption = 'w-full p-4 rounded-lg border text-left transition-colors'
-  const justifiedClass = selected === true
-    ? `${baseOption} border-green-400 bg-green-50 ring-1 ring-green-300`
-    : `${baseOption} border-gray-200 hover:bg-green-50`
-  const unjustifiedClass = selected === false
-    ? `${baseOption} border-red-400 bg-red-50 ring-1 ring-red-300`
-    : `${baseOption} border-gray-200 hover:bg-red-50`
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Registrar falta — ${date ? format(new Date(date), "d 'de' MMMM", { locale: es }) : ''}`}>
-      <div className="space-y-3">
-        <p className="text-sm text-gray-600">El cliente no asistió. ¿Fue una falta justificada?</p>
-        <button
-          type="button"
-          onClick={() => setSelected(true)}
-          disabled={submitting}
-          className={justifiedClass}
-        >
-          <p className="font-medium text-gray-900 flex items-center gap-1.5">
-            {selected === true && <Check className="w-4 h-4 text-green-600" />}
-            Justificada
-          </p>
-          <p className="text-sm text-gray-500 mt-0.5">El cliente gana 1 día de recupero</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setSelected(false)}
-          disabled={submitting}
-          className={unjustifiedClass}
-        >
-          <p className="font-medium text-gray-900 flex items-center gap-1.5">
-            {selected === false && <Check className="w-4 h-4 text-red-600" />}
-            No justificada
-          </p>
-          <p className="text-sm text-gray-500 mt-0.5">Sin crédito de recupero</p>
-        </button>
-
-        <div>
-          <label htmlFor="absence-reason" className="block text-sm text-gray-600 mb-1">Motivo (opcional)</label>
-          <textarea
-            id="absence-reason"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Motivo de la falta..."
-            rows={2}
-            disabled={submitting}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-indigo-400"
-          />
-        </div>
-
-        <div className="flex justify-end pt-1">
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={selected === null || submitting}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting ? 'Guardando...' : 'Confirmar falta'}
-          </button>
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
-// ============================================================
-// VacationModal — "Marcar falta justificada" (día futuro)
-// ============================================================
-// Motivos discretos + "Otro" (texto libre). El motivo se guarda en attendance_records.notes.
+// Justificada: no se cobra el día (o suma recupero si el mes ya se cobró) → markDayVacation /
+// markVacationRange. Injustificada: se cobra igual → markDayAbsent(false). El motivo se guarda
+// en attendance_records.notes. Motivos discretos + "Otro" (texto libre).
 const JUSTIFIED_ABSENCE_REASONS = ['Vacaciones', 'Enfermo/a', 'Invierno', 'Cita médica']
 
-function VacationModal({ isOpen, onClose, date, isPaid, onConfirmSingle, onConfirmRange }) {
-  const [tab, setTab] = useState('single')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
+function AbsenceModal({ isOpen, onClose, date, isPaid, onConfirm }) {
+  const [selected, setSelected] = useState(null) // null | 'justified' | 'unjustified'
   const [reasonChoice, setReasonChoice] = useState(null) // preset label | 'Otro' | null
   const [otherText, setOtherText] = useState('')
+  const [unjustifiedReason, setUnjustifiedReason] = useState('')
+  const [rangeOn, setRangeOn] = useState(false)
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!isOpen) { setTab('single'); setFromDate(''); setToDate(''); setReasonChoice(null); setOtherText(''); setError('') }
-    else if (date) { setFromDate(date); setToDate(date) }
+    if (!isOpen) {
+      setSelected(null); setReasonChoice(null); setOtherText(''); setUnjustifiedReason('')
+      setRangeOn(false); setFromDate(''); setToDate(''); setSubmitting(false); setError('')
+    } else if (date) {
+      setFromDate(date); setToDate(date)
+    }
   }, [isOpen, date])
 
+  const isJustified = selected === 'justified'
   const isOther = reasonChoice === 'Otro'
-  const resolvedReason = isOther ? otherText.trim() : reasonChoice
-  const reasonValid = !!resolvedReason
+  const justifiedReason = isOther ? otherText.trim() : reasonChoice
+  const reasonValid = isJustified ? !!justifiedReason : true
+  const canConfirm = selected !== null && reasonValid && !(isJustified && rangeOn && (!fromDate || !toDate || fromDate > toDate))
 
-  const handleSubmit = async () => {
-    if (!reasonValid) { setError(isOther ? 'Escribe el motivo' : 'Selecciona un motivo'); return }
-    if (tab === 'range' && (!fromDate || !toDate)) { setError('Selecciona ambas fechas'); return }
-    if (tab === 'range' && fromDate > toDate) { setError('La fecha de inicio debe ser anterior al fin'); return }
-    setSubmitting(true)
+  const handleConfirm = async () => {
+    if (selected === null) { setError('Elegí justificada o injustificada'); return }
+    if (isJustified && !reasonValid) { setError(isOther ? 'Escribí el motivo' : 'Seleccioná un motivo'); return }
+    if (isJustified && rangeOn) {
+      if (!fromDate || !toDate) { setError('Seleccioná ambas fechas'); return }
+      if (fromDate > toDate) { setError('La fecha de inicio debe ser anterior al fin'); return }
+    }
     setError('')
+    setSubmitting(true)
     try {
-      if (tab === 'single') await onConfirmSingle(resolvedReason)
-      else await onConfirmRange(fromDate, toDate, resolvedReason)
+      await onConfirm({
+        type: selected,
+        reason: isJustified ? justifiedReason : (unjustifiedReason.trim() || null),
+        range: isJustified && rangeOn ? { from: fromDate, to: toDate } : null
+      })
     } catch (e) {
       setError(e.message)
       setSubmitting(false)
     }
   }
 
+  const baseOption = 'w-full p-4 rounded-lg border text-left transition-colors'
+  const justifiedClass = isJustified
+    ? `${baseOption} border-orange-400 bg-orange-50 ring-1 ring-orange-300`
+    : `${baseOption} border-gray-200 hover:bg-orange-50`
+  const unjustifiedClass = selected === 'unjustified'
+    ? `${baseOption} border-red-400 bg-red-50 ring-1 ring-red-300`
+    : `${baseOption} border-gray-200 hover:bg-red-50`
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Marcar falta justificada">
-      <div className="space-y-4">
-        {isPaid && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-            El mes ya fue cobrado — se acreditará 1 día de recupero por cada día marcado.
-          </div>
+    <Modal isOpen={isOpen} onClose={onClose} title={`Registrar falta — ${date ? format(new Date(date), "d 'de' MMMM", { locale: es }) : ''}`}>
+      <div className="space-y-3">
+        <p className="text-sm text-gray-600">El cliente no asiste. ¿Fue una falta justificada?</p>
+        <button type="button" onClick={() => setSelected('justified')} disabled={submitting} className={justifiedClass}>
+          <p className="font-medium text-gray-900 flex items-center gap-1.5">
+            {isJustified && <Check className="w-4 h-4 text-orange-600" />}
+            Justificada
+          </p>
+          <p className="text-sm text-gray-500 mt-0.5">No se cobra el día. Si el mes ya se cobró, suma 1 día de recupero.</p>
+        </button>
+        <button type="button" onClick={() => setSelected('unjustified')} disabled={submitting} className={unjustifiedClass}>
+          <p className="font-medium text-gray-900 flex items-center gap-1.5">
+            {selected === 'unjustified' && <Check className="w-4 h-4 text-red-600" />}
+            No justificada
+          </p>
+          <p className="text-sm text-gray-500 mt-0.5">Se cobra el día igual. Sin crédito de recupero.</p>
+        </button>
+
+        {isJustified && (
+          <>
+            {isPaid && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                El mes ya fue cobrado — se acreditará 1 día de recupero por cada día marcado.
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Motivo</label>
+              <div className="flex flex-wrap gap-2">
+                {[...JUSTIFIED_ABSENCE_REASONS, 'Otro'].map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setReasonChoice(r)}
+                    disabled={submitting}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${reasonChoice === r
+                      ? 'bg-orange-500 text-white border-orange-500'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300'}`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+              {isOther && (
+                <input
+                  type="text"
+                  value={otherText}
+                  onChange={e => setOtherText(e.target.value)}
+                  placeholder="Especifica el motivo..."
+                  disabled={submitting}
+                  className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+              )}
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+              <input type="checkbox" checked={rangeOn} onChange={e => setRangeOn(e.target.checked)} disabled={submitting}
+                className="w-4 h-4 rounded border-gray-300 accent-orange-500" />
+              Marcar un rango de días
+            </label>
+            {rangeOn && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Desde</label>
+                    <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Hasta</label>
+                    <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">Solo se marcarán los días asignados al plan del cliente.</p>
+              </div>
+            )}
+          </>
         )}
 
-        {/* Motivo */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Motivo</label>
-          <div className="flex flex-wrap gap-2">
-            {[...JUSTIFIED_ABSENCE_REASONS, 'Otro'].map(r => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setReasonChoice(r)}
-                disabled={submitting}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${reasonChoice === r
-                  ? 'bg-orange-500 text-white border-orange-500'
-                  : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300'}`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-          {isOther && (
-            <input
-              type="text"
-              value={otherText}
-              onChange={e => setOtherText(e.target.value)}
-              placeholder="Especifica el motivo..."
+        {selected === 'unjustified' && (
+          <div>
+            <label htmlFor="absence-reason" className="block text-sm text-gray-600 mb-1">Motivo (opcional)</label>
+            <textarea
+              id="absence-reason"
+              value={unjustifiedReason}
+              onChange={(e) => setUnjustifiedReason(e.target.value)}
+              placeholder="Motivo de la falta..."
+              rows={2}
               disabled={submitting}
-              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-indigo-400"
             />
-          )}
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
-          {[{ id: 'single', label: 'Día único' }, { id: 'range', label: 'Rango de fechas' }].map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${tab === t.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {tab === 'single' ? (
-          <div className="p-3 bg-gray-50 rounded-lg text-sm">
-            <span className="text-gray-600">Fecha: </span>
-            <span className="font-medium">{date ? format(new Date(date), "d 'de' MMMM, yyyy", { locale: es }) : ''}</span>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Desde</label>
-              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
-              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-            <p className="text-xs text-gray-500">Solo se marcarán los días asignados al plan del cliente.</p>
           </div>
         )}
 
         {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>}
 
-        <div className="flex gap-3 justify-end pt-2 border-t border-gray-200">
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSubmit} loading={submitting} disabled={!reasonValid} className="bg-orange-500 hover:bg-orange-600">
-            Confirmar falta justificada
-          </Button>
+        <div className="flex justify-end pt-1">
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!canConfirm || submitting}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Guardando...' : 'Confirmar falta'}
+          </button>
         </div>
       </div>
     </Modal>
