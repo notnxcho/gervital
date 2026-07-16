@@ -1,8 +1,8 @@
 import { Plus, Trash } from 'iconoir-react'
-import Input, { Select } from '../../../components/ui/Input'
+import Input, { Select, Textarea } from '../../../components/ui/Input'
 
 // Editor generico de una lista de objetos (filas). Sin logica de negocio.
-// fields: [{ key, label, type?: 'text'|'select', options?, placeholder? }]
+// fields: [{ key, label, type?: 'text'|'textarea'|'select', options?, placeholder?, rows? }]
 // emptyRow: objeto con las keys por defecto en ''
 export function RepeatableRows({ value, onChange, fields, emptyRow, addLabel }) {
   const rows = value || []
@@ -39,6 +39,14 @@ export function RepeatableRows({ value, onChange, fields, emptyRow, addLabel }) 
                     value={row[f.key] || ''}
                     onChange={(e) => updateRow(idx, f.key, e.target.value)}
                     options={[{ value: '', label: 'Seleccionar...' }, ...(f.options || [])]}
+                  />
+                ) : f.type === 'textarea' ? (
+                  <Textarea
+                    label={f.label}
+                    value={row[f.key] || ''}
+                    placeholder={f.placeholder || ''}
+                    rows={f.rows || 3}
+                    onChange={(e) => updateRow(idx, f.key, e.target.value)}
                   />
                 ) : (
                   <Input

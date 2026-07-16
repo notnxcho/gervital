@@ -23,7 +23,8 @@ export const DIAGNOSIS_TYPE_OPTIONS = [
   { value: 'sin', label: 'Sin declive' },
   { value: 'declive_cognitivo', label: 'Declive cognitivo' },
   { value: 'deterioro_cognitivo', label: 'Deterioro cognitivo' },
-  { value: 'demencia', label: 'Demencia' }
+  { value: 'demencia', label: 'Demencia' },
+  { value: 'parkinson', label: 'Parkinson' }
 ]
 
 export const MEDICAL_HISTORY_CONDITIONS = [

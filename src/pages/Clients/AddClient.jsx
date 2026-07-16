@@ -147,6 +147,20 @@ const INITIAL_FORM_DATA = {
   testInstances: {}
 }
 
+// Traduce errores del backend (Postgrest/Supabase) a mensajes en español para el toast.
+// Se irá ampliando caso por caso; fallback genérico al final.
+function getSubmitErrorMessage(error) {
+  const code = error?.code
+  const raw = `${error?.message || ''} ${error?.details || ''}`
+  // Domicilio: rango de distancia inválido / dirección incompleta
+  if (code === '23514' && /distance_range/.test(raw)) {
+    return 'No se pudo guardar el domicilio: falta el rango de distancia. Reubicá el pin en el mapa o completá la dirección.'
+  }
+  return error?.message
+    ? `No se pudo guardar: ${error.message}`
+    : 'No se pudo guardar. Revisá los datos e intentá nuevamente.'
+}
+
 export default function AddClient() {
   const navigate = useNavigate()
   const { hasAccess, user } = useAuth()
@@ -170,6 +184,7 @@ export default function AddClient() {
   const [geocoding, setGeocoding] = useState(false)
   const [planEffectiveFrom, setPlanEffectiveFrom] = useState('')
   const [planFloorMonth, setPlanFloorMonth] = useState('')
+  const [toast, setToast] = useState(null)
   const geocoderRef = useRef(null)
   const distanceMatrixRef = useRef(null)
   // Street value the current coords were derived from — lets us re-geocode only when
@@ -523,6 +538,8 @@ export default function AddClient() {
       }
     } catch (error) {
       console.error(isEditMode ? 'Error guardando cliente:' : 'Error creando cliente:', error)
+      setToast({ type: 'error', message: getSubmitErrorMessage(error) })
+      setTimeout(() => setToast(null), 6000)
     } finally {
       setLoading(false)
     }
@@ -575,6 +592,14 @@ export default function AddClient() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      {/* Toast notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 max-w-sm px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
+          toast.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          {toast.message}
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate(isEditMode ? `/clientes/${id}` : '/clientes')}>
@@ -1206,7 +1231,7 @@ export default function AddClient() {
                   emptyRow={{ diagnosisType: '', behaviorDisorder: '' }}
                   fields={[
                     { key: 'diagnosisType', label: 'Tipo', type: 'select', options: DIAGNOSIS_TYPE_OPTIONS },
-                    { key: 'behaviorDisorder', label: 'Tipo y trastorno de comportamiento' }
+                    { key: 'behaviorDisorder', label: 'Tipo y trastorno de comportamiento', type: 'textarea', rows: 3 }
                   ]}
                 />
               </div>
@@ -1220,10 +1245,11 @@ export default function AddClient() {
                     value={formData.educationLevel}
                     onChange={(e) => updateField('educationLevel', e.target.value)}
                   />
-                  <Input
+                  <Textarea
                     label="Trabajo / profesión"
                     value={formData.occupation}
                     onChange={(e) => updateField('occupation', e.target.value)}
+                    rows={2}
                   />
                   <Textarea
                     label="Intereses significativos (actuales y previos)"

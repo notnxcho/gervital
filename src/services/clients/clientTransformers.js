@@ -153,7 +153,7 @@ export function transformUpdateToDb(clientId, updateData) {
     if (updateData.address.accessNotes !== undefined) params.p_addr_access_notes = updateData.address.accessNotes
     if (updateData.address.doorbell !== undefined) params.p_addr_doorbell = updateData.address.doorbell
     if (updateData.address.concierge !== undefined) params.p_addr_concierge = updateData.address.concierge
-    if (updateData.address.distanceRange !== undefined) params.p_addr_distance_range = updateData.address.distanceRange
+    if (updateData.address.distanceRange !== undefined) params.p_addr_distance_range = updateData.address.distanceRange || null
   }
 
   // Personal

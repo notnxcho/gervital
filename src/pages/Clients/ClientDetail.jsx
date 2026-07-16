@@ -701,7 +701,7 @@ export default function ClientDetail() {
                   ) : (
                     <p className="font-medium text-gray-900">-</p>
                   )}
-                  <div className="pt-2"><p className="text-sm text-gray-500">Observaciones</p><p className="font-medium text-gray-900">{client.medicalInfo?.historyNotes || '-'}</p></div>
+                  <div className="pt-2"><p className="text-sm text-gray-500">Observaciones</p><p className="font-medium text-gray-900 whitespace-pre-line">{client.medicalInfo?.historyNotes || '-'}</p></div>
                 </div>
               </div>
 
@@ -713,7 +713,7 @@ export default function ClientDetail() {
                     client.diagnoses.map((d, i) => {
                       const label = DIAGNOSIS_TYPE_OPTIONS.find(x => x.value === d.diagnosisType)?.label || d.diagnosisType || '-'
                       return (
-                        <p key={i} className="font-medium text-gray-900">
+                        <p key={i} className="font-medium text-gray-900 whitespace-pre-line">
                           {label}{d.behaviorDisorder ? ` — ${d.behaviorDisorder}` : ''}
                         </p>
                       )
@@ -729,14 +729,14 @@ export default function ClientDetail() {
                 <h4 className="font-medium text-gray-900 mb-3">Historia de vida</h4>
                 <div className="grid grid-cols-2 gap-4 pl-6">
                   <div><p className="text-sm text-gray-500">Nivel educativo</p><p className="font-medium text-gray-900">{client.medicalInfo?.educationLevel || '-'}</p></div>
-                  <div><p className="text-sm text-gray-500">Ocupación</p><p className="font-medium text-gray-900">{client.medicalInfo?.occupation || '-'}</p></div>
-                  <div><p className="text-sm text-gray-500">Intereses significativos</p><p className="font-medium text-gray-900">{client.medicalInfo?.significantInterests || '-'}</p></div>
-                  <div><p className="text-sm text-gray-500">Vínculos significativos</p><p className="font-medium text-gray-900">{client.medicalInfo?.significantBonds || '-'}</p></div>
-                  <div><p className="text-sm text-gray-500">Gustos musicales</p><p className="font-medium text-gray-900">{client.medicalInfo?.musicTaste || '-'}</p></div>
-                  <div><p className="text-sm text-gray-500">Comidas preferidas</p><p className="font-medium text-gray-900">{client.medicalInfo?.favoriteFoods || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Ocupación</p><p className="font-medium text-gray-900 whitespace-pre-line">{client.medicalInfo?.occupation || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Intereses significativos</p><p className="font-medium text-gray-900 whitespace-pre-line">{client.medicalInfo?.significantInterests || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Vínculos significativos</p><p className="font-medium text-gray-900 whitespace-pre-line">{client.medicalInfo?.significantBonds || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Gustos musicales</p><p className="font-medium text-gray-900 whitespace-pre-line">{client.medicalInfo?.musicTaste || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Comidas preferidas</p><p className="font-medium text-gray-900 whitespace-pre-line">{client.medicalInfo?.favoriteFoods || '-'}</p></div>
                   <div><p className="text-sm text-gray-500">Carácter</p><p className="font-medium text-gray-900">{CHARACTER_OPTIONS.find(o => o.value === client.medicalInfo?.character)?.label || '-'}</p></div>
-                  <div><p className="text-sm text-gray-500">Recursos personales</p><p className="font-medium text-gray-900">{client.medicalInfo?.personalResources || '-'}</p></div>
-                  <div><p className="text-sm text-gray-500">Vulnerabilidades</p><p className="font-medium text-gray-900">{client.medicalInfo?.vulnerabilities || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Recursos personales</p><p className="font-medium text-gray-900 whitespace-pre-line">{client.medicalInfo?.personalResources || '-'}</p></div>
+                  <div><p className="text-sm text-gray-500">Vulnerabilidades</p><p className="font-medium text-gray-900 whitespace-pre-line">{client.medicalInfo?.vulnerabilities || '-'}</p></div>
                 </div>
               </div>
             </div>
