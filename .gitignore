@@ -25,3 +25,6 @@ yarn-error.log*
 
 # local scratch (client-load scripts/data, session notes — not for git)
 /.scratch/
+
+# dashboard mockup (local prototype, not part of the app)
+/dashboard-mockup/
