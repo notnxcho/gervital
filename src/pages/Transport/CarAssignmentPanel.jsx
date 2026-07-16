@@ -74,32 +74,18 @@ function UnassignedPool({ clientIds, clients, onAutoAssign, autoAssigning, recov
 function AbsencesSection({ absentClients, vacationClients }) {
   if (absentClients.length === 0 && vacationClients.length === 0) return null
 
+  const allAbsent = [...absentClients, ...vacationClients]
+
   return (
     <div className="p-3 border-b border-gray-200">
-      {absentClients.length > 0 && (
-        <>
-          <p className="text-xs font-semibold text-red-500 uppercase tracking-wider mb-2">
-            Faltas del día ({absentClients.length})
-          </p>
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {absentClients.map(client => (
-              <AbsenceChip key={client.id} client={client} variant="absent" />
-            ))}
-          </div>
-        </>
-      )}
-      {vacationClients.length > 0 && (
-        <>
-          <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-2">
-            Vacaciones ({vacationClients.length})
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {vacationClients.map(client => (
-              <AbsenceChip key={client.id} client={client} variant="vacation" />
-            ))}
-          </div>
-        </>
-      )}
+      <p className="text-xs font-semibold text-red-500 uppercase tracking-wider mb-2">
+        Faltas del día ({allAbsent.length})
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {allAbsent.map(client => (
+          <AbsenceChip key={client.id} client={client} variant="absent" />
+        ))}
+      </div>
     </div>
   )
 }

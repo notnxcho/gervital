@@ -130,24 +130,11 @@ export default function ClientPool({
               <p className="text-xs text-gray-400 text-center py-2">Sin faltas ni vacaciones este día</p>
             )}
 
-            {filteredAbsent.length > 0 && (
+            {filteredAbsent.length + filteredVacation.length > 0 && (
               <div className="flex flex-col gap-1.5">
-                {filteredAbsent.map(client => (
+                {[...filteredAbsent, ...filteredVacation].map(client => (
                   <AbsenceClientChip key={client.id} client={client} variant="absent" />
                 ))}
-              </div>
-            )}
-
-            {filteredVacation.length > 0 && (
-              <div className="mt-4">
-                <div className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-2">
-                  Vacaciones ({filteredVacation.length})
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {filteredVacation.map(client => (
-                    <AbsenceClientChip key={client.id} client={client} variant="vacation" />
-                  ))}
-                </div>
               </div>
             )}
           </div>
