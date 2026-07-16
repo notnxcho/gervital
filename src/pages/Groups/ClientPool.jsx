@@ -18,8 +18,7 @@ export default function ClientPool({
   clients,
   clientsInAllSlots,
   recoveryIds,
-  absentClients = [],
-  vacationClients = []
+  absentClients = []
 }) {
   const [search, setSearch] = useState('')
   const [showAbsences, setShowAbsences] = useState(true)
@@ -46,8 +45,7 @@ export default function ClientPool({
   const filtered = search ? byTier.filter(c => matchName(c, term)) : byTier
   const filteredAssignedToAll = search ? assignedToAllClients.filter(c => matchName(c, term)) : assignedToAllClients
   const filteredAbsent = search ? absentClients.filter(c => matchName(c, term)) : absentClients
-  const filteredVacation = search ? vacationClients.filter(c => matchName(c, term)) : vacationClients
-  const absenceTotal = absentClients.length + vacationClients.length
+  const absenceTotal = absentClients.length
 
   return (
     <div className="w-60 flex-shrink-0 border-l border-gray-200 bg-gray-50 p-4 overflow-y-auto">
@@ -127,13 +125,13 @@ export default function ClientPool({
         {showAbsences && (
           <div className="mt-3">
             {absenceTotal === 0 && (
-              <p className="text-xs text-gray-400 text-center py-2">Sin faltas ni vacaciones este día</p>
+              <p className="text-xs text-gray-400 text-center py-2">Sin faltas este día</p>
             )}
 
-            {filteredAbsent.length + filteredVacation.length > 0 && (
+            {filteredAbsent.length > 0 && (
               <div className="flex flex-col gap-1.5">
-                {[...filteredAbsent, ...filteredVacation].map(client => (
-                  <AbsenceClientChip key={client.id} client={client} variant="absent" />
+                {filteredAbsent.map(client => (
+                  <AbsenceClientChip key={client.id} client={client} />
                 ))}
               </div>
             )}

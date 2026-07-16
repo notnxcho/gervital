@@ -441,7 +441,7 @@ export default function TransportScheduler() {
             Reintentar
           </Button>
         </div>
-      ) : shiftClients.length === 0 && !(showAbsences && (shiftClassified.absent.length + shiftClassified.vacation.length > 0)) ? (
+      ) : shiftClients.length === 0 && !(showAbsences && shiftClassified.absent.length > 0) ? (
         <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
           No hay asistentes con transporte para este turno
         </div>
@@ -457,7 +457,6 @@ export default function TransportScheduler() {
             clientsById={clientsById}
             recoveryIds={recoveryIds}
             absentClients={shiftClassified.absent}
-            vacationClients={shiftClassified.vacation}
             showAbsences={showAbsences}
           />
         </div>

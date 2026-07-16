@@ -8,11 +8,9 @@ const COGNITIVE_LEVEL_COLORS = {
   D: 'bg-red-100 text-red-700'
 }
 
-// Absence variants shown when "Mostrar faltas" is on (read-only, not draggable)
-const ABSENCE_VARIANTS = {
-  absent: { chip: 'bg-red-50 border-red-200', tag: 'bg-red-100 text-red-700', dot: 'bg-red-500', label: 'falta' },
-  vacation: { chip: 'bg-amber-50 border-amber-200', tag: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500', label: 'vacación' }
-}
+// Chip shown when "Mostrar faltas" is on (read-only, not draggable).
+// Absence reasons are flattened: every absence reads as a plain "falta".
+const ABSENCE_STYLE = { chip: 'bg-red-50 border-red-200', tag: 'bg-red-100 text-red-700', dot: 'bg-red-500', label: 'falta' }
 
 function RecoveryBadge() {
   return (
@@ -64,12 +62,10 @@ export function PoolClientChip({ client, assignedToAll, isRecovery }) {
   )
 }
 
-// Read-only chip for an absent / vacationing client (not draggable)
-export function AbsenceClientChip({ client, variant = 'absent' }) {
-  const v = ABSENCE_VARIANTS[variant] || ABSENCE_VARIANTS.absent
-  const tooltip = variant === 'vacation'
-    ? 'Vacaciones'
-    : client.isJustified ? 'Falta justificada' : 'Falta no justificada'
+// Read-only chip for an absent client (not draggable)
+export function AbsenceClientChip({ client }) {
+  const v = ABSENCE_STYLE
+  const tooltip = client.isJustified ? 'Falta justificada' : 'Falta no justificada'
 
   return (
     <div
@@ -79,6 +75,9 @@ export function AbsenceClientChip({ client, variant = 'absent' }) {
       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${v.dot}`} />
       <span className="text-sm text-gray-700 font-medium flex-1 truncate">
         {client.firstName} {client.lastName}
+      </span>
+      <span className={`flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${v.tag}`}>
+        {v.label}
       </span>
     </div>
   )

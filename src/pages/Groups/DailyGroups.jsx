@@ -664,7 +664,6 @@ export default function DailyGroups() {
               clientsInAllSlots={clientsInAllSlots}
               recoveryIds={recoveryIds}
               absentClients={dayClassified.absent}
-              vacationClients={dayClassified.vacation}
             />
           </div>
 

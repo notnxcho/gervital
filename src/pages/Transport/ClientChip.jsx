@@ -35,25 +35,18 @@ function ChipContent({ client, color, isOverlay, noAddress, isRecovery }) {
   )
 }
 
-// Read-only chip for an absent / vacationing client (not draggable)
-const ABSENCE_CHIP = {
-  absent: { cls: 'bg-red-50 border-red-200 text-red-700', label: 'falta' },
-  vacation: { cls: 'bg-amber-50 border-amber-200 text-amber-700', label: 'vac.' }
-}
-
-export function AbsenceChip({ client, variant = 'absent' }) {
-  const v = ABSENCE_CHIP[variant] || ABSENCE_CHIP.absent
-  const tooltip = variant === 'vacation'
-    ? 'Vacaciones'
-    : client.isJustified ? 'Falta justificada' : 'Falta no justificada'
+// Read-only chip for an absent client (not draggable).
+// Absence reasons are flattened: every absence reads as a plain "falta".
+export function AbsenceChip({ client }) {
+  const tooltip = client.isJustified ? 'Falta justificada' : 'Falta no justificada'
 
   return (
     <div
       title={tooltip}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium select-none ${v.cls}`}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium select-none bg-red-50 border-red-200 text-red-700"
     >
       <span>{client.firstName} {client.lastName}</span>
-      <span className="text-[9px] font-bold uppercase opacity-80">{v.label}</span>
+      <span className="text-[9px] font-bold uppercase opacity-80">falta</span>
     </div>
   )
 }

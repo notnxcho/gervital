@@ -9,8 +9,8 @@ export const SHIFTS = [
 ]
 
 export const CAR_COLORS = [
-  '#ef4444', '#3b82f6', '#22c55e', '#eab308',
-  '#8b5cf6', '#f97316', '#ec4899', '#06b6d4'
+  '#8b5cf6', '#3b82f6', '#22c55e', '#eab308',
+  '#ef4444', '#f97316', '#ec4899', '#06b6d4'
 ]
 
 export const UNASSIGNED_COLOR = '#9ca3af'

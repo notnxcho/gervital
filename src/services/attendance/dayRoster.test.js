@@ -101,7 +101,7 @@ describe('buildDayRoster', () => {
 describe('classifyDay', () => {
   const morningShift = c => c.plan?.schedule === 'morning' || c.plan?.schedule === 'full_day'
 
-  test('splits planned clients into present / absent / vacation', () => {
+  test('splits planned clients into present / absent (all absence reasons flattened)', () => {
     const clients = [
       client('present', ['monday']),
       client('hebe', ['monday']),
@@ -111,19 +111,17 @@ describe('classifyDay', () => {
       ['hebe', { status: 'absent', isJustified: true }],
       ['onvac', { status: 'vacation' }]
     ])
-    const { present, absent, vacation } = classifyDay({ clients, dayName: 'monday', matchesShift: morningShift, attendanceByClientId: att })
+    const { present, absent } = classifyDay({ clients, dayName: 'monday', matchesShift: morningShift, attendanceByClientId: att })
     expect(present.map(c => c.id)).toEqual(['present'])
-    expect(absent.map(c => c.id)).toEqual(['hebe'])
-    expect(vacation.map(c => c.id)).toEqual(['onvac'])
+    expect(absent.map(c => c.id)).toEqual(['hebe', 'onvac'])
   })
 
-  test('recovery attendee (non-planned day) lands in present, not absent/vacation', () => {
+  test('recovery attendee (non-planned day) lands in present, not absent', () => {
     const clients = [client('r', ['monday'], 'morning')]
     const att = new Map([['r', { status: 'recovery' }]])
-    const { present, absent, vacation } = classifyDay({ clients, dayName: 'thursday', matchesShift: morningShift, attendanceByClientId: att })
+    const { present, absent } = classifyDay({ clients, dayName: 'thursday', matchesShift: morningShift, attendanceByClientId: att })
     expect(present.map(c => c.id)).toEqual(['r'])
     expect(absent).toEqual([])
-    expect(vacation).toEqual([])
   })
 
   test('present matches buildDayRoster output', () => {
@@ -140,7 +138,7 @@ describe('classifyDay', () => {
     expect(classifyDay(args).present.map(c => c.id)).toEqual(buildDayRoster(args).map(c => c.id))
   })
 
-  test('absent/vacation only include clients whose shift matches', () => {
+  test('absent only includes clients whose shift matches', () => {
     // afternoon-schedule absent client should NOT appear in a morning classification
     const clients = [client('pm', ['monday'], 'afternoon')]
     const att = new Map([['pm', { status: 'absent' }]])
@@ -148,15 +146,14 @@ describe('classifyDay', () => {
     expect(absent).toEqual([])
   })
 
-  test('empty attendance map yields all-present, empty absent/vacation', () => {
+  test('empty attendance map yields all-present, empty absent', () => {
     const clients = [client('a', ['monday']), client('b', ['monday'])]
-    const { present, absent, vacation } = classifyDay({ clients, dayName: 'monday', matchesShift: morningShift })
+    const { present, absent } = classifyDay({ clients, dayName: 'monday', matchesShift: morningShift })
     expect(present.map(c => c.id).sort()).toEqual(['a', 'b'])
     expect(absent).toEqual([])
-    expect(vacation).toEqual([])
   })
 
-  test('reflectAbsences=false keeps absent/vacation planned clients in present (weekly view)', () => {
+  test('reflectAbsences=false keeps absent planned clients in present (weekly view)', () => {
     const clients = [
       client('present', ['monday']),
       client('hebe', ['monday']),
@@ -166,12 +163,11 @@ describe('classifyDay', () => {
       ['hebe', { status: 'absent', isJustified: true }],
       ['onvac', { status: 'vacation' }]
     ])
-    const { present, absent, vacation } = classifyDay({
+    const { present, absent } = classifyDay({
       clients, dayName: 'monday', matchesShift: morningShift, attendanceByClientId: att, reflectAbsences: false
     })
     expect(present.map(c => c.id)).toEqual(['present', 'hebe', 'onvac'])
     expect(absent).toEqual([])
-    expect(vacation).toEqual([])
   })
 
   test('reflectAbsences=false still adds recovery attendees on non-planned days', () => {
