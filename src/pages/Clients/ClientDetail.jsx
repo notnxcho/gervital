@@ -19,11 +19,9 @@ import {
   markMonthInvoiced,
   syncClientToBiller,
   unmarkMonthPaid,
-  markDayAbsent,
-  unmarkDayAbsent,
-  markDayVacation,
-  unmarkDayVacation,
-  markVacationRange,
+  registerAbsence,
+  unregisterAbsence,
+  registerAbsenceRange,
   markDayRecoveryAttended,
   unmarkDayRecoveryAttended,
   getRecoveryCredits,
@@ -35,6 +33,7 @@ import {
   removePlanDiscount,
   getClientTestInstances
 } from '../../services/api'
+import { dayStyle, dayTooltip, outcomePreview } from '../../services/attendance/absenceModel'
 import { useAuth, roleHasAccess } from '../../context/AuthContext'
 import { useReasonLabels } from '../../hooks/useReasonLabels'
 import EmitInvoiceModal from './EmitInvoiceModal'
@@ -102,29 +101,6 @@ const COGNITIVE_LEVEL_CONFIG = {
   B: { label: 'Tier B - Asistencia leve', color: 'bg-blue-100 text-blue-700 border-blue-200' },
   C: { label: 'Tier C - Asistencia moderada', color: 'bg-amber-100 text-amber-700 border-amber-200' },
   D: { label: 'Tier D - Asistencia alta', color: 'bg-red-100 text-red-700 border-red-200' }
-}
-
-// Day cell styling by status
-function getDayStyle(status, isJustified) {
-  if (status === 'attended') return 'bg-green-500 text-white'
-  if (status === 'absent') return isJustified ? 'bg-red-300 text-white' : 'bg-red-500 text-white'
-  if (status === 'vacation') return 'bg-orange-400 text-white'
-  if (status === 'recovery') return 'bg-blue-500 text-white'
-  if (status === 'scheduled') return 'bg-gray-200 text-gray-600'
-  return ''
-}
-
-// Returns { title, reason } — title is the status label, reason is the optional
-// free-text absence note (null when absent). Empty title => no tooltip.
-function getDayTooltip(status, isJustified, notes) {
-  let title = ''
-  if (status === 'attended') title = 'Asistió'
-  else if (status === 'absent') title = isJustified ? 'Falta justificada (+1 recupero)' : 'Falta no justificada'
-  else if (status === 'vacation') title = 'Falta justificada'
-  else if (status === 'recovery') title = 'Día recuperado'
-  else if (status === 'scheduled') title = 'Programado'
-  const reason = (status === 'absent' || status === 'vacation') && notes ? notes : null
-  return { title, reason }
 }
 
 export default function ClientDetail() {
@@ -859,7 +835,7 @@ export default function ClientDetail() {
 // ============================================================
 function MonthCard({ client, year, month, invoice, attendance, pricingData, transportPricingData, user, onRefresh }) {
   const [processing, setProcessing] = useState(false)
-  // Modal state: null | 'payment' | 'undoPayment' | 'invoice' | 'absence' | 'undoAbsence' | 'undoVacation' | 'recovery' | 'undoRecovery'
+  // Modal state: null | 'payment' | 'undoPayment' | 'invoice' | 'absence' | 'undoAbsence' | 'recovery' | 'undoRecovery'
   const [modal, setModal] = useState(null)
   const [selectedDate, setSelectedDate] = useState(null)
   const [selectedRecord, setSelectedRecord] = useState(null)
@@ -884,10 +860,10 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   // since client.plan from clients_full carries no distanceRange.
   const plan = getPlanForMonth(client.planVersions, { ...client.plan, distanceRange: client.address?.distanceRange }, year, month)
 
-  // Días descontados del mes (vacaciones / no cobrados) → adenda por defecto del modal.
+  // Días descontados del mes (no cobrables) → adenda por defecto del modal.
   const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`
   const discountedDays = attendance
-    .filter(a => a.status === 'vacation' && String(a.date).startsWith(monthPrefix))
+    .filter(a => a.status === 'absent' && a.isChargeable === false && String(a.date).startsWith(monthPrefix))
     .map(a => new Date(String(a.date) + 'T12:00:00'))
 
   const startDay = getDay(monthStart)
@@ -911,7 +887,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     const dateStr = format(d, 'yyyy-MM-dd')
     const rec = attendance.find(a => a.date === dateStr)
     const name = DAY_INDEX_TO_NAME[getDay(d)]
-    return name && plan.assignedDays.includes(name) && d >= effectiveStart && (!deactDate || d < deactDate) && rec?.status === 'vacation'
+    return name && plan.assignedDays.includes(name) && d >= effectiveStart && (!deactDate || d < deactDate) && rec?.status === 'absent' && rec?.isChargeable === false
   }).length
 
   const plannedDays = days.filter(d => {
@@ -964,34 +940,33 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     const name = DAY_INDEX_TO_NAME[getDay(day)]
     const isAssigned = name && plan.assignedDays.includes(name)
 
-    if (rec?.status === 'recovery') return { status: 'recovery', isJustified: false, isAssigned: false }
-    if (!isAssigned) return { status: 'not_scheduled', isJustified: false, isAssigned: false }
-    if (day < clientStart) return { status: 'not_scheduled', isJustified: false, isAssigned: false }
+    if (rec?.status === 'recovery') return { status: 'recovery', isJustified: false, isChargeable: true, isAssigned: false }
+    if (!isAssigned) return { status: 'not_scheduled', isJustified: false, isChargeable: true, isAssigned: false }
+    if (day < clientStart) return { status: 'not_scheduled', isJustified: false, isChargeable: true, isAssigned: false }
     // Baja: desde la fecha de baja (inclusive) el día ya no cuenta como asistencia ni es cobrable.
-    if (deactDate && day >= deactDate) return { status: 'not_scheduled', isJustified: false, isAssigned: false }
+    if (deactDate && day >= deactDate) return { status: 'not_scheduled', isJustified: false, isChargeable: true, isAssigned: false }
     // 'scheduled' es un placeholder derivado de la fecha, no una decisión del usuario. Un registro
     // 'scheduled' persistido para hoy/pasado (ej: quedó de deshacer una vacación futura que ya llegó)
     // no debe congelar el estado: se ignora y se deriva por fecha (hoy y pasado => 'attended').
-    if (rec && rec.status !== 'scheduled') return { status: rec.status, isJustified: rec.isJustified ?? false, isAssigned: true, notes: rec.notes ?? null }
-    if (day > today) return { status: 'scheduled', isJustified: false, isAssigned: true }
-    return { status: 'attended', isJustified: false, isAssigned: true }
+    if (rec && rec.status !== 'scheduled') return { status: rec.status, isJustified: rec.isJustified ?? false, isChargeable: rec.isChargeable ?? true, isAssigned: true, notes: rec.notes ?? null }
+    if (day > today) return { status: 'scheduled', isJustified: false, isChargeable: true, isAssigned: true }
+    return { status: 'attended', isJustified: false, isChargeable: true, isAssigned: true }
   }
 
   const handleDayClick = (day) => {
     if (isDeactivated) return
     const dateStr = format(day, 'yyyy-MM-dd')
-    const { status, isJustified, isAssigned } = getDayStatus(day)
+    const { status, isJustified, isChargeable, isAssigned } = getDayStatus(day)
     const isWeekend = getDay(day) === 0 || getDay(day) === 6
     if (isWeekend) return
 
     setSelectedDate(dateStr)
-    setSelectedRecord({ status, isJustified })
+    setSelectedRecord({ status, isJustified, isChargeable })
 
     if (isAssigned) {
       // Flujo único: cualquier día asignado sin falta (futuro 'scheduled' o pasado 'attended')
       // abre el modal de falta; los ya marcados abren el "deshacer" correspondiente.
       if (status === 'scheduled' || status === 'attended') setModal('absence')
-      else if (status === 'vacation') setModal('undoVacation')
       else if (status === 'absent') setModal('undoAbsence')
     } else {
       // Non-assigned day: always open the recovery modal (it reports when there
@@ -1152,7 +1127,7 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
             {Array.from({ length: paddingDays }).map((_, i) => <div key={`pad-${i}`} className="h-7" />)}
             {days.map(day => {
               const isWeekend = getDay(day) === 0 || getDay(day) === 6
-              const { status, isJustified, isAssigned, notes } = getDayStatus(day)
+              const { status, isJustified, isChargeable, isAssigned, notes } = getDayStatus(day)
               const isStartDate = format(day, 'yyyy-MM-dd') === format(clientStart, 'yyyy-MM-dd')
               // Every weekday (Mon-Fri) is clickable. Recovery still requires an
               // available credit, but that is enforced inside the recovery modal.
@@ -1166,9 +1141,9 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
                 ? 'text-gray-300'
                 : status === 'not_scheduled'
                   ? 'bg-gray-50 text-gray-400 border border-dashed border-gray-200 hover:bg-blue-50 hover:text-blue-500'
-                  : getDayStyle(status, isJustified)
+                  : dayStyle(status, isJustified, isChargeable)
 
-              const tip = getDayTooltip(status, isJustified, notes)
+              const tip = dayTooltip(status, isJustified, isChargeable, notes)
               const isRecoverable = status === 'not_scheduled' && !isWeekend
               const nativeTitle = isStartDate
                 ? 'Primer día'
@@ -1249,11 +1224,10 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
         date={selectedDate}
         isPaid={isPaid}
         onConfirm={({ type, reason, range }) => {
-          if (type === 'unjustified')
-            return withProcessing(() => markDayAbsent(client.id, selectedDate, false, user?.name, reason))
+          const isJustified = type === 'justified'
           if (range)
-            return withProcessing(() => markVacationRange(client.id, range.from, range.to, user?.name, reason))
-          return withProcessing(() => markDayVacation(client.id, selectedDate, user?.name, reason))
+            return withProcessing(() => registerAbsenceRange(client.id, range.from, range.to, isJustified, user?.name, reason))
+          return withProcessing(() => registerAbsence(client.id, selectedDate, isJustified, user?.name, reason))
         }}
       />
 
@@ -1262,23 +1236,10 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
         isOpen={modal === 'undoAbsence'}
         onClose={closeModal}
         title="Deshacer falta"
-        message={`¿Revertir la falta del ${selectedDate ? format(new Date(selectedDate), "d 'de' MMMM", { locale: es }) : ''}? ${selectedRecord?.isJustified ? 'Se descontará 1 día de recupero.' : ''}`}
+        message={`¿Revertir la falta del ${selectedDate ? format(new Date(selectedDate), "d 'de' MMMM", { locale: es }) : ''}? ${selectedRecord?.isJustified && selectedRecord?.isChargeable ? 'Se descontará 1 día de recupero.' : ''}`}
         confirmLabel="Sí, deshacer"
         onConfirm={() =>
-          withProcessing(() => unmarkDayAbsent(client.id, selectedDate, user?.name))
-        }
-        loading={processing}
-      />
-
-      {/* ── Undo vacation ── */}
-      <ConfirmModal
-        isOpen={modal === 'undoVacation'}
-        onClose={closeModal}
-        title="Quitar falta justificada"
-        message={`¿Quitar la falta justificada del ${selectedDate ? format(new Date(selectedDate), "d 'de' MMMM", { locale: es }) : ''}?${isPaid ? ' El mes ya fue cobrado — se descontará 1 día de recupero.' : ''}`}
-        confirmLabel="Sí, quitar"
-        onConfirm={() =>
-          withProcessing(() => unmarkDayVacation(client.id, selectedDate, user?.name))
+          withProcessing(() => unregisterAbsence(client.id, selectedDate, user?.name))
         }
         loading={processing}
       />
@@ -1510,9 +1471,10 @@ function InvoiceModal({ isOpen, onClose, onConfirm }) {
 // ============================================================
 // AbsenceModal — flujo único de falta (justificada / injustificada), pasado o futuro
 // ============================================================
-// Justificada: no se cobra el día (o suma recupero si el mes ya se cobró) → markDayVacation /
-// markVacationRange. Injustificada: se cobra igual → markDayAbsent(false). El motivo se guarda
-// en attendance_records.notes. Motivos discretos + "Otro" (texto libre).
+// Justificada: no se cobra el día (o suma recupero si el mes ya se cobró) → registerAbsence /
+// registerAbsenceRange con isJustified=true. Injustificada: se cobra igual → registerAbsence con
+// isJustified=false. El motivo se guarda en attendance_records.notes. Motivos discretos + "Otro"
+// (texto libre).
 const JUSTIFIED_ABSENCE_REASONS = ['Vacaciones', 'Enfermo/a', 'Invierno', 'Cita médica']
 
 function AbsenceModal({ isOpen, onClose, date, isPaid, onConfirm }) {
@@ -1538,6 +1500,10 @@ function AbsenceModal({ isOpen, onClose, date, isPaid, onConfirm }) {
   const isJustified = selected === 'justified'
   const isOther = reasonChoice === 'Otro'
   const justifiedReason = isOther ? otherText.trim() : reasonChoice
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const previewText = selected
+    ? outcomePreview({ isJustified: selected === 'justified', date, today: todayStr, monthPaid: !!isPaid })
+    : null
   const reasonValid = isJustified ? !!justifiedReason : true
   const canConfirm = selected !== null && reasonValid && !(isJustified && rangeOn && (!fromDate || !toDate || fromDate > toDate))
 
@@ -1579,7 +1545,7 @@ function AbsenceModal({ isOpen, onClose, date, isPaid, onConfirm }) {
             {isJustified && <Check className="w-4 h-4 text-orange-600" />}
             Justificada
           </p>
-          <p className="text-sm text-gray-500 mt-0.5">No se cobra el día. Si el mes ya se cobró, suma 1 día de recupero.</p>
+          <p className="text-sm text-gray-500 mt-0.5">Puede o no cobrarse según la fecha y si el mes ya se cobró; genera recupero cuando se cobra.</p>
         </button>
         <button type="button" onClick={() => setSelected('unjustified')} disabled={submitting} className={unjustifiedClass}>
           <p className="font-medium text-gray-900 flex items-center gap-1.5">
@@ -1589,13 +1555,12 @@ function AbsenceModal({ isOpen, onClose, date, isPaid, onConfirm }) {
           <p className="text-sm text-gray-500 mt-0.5">Se cobra el día igual. Sin crédito de recupero.</p>
         </button>
 
+        {selected && !(isJustified && rangeOn) && (
+          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">{previewText}</div>
+        )}
+
         {isJustified && (
           <>
-            {isPaid && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-                El mes ya fue cobrado — se acreditará 1 día de recupero por cada día marcado.
-              </div>
-            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Motivo</label>
               <div className="flex flex-wrap gap-2">
@@ -1645,6 +1610,9 @@ function AbsenceModal({ isOpen, onClose, date, isPaid, onConfirm }) {
                   </div>
                 </div>
                 <p className="text-xs text-gray-500">Solo se marcarán los días asignados al plan del cliente.</p>
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+                  Cada día del rango se evalúa por separado según su fecha y el estado de cobro del mes.
+                </div>
               </div>
             )}
           </>

@@ -5,9 +5,9 @@
  *
  * Rule:
  *  - Planned client (assignedDays includes dayName AND matchesShift) is present,
- *    UNLESS their record for that date is an absence. The absence reason
- *    (absent / vacation / etc.) is NOT relevant to the daily roster UIs
- *    (Grupos / Transporte): all absences are flattened into a single "falta".
+ *    UNLESS their record for that date is an absence. Whether the absence is
+ *    justified/chargeable is NOT relevant to the daily roster UIs (Grupos /
+ *    Transporte): all absences are flattened into a single "falta".
  *  - A client attending on a recovery day (record status 'recovery') is added
  *    even if the day is not in their plan, as long as matchesShift is true.
  *    Recovery records do not carry a shift, so shift membership is derived from
@@ -16,7 +16,7 @@
  */
 
 // Statuses meaning the client is NOT physically present that day
-export const ABSENT_STATUSES = ['absent', 'vacation']
+export const ABSENT_STATUSES = ['absent']
 
 // Status meaning the client attends on a day outside their plan
 export const RECOVERY_STATUS = 'recovery'

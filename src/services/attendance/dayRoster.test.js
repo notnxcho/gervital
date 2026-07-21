@@ -34,9 +34,9 @@ describe('buildDayRoster', () => {
     expect(roster.map(c => c.id)).toEqual([])
   })
 
-  test('planned client is excluded when on vacation that day', () => {
+  test('planned client is excluded when marked absent that day (justified, non-chargeable)', () => {
     const clients = [client('a', ['monday'])]
-    const att = new Map([['a', { status: 'vacation' }]])
+    const att = new Map([['a', { status: 'absent', isJustified: true, isChargeable: false }]])
     const roster = buildDayRoster({ clients, dayName: 'monday', matchesShift: morningShift, attendanceByClientId: att })
     expect(roster.map(c => c.id)).toEqual([])
   })
@@ -108,8 +108,8 @@ describe('classifyDay', () => {
       client('onvac', ['monday'])
     ]
     const att = new Map([
-      ['hebe', { status: 'absent', isJustified: true }],
-      ['onvac', { status: 'vacation' }]
+      ['hebe', { status: 'absent', isJustified: true, isChargeable: true }],
+      ['onvac', { status: 'absent', isJustified: true, isChargeable: false }]
     ])
     const { present, absent } = classifyDay({ clients, dayName: 'monday', matchesShift: morningShift, attendanceByClientId: att })
     expect(present.map(c => c.id)).toEqual(['present'])
@@ -160,8 +160,8 @@ describe('classifyDay', () => {
       client('onvac', ['monday'])
     ]
     const att = new Map([
-      ['hebe', { status: 'absent', isJustified: true }],
-      ['onvac', { status: 'vacation' }]
+      ['hebe', { status: 'absent', isJustified: true, isChargeable: true }],
+      ['onvac', { status: 'absent', isJustified: true, isChargeable: false }]
     ])
     const { present, absent } = classifyDay({
       clients, dayName: 'monday', matchesShift: morningShift, attendanceByClientId: att, reflectAbsences: false
@@ -276,9 +276,9 @@ describe('stripClientsFromSlots', () => {
 })
 
 describe('status constants', () => {
-  test('absent statuses cover absent and vacation', () => {
+  test('absent statuses cover the unified absence status', () => {
     expect(ABSENT_STATUSES).toContain('absent')
-    expect(ABSENT_STATUSES).toContain('vacation')
+    expect(ABSENT_STATUSES).toEqual(['absent'])
   })
 
   test('recovery status is "recovery"', () => {
