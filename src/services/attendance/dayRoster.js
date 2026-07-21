@@ -81,3 +81,31 @@ export function buildDayRoster(params) {
 export function isRecoveryAttendee(client, attendanceByClientId) {
   return attendanceByClientId?.get(client.id)?.status === RECOVERY_STATUS
 }
+
+/**
+ * Return the day's time slots with the given client ids removed from every
+ * activity. Grupos uses this to keep absent clients out of the rendered time
+ * slots: a client can be assigned to an activity and then be marked absent (or
+ * be assigned during the brief window before the date's attendance loads), and
+ * the day view must not show them mapped to a horario.
+ *
+ * Non-destructive: the underlying assignment row is left intact, so un-marking
+ * the absence brings them back and saving the reference group still snapshots
+ * their usual spot. Referentially stable — returns the same array when there is
+ * nothing to strip, and reuses untouched activity objects, so it plays well
+ * with useMemo and React reconciliation.
+ * @param {Array} timeSlots
+ * @param {Set<string>} excludeIds
+ * @returns {Array}
+ */
+export function stripClientsFromSlots(timeSlots, excludeIds) {
+  if (!excludeIds || excludeIds.size === 0) return timeSlots
+  return timeSlots.map(slot => ({
+    ...slot,
+    activities: slot.activities.map(a =>
+      a.clientIds.some(id => excludeIds.has(id))
+        ? { ...a, clientIds: a.clientIds.filter(id => !excludeIds.has(id)) }
+        : a
+    )
+  }))
+}

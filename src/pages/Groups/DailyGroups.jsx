@@ -10,7 +10,7 @@ import { format, addDays, subDays, isToday, differenceInCalendarDays, startOfDay
 import { es } from 'date-fns/locale/es'
 import { NavArrowLeft, NavArrowRight, Calendar } from 'iconoir-react'
 import { getClients, getAttendanceForDate, getAttendanceForDateRange } from '../../services/api'
-import { classifyDay, buildDayRoster, indexAttendanceByClientId, RECOVERY_STATUS } from '../../services/attendance/dayRoster'
+import { classifyDay, buildDayRoster, indexAttendanceByClientId, stripClientsFromSlots, RECOVERY_STATUS } from '../../services/attendance/dayRoster'
 import {
   getTimeSlotsForDate,
   createTimeSlot,
@@ -102,6 +102,18 @@ export default function DailyGroups() {
 
   const shiftClients = dayClassified.present
 
+  // Absent clients must not appear mapped inside a time slot. An assignment can
+  // outlive presence (assigned while present, then marked absent), so we strip
+  // absentees from the rendered slots without touching the stored assignment.
+  const absentIds = useMemo(
+    () => new Set(dayClassified.absent.map(c => c.id)),
+    [dayClassified]
+  )
+  const displaySlots = useMemo(
+    () => stripClientsFromSlots(timeSlots, absentIds),
+    [timeSlots, absentIds]
+  )
+
   // Meal counts: global to the day, independent of the active shift tab.
   // Desayuno = mañana + día completo · Almuerzo = solo día completo · Merienda = tarde + día completo.
   const mealCounts = useMemo(() => {
@@ -123,8 +135,8 @@ export default function DailyGroups() {
   // Clients assigned to every time slot of the active shift
   const clientsInAllSlots = useMemo(() => {
     const result = new Set()
-    if (timeSlots.length === 0) return result
-    const slotSets = timeSlots.map(slot => {
+    if (displaySlots.length === 0) return result
+    const slotSets = displaySlots.map(slot => {
       const ids = new Set()
       slot.activities.forEach(a => a.clientIds.forEach(id => ids.add(id)))
       return ids
@@ -133,7 +145,7 @@ export default function DailyGroups() {
       if (slotSets.every(s => s.has(id))) result.add(id)
     }
     return result
-  }, [timeSlots])
+  }, [displaySlots])
 
   // ── Navigation helpers ────────────────────────────────────────────────────
 
@@ -223,9 +235,12 @@ export default function DailyGroups() {
     init()
   }, [today])
 
-  // Load actual attendance for the selected date (to reflect absences/recoveries)
+  // Load actual attendance for the selected date (to reflect absences/recoveries).
+  // Clear first so a previous day's absences can't briefly strip clients from
+  // the newly loaded slots — empty attendance means "treat everyone as present".
   useEffect(() => {
     let cancelled = false
+    setAttendanceByClientId(new Map())
     getAttendanceForDate(dateStr)
       .then(records => { if (!cancelled) setAttendanceByClientId(indexAttendanceByClientId(records)) })
       .catch(err => {
@@ -637,7 +652,7 @@ export default function DailyGroups() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {timeSlots.map(slot => (
+                  {displaySlots.map(slot => (
                     <TimeSlotCard
                       key={slot.id}
                       slot={slot}

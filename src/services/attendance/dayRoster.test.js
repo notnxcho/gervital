@@ -1,4 +1,4 @@
-import { buildDayRoster, classifyDay, isRecoveryAttendee, indexAttendanceByClientId, ABSENT_STATUSES, RECOVERY_STATUS } from './dayRoster'
+import { buildDayRoster, classifyDay, isRecoveryAttendee, indexAttendanceByClientId, stripClientsFromSlots, ABSENT_STATUSES, RECOVERY_STATUS } from './dayRoster'
 
 // Helpers
 const client = (id, days, schedule = 'morning', over = {}) => ({
@@ -220,6 +220,58 @@ describe('indexAttendanceByClientId', () => {
       { clientId: 'a', status: 'absent' }
     ])
     expect(map.get('a').status).toBe('absent')
+  })
+})
+
+describe('stripClientsFromSlots', () => {
+  const slots = () => [
+    {
+      id: 's1',
+      activities: [
+        { id: 'a1', clientIds: ['juan', 'ana'] },
+        { id: 'a2', clientIds: ['leo'] }
+      ]
+    },
+    {
+      id: 's2',
+      activities: [{ id: 'a3', clientIds: ['juan', 'leo'] }]
+    }
+  ]
+
+  test('removes the excluded client from every activity across all slots', () => {
+    const result = stripClientsFromSlots(slots(), new Set(['juan']))
+    expect(result[0].activities[0].clientIds).toEqual(['ana'])
+    expect(result[0].activities[1].clientIds).toEqual(['leo'])
+    expect(result[1].activities[0].clientIds).toEqual(['leo'])
+  })
+
+  test('returns the same array reference when exclude set is empty', () => {
+    const input = slots()
+    expect(stripClientsFromSlots(input, new Set())).toBe(input)
+  })
+
+  test('returns the same array reference when exclude set is missing', () => {
+    const input = slots()
+    expect(stripClientsFromSlots(input, undefined)).toBe(input)
+  })
+
+  test('does not mutate the input slots', () => {
+    const input = slots()
+    stripClientsFromSlots(input, new Set(['juan']))
+    expect(input[0].activities[0].clientIds).toEqual(['juan', 'ana'])
+    expect(input[1].activities[0].clientIds).toEqual(['juan', 'leo'])
+  })
+
+  test('leaves activities without excluded clients untouched (same reference)', () => {
+    const input = slots()
+    const result = stripClientsFromSlots(input, new Set(['juan']))
+    // a2 has no excluded client → same object reference preserved
+    expect(result[0].activities[1]).toBe(input[0].activities[1])
+  })
+
+  test('excluding multiple clients empties an activity', () => {
+    const result = stripClientsFromSlots(slots(), new Set(['juan', 'leo']))
+    expect(result[1].activities[0].clientIds).toEqual([])
   })
 })
 
