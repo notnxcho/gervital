@@ -72,7 +72,7 @@ export default function AttendanceSection({ selected }) {
         />
         <StatCard label="Ausencias injustificadas" value={String(kpis.absentUnjustified)} sub={`${totalAbsences} ausencias en total`} />
         <StatCard label="Ausencias justificadas" value={String(kpis.absentJustified)} sub="con o sin recupero" />
-        <StatCard label="Recuperos usados" value={String(kpis.recovery)} valueClass="text-indigo-700" sub={`${kpis.vacation} días de licencia`} />
+        <StatCard label="Recuperos usados" value={String(kpis.recovery)} valueClass="text-indigo-700" sub={`${kpis.vacation} días no cobrables`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
