@@ -64,11 +64,9 @@ export {
   getAttendanceForDate,
   getAttendanceForDateRange,
   advanceScheduledAttendance,
-  markDayAbsent,
-  unmarkDayAbsent,
-  markDayVacation,
-  unmarkDayVacation,
-  markVacationRange,
+  registerAbsence,
+  unregisterAbsence,
+  registerAbsenceRange,
   markDayRecoveryAttended,
   unmarkDayRecoveryAttended
 } from './attendance/attendanceService'

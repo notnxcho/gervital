@@ -18,6 +18,7 @@ export async function getClientAttendance(clientId) {
     date: r.date,
     status: r.status,
     isJustified: r.isJustified,
+    isChargeable: r.isChargeable,
     shift: r.shift,
     notes: r.notes
   }))
@@ -66,100 +67,59 @@ export async function advanceScheduledAttendance() {
 }
 
 /**
- * Mark a past assigned day as absent
+ * Registra una falta (única fuente de verdad server-side). El backend deriva
+ * si es cobrable y si genera recupero. Ver absenceModel.deriveAbsence.
  * @param {string} clientId
  * @param {string} date - YYYY-MM-DD
  * @param {boolean} isJustified
  * @param {string} userName
- * @param {string|null} notes - Optional free-text reason
+ * @param {string|null} notes - Motivo (chip o texto libre)
+ * @returns {Promise<{success: boolean, isChargeable: boolean, creditEarned: boolean}>}
  */
-export async function markDayAbsent(clientId, date, isJustified, userName, notes = null) {
-  const { data, error } = await supabase.rpc('mark_day_absent', {
+export async function registerAbsence(clientId, date, isJustified, userName, notes = null) {
+  const { data, error } = await supabase.rpc('register_absence', {
     p_client_id: clientId,
     p_date: date,
     p_is_justified: isJustified,
-    p_created_by: userName,
-    p_notes: notes
+    p_notes: notes,
+    p_created_by: userName
   })
   if (error) throw new Error(error.message)
-  if (!data.success) throw new Error(data.error || 'Error al marcar falta')
+  if (!data.success) throw new Error(data.error || 'Error al registrar falta')
   return data
 }
 
 /**
- * Revert an absent record back to attended
- * @param {string} clientId
- * @param {string} date - YYYY-MM-DD
- * @param {string} userName
+ * Registra faltas en un rango; cada día asignado se evalúa por separado.
+ * @returns {Promise<{success: boolean, daysMarked: number}>}
  */
-export async function unmarkDayAbsent(clientId, date, userName) {
-  const { data, error } = await supabase.rpc('unmark_day_absent', {
+export async function registerAbsenceRange(clientId, fromDate, toDate, isJustified, userName, notes = null) {
+  const { data, error } = await supabase.rpc('register_absence_range', {
+    p_client_id: clientId,
+    p_from_date: fromDate,
+    p_to_date: toDate,
+    p_is_justified: isJustified,
+    p_notes: notes,
+    p_created_by: userName
+  })
+  if (error) throw new Error(error.message)
+  if (!data.success) throw new Error(data.error || 'Error al registrar rango de faltas')
+  return data
+}
+
+/**
+ * Deshace una falta: revierte el día a attended/scheduled y revoca el crédito
+ * de recupero si la falta lo había generado.
+ * @returns {Promise<{success: boolean, creditRevoked: boolean}>}
+ */
+export async function unregisterAbsence(clientId, date, userName) {
+  const { data, error } = await supabase.rpc('unregister_absence', {
     p_client_id: clientId,
     p_date: date,
     p_created_by: userName
   })
   if (error) throw new Error(error.message)
   if (!data.success) throw new Error(data.error || 'Error al deshacer falta')
-  return data
-}
-
-/**
- * Mark a future assigned day as a justified absence (stored as status 'vacation')
- * @param {string} clientId
- * @param {string} date - YYYY-MM-DD
- * @param {string} userName
- * @param {string|null} notes - Reason (preset label or free text)
- * @returns {Promise<{success: boolean, creditEarned: boolean}>}
- */
-export async function markDayVacation(clientId, date, userName, notes = null) {
-  const { data, error } = await supabase.rpc('mark_day_vacation', {
-    p_client_id: clientId,
-    p_date: date,
-    p_created_by: userName,
-    p_notes: notes
-  })
-  if (error) throw new Error(error.message)
-  if (!data.success) throw new Error(data.error || 'Error al marcar falta justificada')
-  return data
-}
-
-/**
- * Remove vacation from a day
- * @param {string} clientId
- * @param {string} date - YYYY-MM-DD
- * @param {string} userName
- * @returns {Promise<{success: boolean, creditRevoked: boolean}>}
- */
-export async function unmarkDayVacation(clientId, date, userName) {
-  const { data, error } = await supabase.rpc('unmark_day_vacation', {
-    p_client_id: clientId,
-    p_date: date,
-    p_created_by: userName
-  })
-  if (error) throw new Error(error.message)
-  if (!data.success) throw new Error(data.error || 'Error al quitar vacación')
-  return data
-}
-
-/**
- * Mark a range of assigned days as justified absences (stored as status 'vacation')
- * @param {string} clientId
- * @param {string} fromDate - YYYY-MM-DD
- * @param {string} toDate - YYYY-MM-DD
- * @param {string} userName
- * @param {string|null} notes - Reason (preset label or free text) applied to the whole range
- * @returns {Promise<{success: boolean, daysMarked: number}>}
- */
-export async function markVacationRange(clientId, fromDate, toDate, userName, notes = null) {
-  const { data, error } = await supabase.rpc('mark_vacation_range', {
-    p_client_id: clientId,
-    p_from_date: fromDate,
-    p_to_date: toDate,
-    p_created_by: userName,
-    p_notes: notes
-  })
-  if (error) throw new Error(error.message)
-  if (!data.success) throw new Error(data.error || 'Error al marcar rango de faltas justificadas')
   return data
 }
 
