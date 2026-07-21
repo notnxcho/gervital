@@ -21,6 +21,11 @@ describe('attendanceRate', () => {
     expect(attendanceRate({ attended: 0, recovery: 0, absentJustified: 0, absentUnjustified: 0 })).toBeNull()
     expect(attendanceRate({ vacation: 5, scheduled: 3 })).toBeNull()
   })
+  test('falta justificada cobrable cuenta como ausencia; no cobrable no', () => {
+    // 8 attended, 1 absentJustified (cobrable) → 8/9; vacation (no cobrable) y scheduled ignorados
+    expect(attendanceRate({ attended: 8, absentJustified: 1, vacation: 5, scheduled: 4 }))
+      .toBeCloseTo(8 / 9)
+  })
 })
 
 describe('monthKpis', () => {

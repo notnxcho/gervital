@@ -260,6 +260,7 @@ export async function getAttendanceStats(fromYear, fromMonth, toYear, toMonth) {
     absentJustified: Number(r.absent_justified) || 0,
     absentUnjustified: Number(r.absent_unjustified) || 0,
     recovery: Number(r.recovery) || 0,
+    // vacation = faltas justificadas no cobrables (se excluyen del denominador de la tasa de asistencia)
     vacation: Number(r.vacation) || 0,
     scheduled: Number(r.scheduled) || 0
   }))
