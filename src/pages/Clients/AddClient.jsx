@@ -5,6 +5,7 @@ import { useJsApiLoader } from '@react-google-maps/api'
 import { ArrowLeft, Check, Plus, Trash, Bus, MapPin } from 'iconoir-react'
 import { createClient, updateClient, getClientById, uploadClientAvatar, updateClientAddressCoords, getClientInvoices, setClientPlanVersion, syncClientToBiller, voidPendingInvoices } from '../../services/api'
 import LocationPickerModal from './LocationPickerModal'
+import { FREQUENCY_OPTIONS, SCHEDULE_OPTIONS, DAYS_OPTIONS, DISTANCE_LABELS } from './planOptions'
 import { geocodeWithGoogle, haversineKm, distanceToRange, routeDistanceKm } from '../../services/clients/geocodingService'
 import { CLUB_LOCATION } from '../../services/transport/transportConstants'
 import { getPlanPricing, getPlanPriceSync, calculateMonthProration } from '../../services/pricing/pricingService'
@@ -22,8 +23,6 @@ import { createTestInstance } from '../../services/api'
 
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
 
-const DISTANCE_LABELS = { '0_to_2km': '0 a 2 km', '2_to_5km': '2 a 5 km', '5_to_10km': '5 a 10 km' }
-
 // Build month options from floorKey ('YYYY-MM') through floor + 6 months.
 function buildEffectiveMonthOptions(floorKey) {
   if (!floorKey) return []
@@ -38,28 +37,6 @@ function buildEffectiveMonthOptions(floorKey) {
   return options
 }
 
-// MOCKED RES - Opciones de planes
-const FREQUENCY_OPTIONS = [
-  { value: '1', label: '1 vez por semana' },
-  { value: '2', label: '2 veces por semana' },
-  { value: '3', label: '3 veces por semana' },
-  { value: '4', label: '4 veces por semana' },
-  { value: '5', label: '5 veces por semana' }
-]
-
-const SCHEDULE_OPTIONS = [
-  { value: 'morning', label: 'Mañana' },
-  { value: 'afternoon', label: 'Tarde' },
-  { value: 'full_day', label: 'Día completo' }
-]
-
-const DAYS_OPTIONS = [
-  { value: 'monday', label: 'Lunes' },
-  { value: 'tuesday', label: 'Martes' },
-  { value: 'wednesday', label: 'Miércoles' },
-  { value: 'thursday', label: 'Jueves' },
-  { value: 'friday', label: 'Viernes' }
-]
 
 // MOCKED RES - Opciones de tier cognitivo
 const COGNITIVE_LEVEL_OPTIONS = [
