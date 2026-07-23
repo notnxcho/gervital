@@ -7,6 +7,7 @@ import {
   useSensors
 } from '@dnd-kit/core'
 import { getChurnBoard, updateChurnStage } from '../../services/churn/churnService'
+import { applyDueReactivations } from '../../services/api'
 import { getReasons } from '../../services/churn/deactivationReasonService'
 import { useAuth } from '../../context/AuthContext'
 import { STAGES } from './churnConstants'
@@ -38,6 +39,8 @@ export default function ChurnBoard() {
   const loadBoard = useCallback(async () => {
     setLoading(true)
     try {
+      // Self-heal: voltea a activo los reintegros programados cuya fecha ya llegó (no hay cron).
+      await applyDueReactivations().catch(() => {})
       const data = await getChurnBoard()
       setCards(data)
     } catch (err) {

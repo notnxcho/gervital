@@ -8,6 +8,7 @@ import { reactivateClient } from '../../services/clients/clientService'
 import { formatCurrency } from '../../utils/format'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
+import ReactivateClientModal from '../Clients/ReactivateClientModal'
 import { STAGE_LABEL, planSubtitle } from './churnConstants'
 
 // A single labeled field in the details grid.
@@ -45,6 +46,7 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, o
   const [body, setBody] = useState('')
   const [saving, setSaving] = useState(false)
   const [reactivating, setReactivating] = useState(false)
+  const [reactivateModal, setReactivateModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [editBody, setEditBody] = useState('')
   const [busyNoteId, setBusyNoteId] = useState(null)
@@ -178,24 +180,23 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, o
     }
   }
 
-  const handleReactivate = async () => {
-    const ok = window.confirm(
-      `¿Reactivar a ${card.firstName} ${card.lastName}? El cliente volverá a estar activo.`
-    )
-    if (!ok) return
+  const handleReactivate = async ({ reactivationDate, plan }) => {
     setReactivating(true)
     try {
-      await reactivateClient(clientId)
+      await reactivateClient(clientId, { reactivationDate, plan })
+      setReactivateModal(false)
       onReactivated?.()
       onClose()
     } catch (err) {
-      console.error('Error reactivating client:', err)
+      console.error('Error reintegrando cliente:', err)
+      alert(err.message)
     } finally {
       setReactivating(false)
     }
   }
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
       onClose={onClose}
@@ -405,13 +406,22 @@ export default function ChurnCardModal({ card, isOpen, onClose, onReactivated, o
         <div className="flex justify-end pt-3 border-t border-gray-100">
           <Button
             variant="success"
-            onClick={handleReactivate}
+            onClick={() => setReactivateModal(true)}
             loading={reactivating}
           >
-            Reactivar cliente
+            Reintegrar cliente
           </Button>
         </div>
       </div>
-    </Modal>
+      </Modal>
+
+      <ReactivateClientModal
+        isOpen={reactivateModal}
+        onClose={() => setReactivateModal(false)}
+        client={{ id: clientId, firstName: card.firstName, lastName: card.lastName, deactivationDate: card.deactivationDate }}
+        onConfirm={handleReactivate}
+        loading={reactivating}
+      />
+    </>
   )
 }

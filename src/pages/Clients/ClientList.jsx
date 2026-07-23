@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Plus, Search, User, Heart, Flash, Calculator } from 'iconoir-react'
 import { differenceInYears, format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { getClients, deactivateClient } from '../../services/api'
+import { getClients, deactivateClient, applyDueReactivations } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { useReasonLabels } from '../../hooks/useReasonLabels'
 import Button from '../../components/ui/Button'
@@ -228,6 +228,8 @@ export default function ClientList() {
   const loadClients = async () => {
     setLoading(true)
     try {
+      // Self-heal: voltea a activo los reintegros programados cuya fecha ya llegó (no hay cron).
+      await applyDueReactivations().catch(() => {})
       const data = await getClients({ includeDeleted: filters.showDeleted === true })
       setClients(data)
     } catch (error) {
