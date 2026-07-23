@@ -133,13 +133,22 @@ export async function deactivateClient(id, { reason, notes, userId, deactivation
 }
 
 /**
- * Reactivate a soft-deleted client.
+ * Reactivate (reintegrar) a client with an effective date and optional new plan.
  * @param {string} id - Client UUID
+ * @param {object} payload
+ * @param {string} payload.reactivationDate - YYYY-MM-DD (must be after the baja date; may be retroactive or future)
+ * @param {object} [payload.plan] - { frequency, schedule, hasTransport, assignedDays, distanceRange }
  * @returns {Promise<object>} The updated client
  */
-export async function reactivateClient(id) {
+export async function reactivateClient(id, { reactivationDate, plan } = {}) {
   const { error } = await supabase.rpc('reactivate_client', {
-    p_client_id: id
+    p_client_id: id,
+    p_reactivation_date: reactivationDate,
+    p_frequency: plan?.frequency ?? null,
+    p_schedule: plan?.schedule ?? null,
+    p_has_transport: plan?.hasTransport ?? null,
+    p_assigned_days: plan?.assignedDays ?? null,
+    p_distance_range: plan?.distanceRange ?? null
   })
 
   if (error) {
@@ -147,6 +156,17 @@ export async function reactivateClient(id) {
   }
 
   return getClientById(id)
+}
+
+/**
+ * Self-heal: flip clients whose scheduled future reactivation date has arrived.
+ * Idempotent and cheap; call on board/list load (there is no cron).
+ * @returns {Promise<number>} Count of clients reactivated
+ */
+export async function applyDueReactivations() {
+  const { data, error } = await supabase.rpc('apply_due_reactivations')
+  if (error) throw new Error(error.message)
+  return data ?? 0
 }
 
 /**

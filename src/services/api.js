@@ -29,6 +29,7 @@ export {
   updateClient,
   deactivateClient,
   reactivateClient,
+  applyDueReactivations,
   updateClientAddressCoords,
   getClientPlanVersions,
   setClientPlanVersion
