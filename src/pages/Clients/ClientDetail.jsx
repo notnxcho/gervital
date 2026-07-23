@@ -44,6 +44,8 @@ import Card, { CardContent, CardHeader } from '../../components/ui/Card'
 import Tabs from '../../components/ui/Tabs'
 import Modal from '../../components/ui/Modal'
 import DeactivateClientModal from './DeactivateClientModal'
+import ReactivateClientModal from './ReactivateClientModal'
+import { isInactiveOn } from '../../services/clients/inactivityPeriods'
 import RecoveryCreditsModal from './RecoveryCreditsModal'
 import ClientTests from './ClientTests'
 import { MARITAL_STATUS_OPTIONS, RESIDENCE_TYPE_OPTIONS, MEDICAL_HISTORY_CONDITIONS, DIAGNOSIS_TYPE_OPTIONS, CHARACTER_OPTIONS } from '../../services/clients/medicalConstants'
@@ -120,6 +122,7 @@ export default function ClientDetail() {
   const [showDiscountModal, setShowDiscountModal] = useState(false)
   const [showPromoModal, setShowPromoModal] = useState(false)
   const [deactivateModal, setDeactivateModal] = useState(false)
+  const [reactivateModal, setReactivateModal] = useState(false)
   const [deactivating, setDeactivating] = useState(false)
   const [reactivating, setReactivating] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -213,13 +216,16 @@ export default function ClientDetail() {
     }
   }
 
-  const handleReactivate = async () => {
+  const handleReactivate = async ({ reactivationDate, plan }) => {
     setReactivating(true)
     try {
-      const updated = await reactivateClient(id)
-      setClient(prev => ({ ...updated, planVersions: prev?.planVersions }))
+      const updated = await reactivateClient(id, { reactivationDate, plan })
+      const versions = await getClientPlanVersions(id).catch(() => null)
+      setClient(prev => ({ ...updated, planVersions: versions ?? prev?.planVersions }))
+      setReactivateModal(false)
     } catch (error) {
-      console.error('Error reactivando cliente:', error)
+      console.error('Error reintegrando cliente:', error)
+      alert(error.message)
     } finally {
       setReactivating(false)
     }
@@ -448,9 +454,14 @@ export default function ClientDetail() {
               Motivo: {reasonLabels[client.deactivationReason] || '—'}
               {client.deactivationNotes && <> · {client.deactivationNotes}</>}
             </p>
+            {client.scheduledReactivationDate && (
+              <p className="text-sm text-amber-800 mt-1">
+                Reintegro programado para {format(new Date(`${client.scheduledReactivationDate}T00:00:00`), "d 'de' MMMM, yyyy", { locale: es })}
+              </p>
+            )}
           </div>
-          <Button variant="secondary" onClick={handleReactivate} loading={reactivating}>
-            Reactivar cliente
+          <Button variant="secondary" onClick={() => setReactivateModal(true)} loading={reactivating}>
+            Reintegrar cliente
           </Button>
         </div>
       )}
@@ -801,6 +812,14 @@ export default function ClientDetail() {
         loading={deactivating}
       />
 
+      <ReactivateClientModal
+        isOpen={reactivateModal}
+        onClose={() => setReactivateModal(false)}
+        client={client}
+        onConfirm={handleReactivate}
+        loading={reactivating}
+      />
+
       <RecoveryCreditsModal
         isOpen={recoveryModalOpen}
         onClose={() => setRecoveryModalOpen(false)}
@@ -880,21 +899,22 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
   // --- Billing calculation (local, for unpaid months) ---
   const clientStart = new Date(client.startDate)
   const effectiveStart = clientStart > monthStart ? clientStart : monthStart
-  // Fecha de baja: desde ese día (inclusive) el cliente ya NO asiste ni se cobra (corte exclusivo).
-  const deactDate = client.deactivationDate ? new Date(`${client.deactivationDate}T00:00:00`) : null
+  // Períodos de inactividad [from, to): días dentro no asisten ni se cobran (cubre la baja vigente
+  // y cualquier gap cerrado por un reintegro pasado).
+  const inactivityPeriods = client.inactivityPeriods || []
 
   const vacationDays = days.filter(d => {
     const dateStr = format(d, 'yyyy-MM-dd')
     const rec = attendance.find(a => a.date === dateStr)
     const name = DAY_INDEX_TO_NAME[getDay(d)]
-    return name && plan.assignedDays.includes(name) && d >= effectiveStart && (!deactDate || d < deactDate) && rec?.status === 'absent' && rec?.isChargeable === false
+    return name && plan.assignedDays.includes(name) && d >= effectiveStart && !isInactiveOn(dateStr, inactivityPeriods) && rec?.status === 'absent' && rec?.isChargeable === false
   }).length
 
   const plannedDays = days.filter(d => {
     const name = DAY_INDEX_TO_NAME[getDay(d)]
     if (!name || !plan.assignedDays.includes(name)) return false
     if (d < effectiveStart) return false
-    if (deactDate && d >= deactDate) return false
+    if (isInactiveOn(format(d, 'yyyy-MM-dd'), inactivityPeriods)) return false
     return true
   }).length
 
@@ -943,8 +963,8 @@ function MonthCard({ client, year, month, invoice, attendance, pricingData, tran
     if (rec?.status === 'recovery') return { status: 'recovery', isJustified: false, isChargeable: true, isAssigned: false }
     if (!isAssigned) return { status: 'not_scheduled', isJustified: false, isChargeable: true, isAssigned: false }
     if (day < clientStart) return { status: 'not_scheduled', isJustified: false, isChargeable: true, isAssigned: false }
-    // Baja: desde la fecha de baja (inclusive) el día ya no cuenta como asistencia ni es cobrable.
-    if (deactDate && day >= deactDate) return { status: 'not_scheduled', isJustified: false, isChargeable: true, isAssigned: false }
+    // Inactividad: días dentro de un período [baja, reintegro) no cuentan como asistencia ni son cobrables.
+    if (isInactiveOn(dateStr, inactivityPeriods)) return { status: 'not_scheduled', isJustified: false, isChargeable: true, isAssigned: false }
     // 'scheduled' es un placeholder derivado de la fecha, no una decisión del usuario. Un registro
     // 'scheduled' persistido para hoy/pasado (ej: quedó de deshacer una vacación futura que ya llegó)
     // no debe congelar el estado: se ignora y se deriva por fecha (hoy y pasado => 'attended').
