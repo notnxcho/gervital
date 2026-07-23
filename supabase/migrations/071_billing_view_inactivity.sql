@@ -31,6 +31,13 @@ BEGIN
   WHERE client_id = p_client_id
     AND effective_from <= _month_start(p_year, p_month)
   ORDER BY effective_from DESC LIMIT 1;
+  -- Meses anteriores a la primera versión: usar la más antigua (los días caen fuera del
+  -- rango efectivo → $0). Preserva el comportamiento previo (no erra si existe algún plan).
+  IF v_plan IS NULL THEN
+    SELECT * INTO v_plan FROM client_plans
+    WHERE client_id = p_client_id
+    ORDER BY effective_from ASC LIMIT 1;
+  END IF;
   IF v_plan IS NULL THEN RETURN jsonb_build_object('error', 'Plan no encontrado'); END IF;
 
   SELECT price_net, price_gross INTO v_plan_price FROM plan_pricing
